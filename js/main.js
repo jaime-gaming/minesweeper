@@ -1302,6 +1302,11 @@ function accion(nombre, repetido = false, datos) {
         mostrarHistoria(app.nivel + 1);
         return;
       }
+      // el epílogo: ↵ hace lo que promete su botón — cerrar y volver a la puerta
+      if (app.pantalla === 'won' && app.modo === 'campaign' && app.nivel === NIVELES.length - 1) {
+        mostrarPortada();
+        return;
+      }
       if (app.pantalla === 'dead' || app.pantalla === 'won') reiniciarPartida();
       return;
     case 'pause':

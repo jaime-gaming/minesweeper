@@ -55,7 +55,7 @@ export const NIVELES = [
   { act: 3, nombreEs: 'el óxido', nombreEn: 'the rust', filas: 14, columnas: 14, minas: 44,
     historiaEs: 'El óxido pinta la roca de sangre seca. Las primeras vetas asoman como vértebras.',
     historiaEn: 'Rust paints the rock with dry blood. The first veins show through like vertebrae.' },
-  { act: 3, nombreEs: 'la luz del farol', nombreEn: 'lantern light', filas: 16, columnas: 16, minas: 40,
+  { act: 3, nombreEs: 'la veta', nombreEn: 'the seam', filas: 16, columnas: 16, minas: 40,
     historiaEs: 'La veta empieza aquí, sangrando luz. A partir de este punto, la montaña manda en las luces.',
     historiaEn: 'The seam begins here, bleeding light. From this point on, the mountain rules the lanterns.' },
   { act: 3, nombreEs: 'galería estrecha', nombreEn: 'narrow gallery', filas: 16, columnas: 16, minas: 48,
