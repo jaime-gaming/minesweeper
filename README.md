@@ -10,7 +10,7 @@ La portada juega sola: una partida automática del siguiente nivel de la Treinta
 
 ## Sonido
 
-Los efectos van sintetizados en tiempo real (sin ficheros). La victoria y la derrota llevan su propia pieza, `Win.mp3` y `Death.mp3`, que entran y salen con fundidos: suenan sobre el estallido o la oleada de banderas y se apagan solas al empezar otra partida o volver a la portada. El interruptor de sonido (y la tecla `M`) las silencia con lo demás.
+Los efectos van sintetizados en tiempo real, salvo el estallido, que usa `audio/Boom.mp3` (recortado a un segundo). La victoria y la derrota llevan su propia pieza, `audio/Win.mp3` y `audio/Death.mp3`, que entran y salen con fundidos: suenan sobre el estallido o la oleada de banderas y se apagan solas al empezar otra partida o volver a la portada. El interruptor de sonido (y la tecla `M`) las silencia con lo demás.
 
 ## Controles
 
@@ -69,6 +69,7 @@ Sin dependencias ni pasos de compilación obligatorios. El JavaScript vive en `j
 ```sh
 node tools/build.mjs     # empaqueta js/*.js → minesweeper.js
 node tools/check.mjs     # pruebas de la lógica del tablero e i18n
+node tools/smoke.mjs     # humo de arranque con DOM simulado
 node serve.mjs 8123      # sirve el sitio en http://0.0.0.0:8123
 ```
 
@@ -78,17 +79,20 @@ node serve.mjs 8123      # sirve el sitio en http://0.0.0.0:8123
 
 ```
 index.html        esqueleto: barra superior, lienzo, capas de menú y arranque roto
-styles.css        la casa: tinta negra, monoespaciada y un único rojo
+styles.css        la casa: tinta negra, monoespaciada, un rojo y un verde
+audio/            Win.mp3 · Death.mp3 · Boom.mp3 (el estallido, por debajo de un segundo)
 js/board.js       reglas puras del buscaminas (sembrar, destapar, acorde); sin DOM
 js/presets.js     las tres dificultades fijas y los límites de la personalizada
 js/engine.js      máquina de estados y dibujado en lienzo (bloques, no suavizado)
 js/input.js       teclado, gestos táctiles y mando; habla en acciones
-js/audio.js       sonido sintetizado por Web Audio: sin ficheros externos
+js/audio.js       efectos por Web Audio; música y estallido desde audio/, con fundidos
 js/i18n.js        textos en ES/EN y slugs de ruta (jugar, campaña, …)
 js/campaign.js    la Treinta: el relato, los actos, los treinta niveles y sus líneas de historia
 js/main.js        pantallas, HUD, récords en localStorage, demo de portada, rutas y arranque
+serve.mjs         servidor estático local (node serve.mjs 8123)
 tools/build.mjs   empaquetador sin dependencias
 tools/check.mjs   pruebas de lógica, sin navegador
+tools/smoke.mjs   humo de arranque: juega una partida con un DOM simulado
 ```
 
 ## Despliegue

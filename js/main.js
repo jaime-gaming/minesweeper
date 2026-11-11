@@ -1,4 +1,4 @@
-import { Game } from './engine.js?v=7';
+import { Game } from './engine.js?v=8';
 import {
   DIFICULTADES,
   DIFICULTAD_POR_DEFECTO,
@@ -7,10 +7,10 @@ import {
   esDificultadFija,
   limitesMinas,
 } from './presets.js?v=1';
-import { audio } from './audio.js?v=3';
+import { audio } from './audio.js?v=4';
 import { attachInput, registrarConversorPunto } from './input.js?v=1';
-import { t, getLanguage, setLanguage, unitMinas, routeSlug, routeWords } from './i18n.js?v=7';
-import { NIVELES, ACTOS, configNivel, nivelCampana, actoDe } from './campaign.js?v=6';
+import { t, getLanguage, setLanguage, unitMinas, routeSlug, routeWords } from './i18n.js?v=8';
+import { NIVELES, ACTOS, configNivel, nivelCampana, actoDe } from './campaign.js?v=7';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -548,12 +548,13 @@ function renderDemo() {
 }
 /* ------------------------------------------------------------ pantallas */
 
-function filaHTML({ accion = null, campo = null, idx, nombre, detalle = '', derecha = '', peligro = false, stat = false, dim = false, acento = false, titulo = '' }) {
+function filaHTML({ accion = null, campo = null, idx, nombre, detalle = '', derecha = '', peligro = false, stat = false, dim = false, acento = false, hecho = false, titulo = '' }) {
   const clases = ['row'];
   if (peligro) clases.push('peligro');
   if (stat) clases.push('stat');
   if (dim) clases.push('dim');
   if (acento) clases.push('acento');
+  if (hecho) clases.push('hecho');
   const attrs = ['type="button"', `class="${clases.join(' ')}"`];
   if (accion) attrs.push(`data-accion="${accion}"`);
   if (campo) attrs.push(`data-campo="${campo}"`);
@@ -671,6 +672,7 @@ function mostrarCampaña() {
           detalle,
           derecha,
           acento: esSiguiente && mejor === 0,
+          hecho: mejor > 0,
           titulo: esSiguiente && mejor === 0 ? t('campaignHere') : '',
         }));
       } else {
@@ -936,7 +938,7 @@ function eventosJuego(tipo, datos) {
       }
       setTimeout(() => {
         if (app.juego === j && j.estado === 'perdido') mostrarFinPerdida();
-      }, 480);
+      }, 900);
       break;
     }
     case 'win':

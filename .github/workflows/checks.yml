@@ -23,3 +23,5 @@ jobs:
         run: node tools/build.mjs --check
       - name: Run game tests
         run: node tools/check.mjs
+      - name: Smoke boot and self-play
+        run: node tools/smoke.mjs

@@ -36,7 +36,7 @@ npx wrangler deploy
 `_headers` (Pages) marca el HTML como `no-store`. En Workers, el HTML se sirve
 sin caché por defecto; si tienes una regla de caché para todo el sitio, excluye
 `/` y `/index.html`, o purga tras cada despliegue. Los assets llevan sello
-`?v=1` para que un cambio de CSS/JS no reutilice la copia anterior: súbelo en
+`?v=N` para que un cambio de CSS/JS no reutilice la copia anterior: súbelo en
 `index.html` cuando toques `styles.css` o `minesweeper.js`.
 
 ## Antes de publicar

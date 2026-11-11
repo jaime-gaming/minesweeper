@@ -1,5 +1,6 @@
 // Sonido sintetizado en tiempo real para los efectos; la victoria y la
-// derrota llevan su propia pieza (Win.mp3 / Death.mp3, en la raíz del repo).
+// derrota llevan su propia pieza (audio/Win.mp3 / audio/Death.mp3), y el
+// estallido usa audio/Boom.mp3 (recortado a menos de un segundo).
 
 let ctx = null;
 let master = null;
@@ -40,6 +41,7 @@ function build() {
     noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate);
     const data = noiseBuf.getChannelData(0);
     for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    precargarEfectos();
     return ctx;
   } catch (err) {
     // Sin audio se puede jugar con normalidad.
@@ -99,6 +101,21 @@ function ruido(dur, opts = {}) {
   src.stop(t0 + dur + 0.02);
 }
 
+function boomSintetico() {
+    // capa 1 — el estruendo: ruido ancho que cae en barrido largo
+    ruido(1.7, { desde: 1050, hasta: 52, vol: 0.5, ataque: 0.002 });
+    // capa 2 — el cuerpo: un sub que muere muy abajo, como la onda de presión
+    tono(57, 1.25, { tipo: 'sine', vol: 0.42, fin: 29, release: 0.6 });
+    // capa 3 — el crack metálico: el chasquido que rompe el aire
+    tono(150, 0.2, { tipo: 'sawtooth', vol: 0.28, fin: 58 });
+    tono(320, 0.09, { tipo: 'square', vol: 0.12, fin: 180, delay: 0.012 });
+    // capa 4 — los escombros: metralla breve justo por encima, con retardo
+    ruido(0.42, { desde: 3400, hasta: 640, vol: 0.17, delay: 0.085, ataque: 0.004 });
+    // capa 5 — el eco en el valle: casi nada, pero sigue vivo un segundo
+    ruido(1.15, { desde: 320, hasta: 58, vol: 0.2, delay: 0.27 });
+    tono(41, 0.9, { tipo: 'triangle', vol: 0.15, fin: 26, delay: 0.22, release: 0.5 });
+}
+
 function secuencia(frecuencias, opts = {}) {
   const { tipo = 'triangle', dur = 0.075, vol = 0.12, salto = 0.045 } = opts;
   frecuencias.forEach((freq, i) => tono(freq, dur, {
@@ -109,9 +126,36 @@ function secuencia(frecuencias, opts = {}) {
 }
 
 const MUSICA = {
-  win: 'Win.mp3',
-  death: 'Death.mp3',
+  win: 'audio/Win.mp3',
+  death: 'audio/Death.mp3',
 };
+
+// el estallido real del jugador; si no carga, la explosión sintética lo sustituye
+const EFECTOS = {
+  boom: 'audio/Boom.mp3',
+};
+
+const buffersFx = new Map(); // nombre -> Promise<AudioBuffer>
+const fxListos = new Map();  // nombre -> AudioBuffer ya decodificado
+
+function precargarEfectos() {
+  if (!ctx) return;
+  for (const nombre of Object.keys(EFECTOS)) {
+    if (buffersFx.has(nombre)) continue;
+    const peticion = fetch(EFECTOS[nombre])
+      .then((r) => {
+        if (!r.ok) throw new Error(`audio ${r.status}`);
+        return r.arrayBuffer();
+      })
+      .then((ab) => ctx.decodeAudioData(ab))
+      .then((buf) => {
+        fxListos.set(nombre, buf);
+        return buf;
+      });
+    buffersFx.set(nombre, peticion);
+    peticion.catch(() => buffersFx.delete(nombre));
+  }
+}
 
 const buffersMusica = new Map();
 let actual = null; // { src, gan, nombre }
@@ -173,18 +217,22 @@ const SONIDOS = {
     tono(540, 0.035, { tipo: 'square', vol: 0.06, fin: 430 });
   },
   boom() {
-    // capa 1 — el estruendo: ruido ancho que cae en barrido largo
-    ruido(1.7, { desde: 1050, hasta: 52, vol: 0.5, ataque: 0.002 });
-    // capa 2 — el cuerpo: un sub que muere muy abajo, como la onda de presión
-    tono(57, 1.25, { tipo: 'sine', vol: 0.42, fin: 29, release: 0.6 });
-    // capa 3 — el crack metálico: el chasquido que rompe el aire
-    tono(150, 0.2, { tipo: 'sawtooth', vol: 0.28, fin: 58 });
-    tono(320, 0.09, { tipo: 'square', vol: 0.12, fin: 180, delay: 0.012 });
-    // capa 4 — los escombros: metralla breve justo por encima, con retardo
-    ruido(0.42, { desde: 3400, hasta: 640, vol: 0.17, delay: 0.085, ataque: 0.004 });
-    // capa 5 — el eco en el valle: casi nada, pero sigue vivo un segundo
-    ruido(1.15, { desde: 320, hasta: 58, vol: 0.2, delay: 0.27 });
-    tono(41, 0.9, { tipo: 'triangle', vol: 0.15, fin: 26, delay: 0.22, release: 0.5 });
+    const c = ctx;
+    const buf = fxListos.get('boom');
+    if (c && buf) {
+      try {
+        const src = c.createBufferSource();
+        const gan = c.createGain();
+        gan.gain.value = 0.9;
+        src.buffer = buf;
+        src.connect(gan).connect(master);
+        src.start(c.currentTime + 0.001);
+        return;
+      } catch (err) {
+        /* si el estallido del archivo falla, suena la síntesis */
+      }
+    }
+    boomSintetico();
   },
   win() {
     secuencia([523, 659, 784, 1047, 1319], { dur: 0.13, vol: 0.13, salto: 0.075 });
