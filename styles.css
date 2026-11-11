@@ -1205,12 +1205,12 @@ button.foco {
     #000 92%);
   justify-content: flex-end;
   padding-bottom: 0;
-  /* la barra sube desde abajo; el velo entra con una transición más lenta */
-  transition: opacity 0.38s ease, visibility 0.38s;
+  /* mientras la pieza de derrota entra (1.5 s), el velo lo hace también */
+  transition: opacity 1.2s ease, visibility 1.2s;
 }
 
 .panel.fin-muerte {
-  animation: subir-muerte 0.42s cubic-bezier(0.2, 0.75, 0.25, 1) 0.07s backwards;
+  animation: subir-muerte 1.25s cubic-bezier(0.16, 0.84, 0.3, 1) 0.18s backwards;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
@@ -1290,7 +1290,7 @@ button.foco {
 @keyframes subir-muerte {
   from {
     opacity: 0;
-    transform: translateY(30px);
+    transform: translateY(24px);
   }
   to {
     opacity: 1;

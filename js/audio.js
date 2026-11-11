@@ -36,7 +36,7 @@ function build() {
       master.connect(ctx.destination);
     }
 
-    const len = Math.floor(ctx.sampleRate * 0.3);
+    const len = Math.floor(ctx.sampleRate * 2); // 2 s: la explosión respira
     noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate);
     const data = noiseBuf.getChannelData(0);
     for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
@@ -84,13 +84,14 @@ function ruido(dur, opts = {}) {
   const filtro = c.createBiquadFilter();
   const gan = c.createGain();
   const volumen = Math.max(0.0001, opts.vol ?? 0.28);
+  const ataque = Math.max(0.001, opts.ataque ?? Math.min(0.008, dur * 0.2));
 
   src.buffer = noiseBuf;
   filtro.type = 'lowpass';
   filtro.frequency.setValueAtTime(opts.desde || 2400, t0);
   filtro.frequency.exponentialRampToValueAtTime(opts.hasta || 120, t0 + dur);
   gan.gain.setValueAtTime(0.0001, t0);
-  gan.gain.exponentialRampToValueAtTime(volumen, t0 + Math.min(0.008, dur * 0.2));
+  gan.gain.exponentialRampToValueAtTime(volumen, t0 + ataque);
   gan.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
 
   src.connect(filtro).connect(gan).connect(master);
@@ -141,8 +142,8 @@ function detenerMusicaActual(fade = 0.35) {
     const t = c.currentTime;
     gan.gain.cancelScheduledValues(t);
     gan.gain.setValueAtTime(Math.max(0.0001, gan.gain.value), t);
-    gan.gain.setTargetAtTime(0.0001, t, fade / 3);
-    src.stop(t + fade + 0.1);
+    gan.gain.setTargetAtTime(0.0001, t, fade / 4);
+    src.stop(t + fade + 0.25);
   } catch (err) {
     try { src.stop(); } catch (err2) { /* silencio */ }
   }
@@ -172,9 +173,18 @@ const SONIDOS = {
     tono(540, 0.035, { tipo: 'square', vol: 0.06, fin: 430 });
   },
   boom() {
-    ruido(0.34, { desde: 2600, hasta: 80, vol: 0.3 });
-    tono(190, 0.34, { tipo: 'sawtooth', vol: 0.17, fin: 48 });
-    tono(120, 0.3, { tipo: 'triangle', vol: 0.12, fin: 40, delay: 0.03 });
+    // capa 1 — el estruendo: ruido ancho que cae en barrido largo
+    ruido(1.7, { desde: 1050, hasta: 52, vol: 0.5, ataque: 0.002 });
+    // capa 2 — el cuerpo: un sub que muere muy abajo, como la onda de presión
+    tono(57, 1.25, { tipo: 'sine', vol: 0.42, fin: 29, release: 0.6 });
+    // capa 3 — el crack metálico: el chasquido que rompe el aire
+    tono(150, 0.2, { tipo: 'sawtooth', vol: 0.28, fin: 58 });
+    tono(320, 0.09, { tipo: 'square', vol: 0.12, fin: 180, delay: 0.012 });
+    // capa 4 — los escombros: metralla breve justo por encima, con retardo
+    ruido(0.42, { desde: 3400, hasta: 640, vol: 0.17, delay: 0.085, ataque: 0.004 });
+    // capa 5 — el eco en el valle: casi nada, pero sigue vivo un segundo
+    ruido(1.15, { desde: 320, hasta: 58, vol: 0.2, delay: 0.27 });
+    tono(41, 0.9, { tipo: 'triangle', vol: 0.15, fin: 26, delay: 0.22, release: 0.5 });
   },
   win() {
     secuencia([523, 659, 784, 1047, 1319], { dur: 0.13, vol: 0.13, salto: 0.075 });
@@ -220,17 +230,17 @@ export const audio = {
   },
 
   // fanfarria de victoria o derrota: entra con fade, sale al siguiente paso
-  musica(nombre, retardoMs = 0) {
+  musica(nombre, retardoMs = 0, fundido = 1.2) {
     if (!this.enabled || !MUSICA[nombre]) return;
     const c = build();
     if (!c) return;
-    detenerMusicaActual(0.3);
+    detenerMusicaActual(0.85);
     const gen = generacion;
     cargarMusica(nombre).then((buf) => {
       if (gen !== generacion || !this.enabled) return; // se pidió otra cosa entretanto
       const gan = c.createGain();
       gan.gain.setValueAtTime(0.0001, c.currentTime);
-      gan.gain.exponentialRampToValueAtTime(1, c.currentTime + 0.45);
+      gan.gain.exponentialRampToValueAtTime(1, c.currentTime + Math.max(0.05, fundido));
       const src = c.createBufferSource();
       src.buffer = buf;
       src.connect(gan).connect(musicGain);
@@ -245,7 +255,7 @@ export const audio = {
   },
 
   // transición fuera de la fanfarria: al empezar una partida o volver al menú
-  pararMusica(fade = 0.35) {
+  pararMusica(fade = 0.9) {
     detenerMusicaActual(fade);
   },
 

@@ -1,4 +1,4 @@
-import { Game } from './engine.js?v=6';
+import { Game } from './engine.js?v=7';
 import {
   DIFICULTADES,
   DIFICULTAD_POR_DEFECTO,
@@ -7,10 +7,10 @@ import {
   esDificultadFija,
   limitesMinas,
 } from './presets.js?v=1';
-import { audio } from './audio.js?v=2';
+import { audio } from './audio.js?v=3';
 import { attachInput, registrarConversorPunto } from './input.js?v=1';
-import { t, getLanguage, setLanguage, unitMinas, routeSlug, routeWords } from './i18n.js?v=6';
-import { NIVELES, ACTOS, configNivel, nivelCampana, actoDe } from './campaign.js?v=5';
+import { t, getLanguage, setLanguage, unitMinas, routeSlug, routeWords } from './i18n.js?v=7';
+import { NIVELES, ACTOS, configNivel, nivelCampana, actoDe } from './campaign.js?v=6';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -575,7 +575,7 @@ function cabeceraPanel(titulo, extra = '') {
 const botonVolver = () => `<button class="ghost" type="button" data-accion="back">${t('back')}<kbd>Esc</kbd></button>`;
 
 function mostrarPortada() {
-  audio.pararMusica(0.4); // transición: adiós a la fanfarria
+  audio.pararMusica(1.0); // transición: adiós a la fanfarria
   app.juego = null;
   app.contado = false;
   const hechos = campañaHechos();
@@ -827,7 +827,7 @@ function empezarPartida(modo, nivel = null) {
     mostrarCampaña();
     return;
   }
-  audio.pararMusica(0.3); // transición: la fanfarria anterior se apaga sola
+  audio.pararMusica(0.9); // transición: la fanfarria anterior se apaga sola
   app.juego = new Game(cfg, eventosJuego);
   app.record = false;
   app.contado = false;
@@ -927,7 +927,7 @@ function eventosJuego(tipo, datos) {
       contabilizarFin(false);
       audio.play('boom');
       if (typeof navigator.vibrate === 'function') navigator.vibrate([50, 40, 90]);
-      audio.musica('death', 120);
+      audio.musica('death', 200, 1.5);
       const destello = document.getElementById('flash');
       if (destello) {
         destello.classList.remove('activo');
@@ -942,7 +942,7 @@ function eventosJuego(tipo, datos) {
     case 'win':
       contabilizarFin(true);
       audio.play('win');
-      audio.musica('win', 100);
+      audio.musica('win', 150, 1.1);
       if (app.record) setTimeout(() => audio.play('record'), 430);
       setTimeout(() => {
         if (app.juego === j && j.estado === 'ganado') mostrarFinGanada();
