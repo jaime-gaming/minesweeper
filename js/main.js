@@ -1,4 +1,4 @@
-import { Game } from './engine.js?v=3';
+import { Game } from './engine.js?v=4';
 import {
   DIFICULTADES,
   DIFICULTAD_POR_DEFECTO,
@@ -9,8 +9,8 @@ import {
 } from './presets.js?v=1';
 import { audio } from './audio.js?v=1';
 import { attachInput, registrarConversorPunto } from './input.js?v=1';
-import { t, getLanguage, setLanguage, unitMinas, routeSlug, routeWords } from './i18n.js?v=3';
-import { NIVELES, ACTOS, configNivel, nivelCampana, actoDe } from './campaign.js?v=2';
+import { t, getLanguage, setLanguage, unitMinas, routeSlug, routeWords } from './i18n.js?v=4';
+import { NIVELES, ACTOS, configNivel, nivelCampana, actoDe } from './campaign.js?v=3';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -191,7 +191,8 @@ function esTactil() {
 const FOCO_SEL = '.row:not(.stat), .acciones button';
 let focoIndice = -1;
 
-function ponerOverlay(html) {
+function ponerOverlay(html, variante) {
+  el.overlay.classList.toggle('muerte', variante === 'muerte');
   if (!html) {
     el.overlay.classList.remove('abierto');
     el.overlay.innerHTML = '';
@@ -422,7 +423,7 @@ function conversorDePuntos(clientX, clientY) {
 // la mina se despeja sola mientras decides qué jugar
 
 function nivelDemo() {
-  return campañaSiguiente(); // primer nivel sin superar; el corazón si ya los tienes todos
+  return campañaSiguiente(); // primer nivel sin superar; el último campo si ya los tienes todos
 }
 
 function crearDemo() {
@@ -695,6 +696,7 @@ function mostrarHistoria(indice) {
   ponerOverlay(`<div class="panel historia">
     <p class="kicker">${t('actLabel', { n: acto.id, name: nombreActoTxt })} · ${t('levelCell', { n: indice + 1 })}</p>
     <h2 class="historia-titulo">${nombre}</h2>
+    <p class="historia-dossier">${t('storyDossier')}</p>
     <p class="historia-texto">${texto}</p>
     <div class="acciones">
       <button class="principal" type="button" data-accion="descend"><span>${completado ? t('descendAgain') : t('descend')}</span><kbd>↵</kbd></button>
@@ -900,14 +902,21 @@ function eventosJuego(tipo, datos) {
     case 'unflag':
       audio.play('unflag');
       break;
-    case 'boom':
+    case 'boom': {
       contabilizarFin(false);
       audio.play('boom');
       if (typeof navigator.vibrate === 'function') navigator.vibrate([50, 40, 90]);
+      const destello = document.getElementById('flash');
+      if (destello) {
+        destello.classList.remove('activo');
+        void destello.offsetWidth; // reinicia la animación si quedaba a medias
+        destello.classList.add('activo');
+      }
       setTimeout(() => {
         if (app.juego === j && j.estado === 'perdido') mostrarFinPerdida();
       }, 750);
       break;
+    }
     case 'win':
       contabilizarFin(true);
       audio.play('win');
@@ -959,7 +968,7 @@ function mostrarFinGanada() {
       ? `<span class="record-tag">${t('newRecord')}</span>`
       : `<span>${t('yourRecord', { time: formatoTiempo(bestMs) })}</span>`;
   if (enCampaña && app.nivel === NIVELES.length - 1) {
-    // se cerró el corazón: epílogo del viaje
+    // se cerró el último campo: epílogo del viaje
     ponerOverlay(`<div class="panel fin">
       <header class="fin-cabeza">
         <p class="kicker">${t('epilogueKicker')}</p>
@@ -992,16 +1001,16 @@ function mostrarFinGanada() {
 function mostrarFinPerdida() {
   const j = app.juego;
   if (!j) return;
-  ponerOverlay(`<div class="panel fin">
+  ponerOverlay(`<div class="panel fin-muerte">
     <header class="fin-cabeza">
       <p class="kicker">${etiquetaPartida()}</p>
       <h2 class="cifra derrota">${t('youLost')}</h2>
+      <p class="nota">${formatoTiempo(j.tiempoMs)} · ${t('minesExploded', { count: j.cfg.minas })}</p>
     </header>
-    <p class="nota">${formatoTiempo(j.tiempoMs)} · ${t('minesExploded', { count: j.cfg.minas })}</p>
     <div class="acciones">
       ${accionesFin({ hayMas: false })}
     </div>
-  </div>`);
+  </div>`, 'muerte');
   pantalla('dead');
   enfocarPrimero();
 }

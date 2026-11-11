@@ -1,4 +1,4 @@
-/* minesweeper — un solo fichero, sin módulos. generado por tools/build.mjs (2026-11-11 · v3).
+/* minesweeper — un solo fichero, sin módulos. generado por tools/build.mjs (2026-11-11 · v4).
    no lo edites a mano: cambia js/*.js y vuelve a ejecutar node tools/build.mjs */
 (function () {
 'use strict';
@@ -216,6 +216,14 @@ class Tablero {
 
     const gano = this._comprobarVictoria();
     return { reveladas: cosecha, explosion: -1, victoria: gano };
+  }
+
+  // al perder, destapa el tablero entero: la partida ha terminado y el
+  // campo queda a la vista, como un mapa que ya no sirve a nadie
+  revelarTodo() {
+    for (const celda of this.celdas) {
+      celda.revelada = true;
+    }
   }
 
   // pone o quita la bandera. devuelve 'bandera' | 'sin-bandera' | null.
@@ -769,6 +777,7 @@ class Game {
       this.estado = 'perdido';
       this.explosionT = ahora;
       this.shake = 16;
+      this.tablero.revelarTodo(); // el campo queda al descubierto
       this.emit('boom', { indice: resultado.explosion });
       return;
     }
@@ -979,34 +988,17 @@ class Game {
   }
 
   _celdaCerrada(ctx, X, Y, lado, gap, hover) {
+    // bloque plano: la rejilla la marcan los huecos negros, como en snake
     const ix = X + gap;
     const iy = Y + gap;
     const w = lado - gap * 2;
-    // bloque de roca: cuerpo, plano de luz arriba y plano de sombra abajo,
-    // más un filo interior para que el bisel se lea también en casillas grandes
-    ctx.fillStyle = hover ? '#1e1e1e' : '#151515';
+    ctx.fillStyle = hover ? '#1d1d1d' : '#111111';
     ctx.fillRect(ix, iy, w, w);
-    ctx.fillStyle = hover ? '#2b2b2b' : '#222222';
-    ctx.fillRect(ix, iy, w, 1);
-    ctx.fillRect(ix, iy, 1, w);
-    ctx.fillStyle = hover ? '#383838' : '#2e2e2e';
-    ctx.fillRect(ix + 1, iy + 1, w - 2, 1);
-    ctx.fillRect(ix + 1, iy + 1, 1, w - 2);
-    ctx.fillStyle = '#040404';
-    ctx.fillRect(ix, iy + w - 1, w, 1);
-    ctx.fillRect(ix + w - 1, iy, 1, w);
-    ctx.fillStyle = hover ? '#101010' : '#0d0d0d';
-    ctx.fillRect(ix + 1, iy + w - 2, w - 2, 1);
-    ctx.fillRect(ix + w - 2, iy + 1, 1, w - 2);
   }
 
   _celdaAbierta(ctx, X, Y, lado, gap, celda, i, forzada = false) {
     ctx.fillStyle = '#070707';
     ctx.fillRect(X + gap, Y + gap, lado - gap * 2, lado - gap * 2);
-    // un rasgo hundido arriba: la casilla abierta se hunde en la hoja
-    ctx.fillStyle = '#050505';
-    ctx.fillRect(X + gap, Y + gap, lado - gap * 2, 1);
-    ctx.fillRect(X + gap, Y + gap, 1, lado - gap * 2);
 
     if (celda.mina) {
       this._mina(ctx, X, Y, lado, '#f2f2f2');
@@ -1136,9 +1128,9 @@ const KEY = 'minesweeper.language';
 const STRINGS = {
   es: {
     documentTitle: 'Minesweeper',
-    description: 'Buscaminas de bloques en blanco y negro con una historia en treinta niveles: la Treinta. Tres dificultades, banderas y récords locales.',
+    description: 'Buscaminas de bloques en blanco y negro: la historia de un recluta en treinta campos minados. Tres dificultades, banderas y récords locales.',
     language: 'Idioma',
-    brandTagline: 'el buscaminas de bloques en blanco y negro.',
+    brandTagline: 'treinta campos entre tú y tu casa.',
     sound: 'sonido',
     soundOn: 'activado',
     soundOff: 'silenciado',
@@ -1249,24 +1241,25 @@ const STRINGS = {
     hintHelp: 'Esc vuelve',
     hintSettings: 'M silencia · Esc vuelve',
     hintCampaign: 'elige nivel · ↵ ve la historia · Esc vuelve',
-    hintStory: '↵ descender · Esc vuelve',
+    hintStory: '↵ marchar · Esc vuelve',
     // campaña · la treinta
     campaign: 'campaña',
-    campaignTag: 'la treinta · una historia en treinta niveles',
+    campaignTag: 'la treinta · una historia en treinta campos',
     campaignLocked: 'cierra primero el nivel anterior',
     campaignCleared: 'nivel despejado',
     campaignNext: 'siguiente capítulo',
     campaignHud: 'nivel {n} · {name}',
-    campaignTagShort: 'elige tu descenso',
-    campaignPrologue: 'treinta niveles separan la luz del corazón de piedra. tu padre bajó primero. tú bajas detrás.',
+    campaignTagShort: 'op. treinta',
+    campaignPrologue: 'la guerra empezó lejos y despacio. ahora ha llamado a tu puerta: una carta con tu nombre y un número de expediente. nadie recuerda haberse ofrecido. nadie pregunta. treinta campos te separan de la vuelta a casa; esta es la historia de los que caminaron antes que tú.',
     actLabel: 'acto {n} · {name}',
     levelCell: 'nivel {n}',
-    descend: 'descender',
-    descendAgain: 'volver a descender',
-    epilogueKicker: 'epílogo',
-    epilogueTitle: 'el filón padre es tuyo.',
-    epilogueText: 'treinta niveles por un nombre. el filón padre no era metal: era tu padre esperando en la oscuridad. subís juntos a la boca, y la luz ya no tiembla.',
-    epilogueCta: 'volver a la boca',
+    descend: 'marchar',
+    storyDossier: 'exp. nº 0042-a',
+    descendAgain: 'volver a marchar',
+    epilogueKicker: 'el final del campo',
+    epilogueTitle: 'has vuelto.',
+    epilogueText: 'el último campo es el más silencioso. nadie aplaude; alguien anota tu nombre en un parte que nadie leerá. en algún sitio suena un tren, y esta vez es para ti. treinta campos quedan atrás; una parte de ti se queda en ellos. bienvenido a casa.',
+    epilogueCta: 'volver a la puerta',
     statsCampaign: 'campaña',
     statsCampaignTag: 'niveles despejados',
     preview: 'vista previa',
@@ -1274,12 +1267,12 @@ const STRINGS = {
     // ayuda completa
     modesTitle: 'modos',
     modeRule1: 'jugar: principiante, intermedio, experto y una personalizada. las tres fijas guardan su récord.',
-    modeRule2: 'campaña · la treinta: una historia en treinta niveles, de la boca al corazón de piedra. completar uno abre el siguiente.',
+    modeRule2: 'campaña · la treinta: una historia en treinta campos minados, del alistamiento a la vuelta. completar uno abre el siguiente.',
     modeRule3: 'cada nivel cuenta una línea del relato. el perfil guarda tu mejor tiempo en cada uno y cuenta tus victorias y rachas.',
     campaignRulesTitle: 'la treinta',
-    campaignRule1: 'desciende acto a acto: el exterior, las galerías, el filón y el corazón. de seis por seis a veinticuatro por treinta.',
+    campaignRule1: 'avanza acto a acto: el alistamiento, el frente, la operación y el final del campo. de seis por seis a veinticuatro por treinta.',
     campaignRule2: 'completar un nivel abre el siguiente; no hay estrellas, sólo tu mejor tiempo en cada casilla.',
-    campaignRule3: 'tu padre bajó antes que tú. en cada nivel hay una línea del relato; léetela antes de picar.',
+    campaignRule3: 'te reclutaron y marchaste. en cada nivel hay una línea del relato; léetela antes de picar.',
     ctrlNavigate: 'moverse por los menús y ajustar los pasos',
     ctrlHelp: 'abrir y cerrar la ayuda',
     ctrlScroll: 'desplazar los paneles largos',
@@ -1296,9 +1289,9 @@ const STRINGS = {
   },
   en: {
     documentTitle: 'Minesweeper',
-    description: 'A black-and-white block minesweeper with a story in thirty levels: The Thirty. Three difficulties, flags and local records.',
+    description: 'A black-and-white block minesweeper: the story of a conscript across thirty mined fields. Three difficulties, flags and local records.',
     language: 'Language',
-    brandTagline: 'thirty levels separate the light from the stone heart.',
+    brandTagline: 'thirty fields between you and home.',
     sound: 'sound',
     soundOn: 'on',
     soundOff: 'muted',
@@ -1409,24 +1402,25 @@ const STRINGS = {
     hintHelp: 'Esc goes back',
     hintSettings: 'M mutes · Esc goes back',
     hintCampaign: 'pick a level · ↵ reads the story · Esc goes back',
-    hintStory: '↵ descend · Esc goes back',
+    hintStory: '↵ march · Esc goes back',
     // campaign · the thirty
     campaign: 'campaign',
-    campaignTag: 'the thirty · a story in thirty levels',
+    campaignTag: 'the thirty · a story in thirty fields',
     campaignLocked: 'beat the previous level first',
     campaignCleared: 'level cleared',
     campaignNext: 'next chapter',
     campaignHud: 'level {n} · {name}',
-    campaignTagShort: 'choose your descent',
-    campaignPrologue: 'thirty levels stand between the light and the stone heart. your father went in first. you follow.',
+    campaignTagShort: 'op. thirty',
+    campaignPrologue: 'the war began far away and slowly. now it has knocked on your door: a letter with your name and a file number. nobody remembers volunteering. nobody asks. thirty fields stand between you and home; this is the story of those who walked before you.',
     actLabel: 'act {n} · {name}',
     levelCell: 'level {n}',
-    descend: 'descend',
-    descendAgain: 'descend again',
-    epilogueKicker: 'epilogue',
-    epilogueTitle: 'the father lode is yours.',
-    epilogueText: 'thirty levels for a name. the father lode was never metal: it was your father waiting in the dark. you walk up together, and the light no longer trembles.',
-    epilogueCta: 'back to the mouth',
+    descend: 'march',
+    storyDossier: 'file № 0042-a',
+    descendAgain: 'march again',
+    epilogueKicker: 'the end of the field',
+    epilogueTitle: 'you made it home.',
+    epilogueText: 'the last field is the quietest. nobody applauds; someone writes your name in a report nobody will read. somewhere a train sounds, and this time it is for you. thirty fields lie behind you; a part of you stays in them. welcome home.',
+    epilogueCta: 'back to the doorway',
     statsCampaign: 'campaign',
     statsCampaignTag: 'levels cleared',
     preview: 'preview',
@@ -1434,12 +1428,12 @@ const STRINGS = {
     // full help
     modesTitle: 'modes',
     modeRule1: 'play: beginner, intermediate, expert and a custom board. the three fixed ones keep their records.',
-    modeRule2: 'campaign · the thirty: a story in thirty levels, from the mouth to the stone heart. clearing one opens the next.',
+    modeRule2: 'campaign · the thirty: a story in thirty mined fields, from enlistment to homecoming. clearing one opens the next.',
     modeRule3: 'each level tells one line of the tale. the profile keeps your best time on each and counts your wins and streaks.',
     campaignRulesTitle: 'the thirty',
-    campaignRule1: 'descend act by act: the outside, the galleries, the vein and the heart — from six by six to twenty-four by thirty.',
+    campaignRule1: 'advance act by act: enlistment, the front, the operation and the end of the field — from six by six to twenty-four by thirty.',
     campaignRule2: 'clearing a level unlocks the next one; no stars, just your best time on every tile.',
-    campaignRule3: 'your father went in before you. each level holds a line of the story; read it before you dig.',
+    campaignRule3: 'you were recruited and you marched. each level holds a line of the story; read it before you dig.',
     ctrlNavigate: 'move through menus and adjust steps',
     ctrlHelp: 'open and close help',
     ctrlScroll: 'scroll the long panels',
@@ -1529,114 +1523,114 @@ function routeWords() {
 (function (modulo) {
 'use strict';
 // la treinta — el modo historia del juego.
-// treinta niveles en cuatro actos, con su pequeña historia:
-// tu padre bajó a la mina antes que tú. tú bajas a buscarlo.
-// cada nivel guarda una línea del relato; las citas van en ES y EN.
+// treinta campos minados en cuatro actos, con un solo relato lineal:
+// la guerra llamó a tu puerta. nadie pregunta por qué. nadie se ofrece.
+// cada nivel guarda una línea del avance; las citas van en ES y EN.
 //
 // los niveles fijan tamaño y minas; completar uno abre el siguiente.
 
 const ACTOS = [
-  { id: 1, inicio: 0, nombreEs: 'el exterior', nombreEn: 'the outside', subEs: 'la puerta de madera y los tres que no volvieron', subEn: 'the wooden door and the three who never came back' },
-  { id: 2, inicio: 6, nombreEs: 'las galerías', nombreEn: 'the galleries', subEs: 'los relevos, los raíles y el recado', subEn: 'the shifts, the rails and the note' },
-  { id: 3, inicio: 12, nombreEs: 'el filón', nombreEn: 'the vein', subEs: 'la veta empieza a cantar', subEn: 'the seam begins to sing' },
-  { id: 4, inicio: 18, nombreEs: 'el corazón', nombreEn: 'the heart', subEs: 'el corazón late bajo la piedra', subEn: 'the heart beats beneath the stone' },
+  { id: 1, inicio: 0, nombreEs: 'alistamiento', nombreEn: 'enlistment', subEs: 'la carta y el juramento', subEn: 'the letter and the oath' },
+  { id: 2, inicio: 6, nombreEs: 'el frente', nombreEn: 'the front', subEs: 'la zona minada', subEn: 'the mined zone' },
+  { id: 3, inicio: 12, nombreEs: 'la operación', nombreEn: 'the operation', subEs: 'operación puente', subEn: 'operation bridge' },
+  { id: 4, inicio: 18, nombreEs: 'el final del campo', nombreEn: 'the end of the field', subEs: 'la vuelta', subEn: 'the way back' },
 ];
 
 const NIVELES = [
-  // acto I — el exterior
-  { act: 1, nombreEs: 'la boca', nombreEn: 'the mouth', filas: 6, columnas: 6, minas: 6,
-    historiaEs: 'El viento empuja la puerta de madera y el cerro se traga la luz. Tu padre bajó hace tres días. Sus botas siguen en el barro.',
-    historiaEn: 'The wind pushes the wooden door and the hill swallows the light. Your father went down three days ago. His boots are still in the mud.' },
-  { act: 1, nombreEs: 'el sendero', nombreEn: 'the path', filas: 7, columnas: 7, minas: 9,
-    historiaEs: 'El camino de grava baja en espiral. Alguien clavó clavos en la corteza de los castaños para marcar la dirección.',
-    historiaEn: 'The gravel path spirals downward. Someone nailed spikes into the chestnut bark to mark the way.' },
-  { act: 1, nombreEs: 'primer desmonte', nombreEn: 'first cut', filas: 8, columnas: 8, minas: 10,
-    historiaEs: 'La cuadrilla de siete. Los nombres de la tabla todavía huelen a aceite. Tres no volvieron del talud.',
-    historiaEn: 'The crew of seven. The names on the board still smell of oil. Three never came back from the scree.' },
-  { act: 1, nombreEs: 'el cargador', nombreEn: 'the loader', filas: 8, columnas: 8, minas: 14,
-    historiaEs: 'El cargador tiene las palas abiertas, como una boca esperando. Te quedas quieta y escuchas el hueco.',
-    historiaEn: 'The loader sits with its bucket open, like a mouth that expects something. You stay still and listen to the hollow.' },
-  { act: 1, nombreEs: 'mina honda', nombreEn: 'the deep mine', filas: 9, columnas: 9, minas: 12,
-    historiaEs: 'El primer pozo propiamente dicho. La guía del sindicato marcaba aquí con pintura blanca. La pintura sigue fresca.',
-    historiaEn: 'The first proper shaft. The union guide marked it here with white paint. The paint is still fresh.' },
-  { act: 1, nombreEs: 'el capataz', nombreEn: 'the foreman', filas: 9, columnas: 9, minas: 16,
-    historiaEs: 'La cabaña del capataz, tu padre: recibos, órdenes y una carta a medio escribir. La última línea dice tu nombre.',
-    historiaEn: "The foreman's cabin — your father's: receipts, orders, and a half-written letter. The last line says your name." },
-  // acto II — las galerías
-  { act: 2, nombreEs: 'la galería norte', nombreEn: 'north gallery', filas: 10, columnas: 10, minas: 18,
-    historiaEs: 'El aire se vuelve mecha. Un raíl torcido apunta hacia adentro como un dedo índice.',
-    historiaEn: 'The air turns to wick. A twisted rail points inward like an index finger.' },
-  { act: 2, nombreEs: 'el relevo', nombreEn: 'the relief', filas: 10, columnas: 10, minas: 22,
-    historiaEs: 'Aquí la cuadrilla se partía en relevos. Uno dejó marcadas dos minas y un recado: «vuelve por el camino de las banderas».',
-    historiaEn: 'This is where the crew split into shifts. One of them marked two mines and left a note: “come back by the flags.”' },
-  { act: 2, nombreEs: 'carbón y cal', nombreEn: 'coal and lime', filas: 12, columnas: 12, minas: 26,
-    historiaEs: 'El carbón mancha la cal de las paredes. Entre las huellas grandes, otras pequeñas: ¿una cabra? No hay cabras ahí abajo.',
-    historiaEn: 'The coal stains the lime on the walls. Among the big footprints, small ones: a goat? There are no goats down there.' },
-  { act: 2, nombreEs: 'el pozo ciego', nombreEn: 'the blind shaft', filas: 12, columnas: 12, minas: 31,
-    historiaEs: 'Bajada a pico y sin mapa oficial. En los cuadernos el pozo ciego nunca figura como «explorado», pero nombra minas ahí abajo.',
-    historiaEn: 'Picked out by hand, no official map. The notebooks never list the blind shaft as “explored”, yet the mines down there have names.' },
-  { act: 2, nombreEs: 'vía muerta', nombreEn: 'dead track', filas: 14, columnas: 14, minas: 34,
-    historiaEs: 'Vagones parados con la carga a medio camino. El metal conserva el calor de otra época.',
-    historiaEn: 'Wagons stalled mid-track with their loads. The metal still keeps the warmth of another era.' },
-  { act: 2, nombreEs: 'el ventilador', nombreEn: 'the fan', filas: 14, columnas: 14, minas: 40,
-    historiaEs: 'El ventilador de hierro sigue girando. Alguien lo engrasó. Alguien quería que no se detuviera nunca.',
-    historiaEn: 'The iron fan is still turning. Someone oiled it. Someone wanted it never to stop.' },
-  // acto III — el filón
-  { act: 3, nombreEs: 'el óxido', nombreEn: 'the rust', filas: 14, columnas: 14, minas: 44,
-    historiaEs: 'El óxido pinta la roca de sangre seca. Las primeras vetas asoman como vértebras.',
-    historiaEn: 'Rust paints the rock with dry blood. The first veins show through like vertebrae.' },
-  { act: 3, nombreEs: 'la veta', nombreEn: 'the seam', filas: 16, columnas: 16, minas: 40,
-    historiaEs: 'La veta empieza aquí, sangrando luz. A partir de este punto, la montaña manda en las luces.',
-    historiaEn: 'The seam begins here, bleeding light. From this point on, the mountain rules the lanterns.' },
-  { act: 3, nombreEs: 'galería estrecha', nombreEn: 'narrow gallery', filas: 16, columnas: 16, minas: 48,
-    historiaEs: 'Un metro de techo. Gateas. La mochila roza y algo se derrama: tu padre llevaba sal. Para la sed o para el susto.',
-    historiaEn: 'A metre of ceiling. You crawl. The pack scrapes and something spills: your father carried salt. For thirst, or for courage.' },
-  { act: 3, nombreEs: 'agua fría', nombreEn: 'cold water', filas: 16, columnas: 16, minas: 55,
-    historiaEs: 'El agua te sube por los tobillos, fría como una deuda. La corriente empuja hacia afuera. La montaña te echa.',
-    historiaEn: 'The water climbs your ankles, cold as a debt. The current pushes outward. The mountain is telling you to leave.' },
-  { act: 3, nombreEs: 'el escurridor', nombreEn: 'the drain', filas: 16, columnas: 16, minas: 61,
-    historiaEs: 'El agua se traga por los escurridores cantando bajo tus pies. No miras abajo.',
-    historiaEn: 'The water swallows itself through the drains, singing beneath your boots. You do not look down.' },
-  { act: 3, nombreEs: 'vena gruesa', nombreEn: 'thick vein', filas: 16, columnas: 16, minas: 66,
-    historiaEs: 'La veta entera, desnuda. Tu padre dibujó este mismo mapa hace años. Las minas están donde él las dejó anotadas.',
-    historiaEn: 'The whole seam, naked. Your father drew this very map years ago. The mines are where he wrote them down.' },
-  // acto IV — el corazón
-  { act: 4, nombreEs: 'el corazón de la mina', nombreEn: 'heart of the mine', filas: 16, columnas: 16, minas: 69,
-    historiaEs: 'A partir de aquí todo late: el aire, el metal, tu pulso. La roca hierve en silencio.',
-    historiaEn: 'From here on everything beats: the air, the metal, your pulse. The rock boils in silence.' },
-  { act: 4, nombreEs: 'el guardián', nombreEn: 'the warden', filas: 18, columnas: 18, minas: 72,
-    historiaEs: 'El guardián de la boca, una estatua de sal en la oscuridad. La cuadrilla decía que señaliza el camino.',
-    historiaEn: 'The warden of the mouth — a salt statue in the dark. The crew said it marks the path.' },
-  { act: 4, nombreEs: 'polvo y pólvora', nombreEn: 'dust and powder', filas: 16, columnas: 20, minas: 70,
-    historiaEs: 'El polvo se alza como nieve negra con cada respiración. Aquí la pólvora decidió no estallar. No para ti.',
-    historiaEn: 'The dust rises like black snow with every breath. Here the powder decided not to explode. Not for you.' },
-  { act: 4, nombreEs: 'la sala de máquinas', nombreEn: 'the engine room', filas: 20, columnas: 20, minas: 78,
-    historiaEs: 'El corazón mecánico. Las máquinas paran una a una a tu paso, como queriendo escuchar.',
-    historiaEn: 'The mechanical heart. The machines stop one by one as you pass, as if trying to listen.' },
-  { act: 4, nombreEs: 'tres picos', nombreEn: 'three peaks', filas: 18, columnas: 22, minas: 76,
-    historiaEs: 'Tres picos clavados en el muro: los tres de los que se fueron. El tuyo espera su sitio.',
-    historiaEn: 'Three picks nailed to the wall — the three of them, gone. Yours waits for its place.' },
-  { act: 4, nombreEs: 'el último rellano', nombreEn: 'the last landing', filas: 22, columnas: 22, minas: 84,
-    historiaEs: 'El último rellano antes del filón padre. Desde aquí se oye el corazón. Tu padre escuchó este mismo sonido.',
-    historiaEn: 'The last landing before the father lode. From here you can hear the heart. Your father heard this same sound.' },
-  { act: 4, nombreEs: 'la veta maestra', nombreEn: 'the master seam', filas: 20, columnas: 24, minas: 88,
-    historiaEs: 'La veta maestra late con tu pulso. Una sola capa de piedra te separa de todo lo que dejaste atrás.',
-    historiaEn: 'The master seam beats with your pulse. A single layer of stone stands between you and everything you left behind.' },
-  { act: 4, nombreEs: 'minas de agua', nombreEn: 'water mines', filas: 22, columnas: 24, minas: 96,
-    historiaEs: 'El agua sube. La mina entera respira contra ti. Corre.',
-    historiaEn: 'The water rises. The whole mine breathes against you. Run.' },
-  { act: 4, nombreEs: 'el juicio del filón', nombreEn: "the seam's trial", filas: 24, columnas: 24, minas: 104,
-    historiaEs: 'El juicio. La montaña pesa el motivo de tu bajada. Aún no sabe que ya has ganado.',
-    historiaEn: 'The trial. The mountain weighs the reason for your descent. It does not yet know you have already won.' },
-  { act: 4, nombreEs: 'la noche cerrada', nombreEn: 'the black night', filas: 26, columnas: 24, minas: 112,
-    historiaEs: 'Oscuridad entera. Lo único encendido es tu farol y tu nombre en la carta del capataz.',
-    historiaEn: "Total darkness. The only lights left are your lantern and your name in the foreman's letter." },
-  { act: 4, nombreEs: 'el filón padre', nombreEn: 'the father lode', filas: 26, columnas: 28, minas: 124,
-    historiaEs: 'El filón padre. Lo que el valle soñó. El metal canta en voz baja, como acunando lo que tu padre guardó aquí.',
-    historiaEn: 'The father lode. What the valley dreamed of. The metal sings low, like a lullaby for what your father kept here.' },
-  { act: 4, nombreEs: 'el corazón de piedra', nombreEn: 'the stone heart', filas: 24, columnas: 30, minas: 132,
-    historiaEs: 'El corazón de piedra abre, y dentro late tu padre, esperando. Treinta niveles no son nada cuando se baja por alguien.',
-    historiaEn: 'The stone heart opens, and inside your father waits, still beating. Thirty levels are nothing when you descend for someone.' },
+  // acto I — alistamiento
+  { act: 1, nombreEs: 'la carta', nombreEn: 'the letter', filas: 6, columnas: 6, minas: 6,
+    historiaEs: 'La carta llega un martes. Tu nombre, un número de expediente y una hora. La guerra te ha elegido.',
+    historiaEn: 'The letter arrives on a Tuesday. Your name, a file number and an hour. The war has picked you.' },
+  { act: 1, nombreEs: 'el cuartel', nombreEn: 'the barracks', filas: 7, columnas: 7, minas: 9,
+    historiaEs: 'El cuartel huele a lejía y a miedo nuevo. Firmas tu nombre mil veces, como si eso te hiciera dueño del fusil.',
+    historiaEn: 'The barracks smells of bleach and fresh fear. You sign your name a thousand times, as if that made the rifle yours.' },
+  { act: 1, nombreEs: 'la prueba', nombreEn: 'the test', filas: 8, columnas: 8, minas: 10,
+    historiaEs: 'La prueba: cien hombres en fila y diez minutos para aprender otra manera de mirar el suelo.',
+    historiaEn: 'The test: a hundred men in a row and ten minutes to learn another way of looking at the ground.' },
+  { act: 1, nombreEs: 'el juramento', nombreEn: 'the oath', filas: 8, columnas: 8, minas: 14,
+    historiaEs: 'Juráis sobre un campo de verdad. Prometéis volver, o que al menos lo cuenten.',
+    historiaEn: 'You swear over a real field. You promise to return, or at least to be counted.' },
+  { act: 1, nombreEs: 'el polígono', nombreEn: 'the range', filas: 9, columnas: 9, minas: 12,
+    historiaEs: 'En el polígono todo es de verdad: la saliva, el temblor, las banderas.',
+    historiaEn: 'At the range everything is real: the spit, the trembling, the flags.' },
+  { act: 1, nombreEs: 'el ascenso', nombreEn: 'the commission', filas: 9, columnas: 9, minas: 16,
+    historiaEs: 'Te ascienden a alférez por cumplir un trámite. El tren parte al amanecer.',
+    historiaEn: 'You are commissioned for completing a formality. The train leaves at dawn.' },
+  // acto II — el frente
+  { act: 2, nombreEs: 'el convoy', nombreEn: 'the convoy', filas: 10, columnas: 10, minas: 18,
+    historiaEs: 'Tres días de tren y un puente cortado. El enemigo vuela los puentes.',
+    historiaEn: 'Three days of train and a cut bridge. The enemy blows the bridges.' },
+  { act: 2, nombreEs: 'la zona', nombreEn: 'the zone', filas: 10, columnas: 10, minas: 22,
+    historiaEs: 'Zona de operaciones. El cartel dice NO PISAR; debajo, alguien escribió todos los nombres.',
+    historiaEn: 'Operations zone. The sign says DO NOT STEP; underneath, someone wrote every name.' },
+  { act: 2, nombreEs: 'los mapas', nombreEn: 'the maps', filas: 12, columnas: 12, minas: 26,
+    historiaEs: 'Los mapas pertenecen a otra guerra: minas sin marcar, memoria de quien no pudo dibujarlas.',
+    historiaEn: 'The maps belong to another war: unmarked mines, the memory of those who could not draw them.' },
+  { act: 2, nombreEs: 'el sargento', nombreEn: 'the sergeant', filas: 12, columnas: 12, minas: 31,
+    historiaEs: 'El sargento te mira como a un trapo viejo. Aquí se pisa con la cabeza, no con los pies.',
+    historiaEn: 'The sergeant looks at you like an old rag. Here you step with your head, not your feet.' },
+  { act: 2, nombreEs: 'el primer paso', nombreEn: 'the first step', filas: 14, columnas: 14, minas: 34,
+    historiaEs: 'Das el primer paso fuera de la trinchera. El silencio pesa más que el acero.',
+    historiaEn: 'You take the first step out of the trench. Silence weighs more than steel.' },
+  { act: 2, nombreEs: 'la guardia', nombreEn: 'the watch', filas: 14, columnas: 14, minas: 40,
+    historiaEs: 'La noche de guardia. Minas nuevas bajo la luna; alguien las siembra cada noche.',
+    historiaEn: 'The night watch. New mines under the moon; someone lays them every night.' },
+  // acto III — la operación
+  { act: 3, nombreEs: 'el puente', nombreEn: 'the bridge', filas: 14, columnas: 14, minas: 44,
+    historiaEs: 'Operación Puente: cruzar al otro lado. Dos campos, un vado y una radio muerta.',
+    historiaEn: 'Operation Bridge: cross to the other side. Two fields, a ford and a dead radio.' },
+  { act: 3, nombreEs: 'la brecha', nombreEn: 'the breach', filas: 16, columnas: 16, minas: 40,
+    historiaEs: 'La brecha es una raya de luz en la hierba. Más allá, el campo enemigo.',
+    historiaEn: 'The breach is a line of light in the grass. Beyond it, the enemy field.' },
+  { act: 3, nombreEs: 'el silencio', nombreEn: 'the silence', filas: 16, columnas: 16, minas: 48,
+    historiaEs: 'Seis minutos de silencio antes de que la artillería hable. Nadie traga.',
+    historiaEn: 'Six minutes of silence before the guns speak. Nobody swallows.' },
+  { act: 3, nombreEs: 'el asalto', nombreEn: 'the assault', filas: 16, columnas: 16, minas: 55,
+    historiaEs: 'El asalto. Banderas, polvo y el mundo reducido a un metro cuadrado.',
+    historiaEn: 'The assault. Flags, dust and the world reduced to one square metre.' },
+  { act: 3, nombreEs: 'la retirada', nombreEn: 'the retreat', filas: 16, columnas: 16, minas: 61,
+    historiaEs: 'Retirada. Un compañero se ha quedado dentro del campo. La guerra no espera.',
+    historiaEn: 'Retreat. A comrade stayed inside the field. War does not wait.' },
+  { act: 3, nombreEs: 'el recuento', nombreEn: 'the count', filas: 16, columnas: 16, minas: 66,
+    historiaEs: 'El recuento: de cuarenta volvemos nueve. El parte dice «éxito».',
+    historiaEn: "The count: of forty, nine return. The report says 'success'." },
+  // acto IV — el final del campo
+  { act: 4, nombreEs: 'el corredor', nombreEn: 'the corridor', filas: 16, columnas: 16, minas: 69,
+    historiaEs: 'El corredor: la única ruta hasta el depósito enemigo. Un kilómetro de hierba y muerte.',
+    historiaEn: 'The corridor: the only route to the enemy depot. A kilometre of grass and death.' },
+  { act: 4, nombreEs: 'el búnker', nombreEn: 'the bunker', filas: 18, columnas: 18, minas: 72,
+    historiaEs: 'Bajo el búnker, su sala de mandos. Minada por dentro. Deliberadamente.',
+    historiaEn: 'Beneath the bunker, their command room. Mined from the inside. Deliberately.' },
+  { act: 4, nombreEs: 'el documento', nombreEn: 'the document', filas: 16, columnas: 20, minas: 70,
+    historiaEs: 'Un documento: tus órdenes, firmadas con tu nombre por una mano que no es la tuya.',
+    historiaEn: 'A document: your orders, signed with your name by a hand that is not yours.' },
+  { act: 4, nombreEs: 'la traición', nombreEn: 'the betrayal', filas: 20, columnas: 20, minas: 78,
+    historiaEs: 'Nadie te envió. Esto era un castigo disfrazado de papeleo. Pero ya estás aquí.',
+    historiaEn: 'Nobody sent you. This was a punishment dressed as paperwork. But you are here now.' },
+  { act: 4, nombreEs: 'el último campo', nombreEn: 'the last field', filas: 18, columnas: 22, minas: 76,
+    historiaEs: 'El telegrafista escucha tu clave por última vez. Que el silencio te sea propicio.',
+    historiaEn: 'The radio operator hears your callsign for the last time. May the silence be kind to you.' },
+  { act: 4, nombreEs: 'el desierto', nombreEn: 'the desert', filas: 22, columnas: 22, minas: 84,
+    historiaEs: 'El calor rebota en la arena; cada paso es una conjetura.',
+    historiaEn: 'The heat bounces off the sand; every step is a guess.' },
+  { act: 4, nombreEs: 'la ciudad', nombreEn: 'the city', filas: 20, columnas: 24, minas: 88,
+    historiaEs: 'La ciudad tomada. Mercado nuevo, olor a pólvora y pan fresco. Nadie te reconoce.',
+    historiaEn: 'The city taken. A new market, the smell of gunpowder and fresh bread. Nobody recognises you.' },
+  { act: 4, nombreEs: 'el almacén', nombreEn: 'the warehouse', filas: 22, columnas: 24, minas: 96,
+    historiaEs: 'El almacén. Tu expediente, quemado por orden del mando. Tú sabes caminar.',
+    historiaEn: 'The warehouse. Your file, burned by order of the command. You know how to walk.' },
+  { act: 4, nombreEs: 'el expediente', nombreEn: 'the file', filas: 24, columnas: 24, minas: 104,
+    historiaEs: 'El expediente sobre la mesa. El nombre tachado, el sello roto. Te deben el nombre.',
+    historiaEn: 'The file on the table. The name struck through, the seal broken. They owe you your name.' },
+  { act: 4, nombreEs: 'la vuelta', nombreEn: 'the way back', filas: 26, columnas: 24, minas: 112,
+    historiaEs: 'El tren de vuelta. Los campos se alejan por la ventanilla. Nadie dice nada.',
+    historiaEn: 'The train home. The fields slide past the window. Nobody says a word.' },
+  { act: 4, nombreEs: 'la puerta', nombreEn: 'the doorway', filas: 26, columnas: 28, minas: 124,
+    historiaEs: 'La puerta de casa. Dos golpes. Nadie responde. La abres tú.',
+    historiaEn: 'The doorway of home. Two knocks. Nobody answers. You open it yourself.' },
+  { act: 4, nombreEs: 'el final del campo', nombreEn: 'the end of the field', filas: 24, columnas: 30, minas: 132,
+    historiaEs: 'Limpias el último campo porque no volverás a pisar otro. El campo termina; tú, no.',
+    historiaEn: "You clear the last field because you will never tread on another. The field ends; you don't." },
 ];
 
 function nivelCampana(indice) {
@@ -1859,7 +1853,8 @@ function esTactil() {
 const FOCO_SEL = '.row:not(.stat), .acciones button';
 let focoIndice = -1;
 
-function ponerOverlay(html) {
+function ponerOverlay(html, variante) {
+  el.overlay.classList.toggle('muerte', variante === 'muerte');
   if (!html) {
     el.overlay.classList.remove('abierto');
     el.overlay.innerHTML = '';
@@ -2090,7 +2085,7 @@ function conversorDePuntos(clientX, clientY) {
 // la mina se despeja sola mientras decides qué jugar
 
 function nivelDemo() {
-  return campañaSiguiente(); // primer nivel sin superar; el corazón si ya los tienes todos
+  return campañaSiguiente(); // primer nivel sin superar; el último campo si ya los tienes todos
 }
 
 function crearDemo() {
@@ -2363,6 +2358,7 @@ function mostrarHistoria(indice) {
   ponerOverlay(`<div class="panel historia">
     <p class="kicker">${t('actLabel', { n: acto.id, name: nombreActoTxt })} · ${t('levelCell', { n: indice + 1 })}</p>
     <h2 class="historia-titulo">${nombre}</h2>
+    <p class="historia-dossier">${t('storyDossier')}</p>
     <p class="historia-texto">${texto}</p>
     <div class="acciones">
       <button class="principal" type="button" data-accion="descend"><span>${completado ? t('descendAgain') : t('descend')}</span><kbd>↵</kbd></button>
@@ -2568,14 +2564,21 @@ function eventosJuego(tipo, datos) {
     case 'unflag':
       audio.play('unflag');
       break;
-    case 'boom':
+    case 'boom': {
       contabilizarFin(false);
       audio.play('boom');
       if (typeof navigator.vibrate === 'function') navigator.vibrate([50, 40, 90]);
+      const destello = document.getElementById('flash');
+      if (destello) {
+        destello.classList.remove('activo');
+        void destello.offsetWidth; // reinicia la animación si quedaba a medias
+        destello.classList.add('activo');
+      }
       setTimeout(() => {
         if (app.juego === j && j.estado === 'perdido') mostrarFinPerdida();
       }, 750);
       break;
+    }
     case 'win':
       contabilizarFin(true);
       audio.play('win');
@@ -2627,7 +2630,7 @@ function mostrarFinGanada() {
       ? `<span class="record-tag">${t('newRecord')}</span>`
       : `<span>${t('yourRecord', { time: formatoTiempo(bestMs) })}</span>`;
   if (enCampaña && app.nivel === NIVELES.length - 1) {
-    // se cerró el corazón: epílogo del viaje
+    // se cerró el último campo: epílogo del viaje
     ponerOverlay(`<div class="panel fin">
       <header class="fin-cabeza">
         <p class="kicker">${t('epilogueKicker')}</p>
@@ -2660,16 +2663,16 @@ function mostrarFinGanada() {
 function mostrarFinPerdida() {
   const j = app.juego;
   if (!j) return;
-  ponerOverlay(`<div class="panel fin">
+  ponerOverlay(`<div class="panel fin-muerte">
     <header class="fin-cabeza">
       <p class="kicker">${etiquetaPartida()}</p>
       <h2 class="cifra derrota">${t('youLost')}</h2>
+      <p class="nota">${formatoTiempo(j.tiempoMs)} · ${t('minesExploded', { count: j.cfg.minas })}</p>
     </header>
-    <p class="nota">${formatoTiempo(j.tiempoMs)} · ${t('minesExploded', { count: j.cfg.minas })}</p>
     <div class="acciones">
       ${accionesFin({ hayMas: false })}
     </div>
-  </div>`);
+  </div>`, 'muerte');
   pantalla('dead');
   enfocarPrimero();
 }

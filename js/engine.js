@@ -1,7 +1,7 @@
 // motor del buscaminas: máquina de estados + dibujado en lienzo.
 // la lógica del tablero vive en board.js; aquí se anima y se pinta.
 
-import { Tablero } from './board.js?v=2';
+import { Tablero } from './board.js?v=3';
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const ACENTO = '#ff2b2b';
@@ -83,6 +83,7 @@ export class Game {
       this.estado = 'perdido';
       this.explosionT = ahora;
       this.shake = 16;
+      this.tablero.revelarTodo(); // el campo queda al descubierto
       this.emit('boom', { indice: resultado.explosion });
       return;
     }
@@ -293,34 +294,17 @@ export class Game {
   }
 
   _celdaCerrada(ctx, X, Y, lado, gap, hover) {
+    // bloque plano: la rejilla la marcan los huecos negros, como en snake
     const ix = X + gap;
     const iy = Y + gap;
     const w = lado - gap * 2;
-    // bloque de roca: cuerpo, plano de luz arriba y plano de sombra abajo,
-    // más un filo interior para que el bisel se lea también en casillas grandes
-    ctx.fillStyle = hover ? '#1e1e1e' : '#151515';
+    ctx.fillStyle = hover ? '#1d1d1d' : '#111111';
     ctx.fillRect(ix, iy, w, w);
-    ctx.fillStyle = hover ? '#2b2b2b' : '#222222';
-    ctx.fillRect(ix, iy, w, 1);
-    ctx.fillRect(ix, iy, 1, w);
-    ctx.fillStyle = hover ? '#383838' : '#2e2e2e';
-    ctx.fillRect(ix + 1, iy + 1, w - 2, 1);
-    ctx.fillRect(ix + 1, iy + 1, 1, w - 2);
-    ctx.fillStyle = '#040404';
-    ctx.fillRect(ix, iy + w - 1, w, 1);
-    ctx.fillRect(ix + w - 1, iy, 1, w);
-    ctx.fillStyle = hover ? '#101010' : '#0d0d0d';
-    ctx.fillRect(ix + 1, iy + w - 2, w - 2, 1);
-    ctx.fillRect(ix + w - 2, iy + 1, 1, w - 2);
   }
 
   _celdaAbierta(ctx, X, Y, lado, gap, celda, i, forzada = false) {
     ctx.fillStyle = '#070707';
     ctx.fillRect(X + gap, Y + gap, lado - gap * 2, lado - gap * 2);
-    // un rasgo hundido arriba: la casilla abierta se hunde en la hoja
-    ctx.fillStyle = '#050505';
-    ctx.fillRect(X + gap, Y + gap, lado - gap * 2, 1);
-    ctx.fillRect(X + gap, Y + gap, 1, lado - gap * 2);
 
     if (celda.mina) {
       this._mina(ctx, X, Y, lado, '#f2f2f2');

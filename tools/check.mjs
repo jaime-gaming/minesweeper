@@ -265,7 +265,7 @@ prueba('cada nivel de campaña es jugable y progresivo en actos', () => {
   }
   // el acto IV es más duro que el acto I, y no por poco
   const maxMinas = (act) => Math.max(...NIVELES.filter((n) => n.act === act).map((n) => n.minas));
-  afirma(maxMinas(4) > maxMinas(1), 'el corazón muerde más que el exterior');
+  afirma(maxMinas(4) > maxMinas(1), 'el último acto muerde más que el primero');
 });
 
 prueba('configNivel entrega una configuración limpia de motor', () => {

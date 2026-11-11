@@ -209,6 +209,14 @@ export class Tablero {
     return { reveladas: cosecha, explosion: -1, victoria: gano };
   }
 
+  // al perder, destapa el tablero entero: la partida ha terminado y el
+  // campo queda a la vista, como un mapa que ya no sirve a nadie
+  revelarTodo() {
+    for (const celda of this.celdas) {
+      celda.revelada = true;
+    }
+  }
+
   // pone o quita la bandera. devuelve 'bandera' | 'sin-bandera' | null.
   alternarBandera(indice) {
     if (this.estado !== 'jugando') return null;

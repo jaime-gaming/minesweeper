@@ -4,7 +4,7 @@ El buscaminas clásico, de bloques en blanco y negro y muy poco más: la rejilla
 
 ## Idea visual
 
-La pantalla es una hoja de tinta: negro profundo, blancos duros y un rojo para la bandera, las minas y la casilla que estalla. Las celdas cerradas son bloques con un bisel doble; las descubiertas se funden con el fondo y dejan su número plano, en la monoespaciada de la casa, con el color clásico del buscaminas (1 azul, 2 verde, 3 rojo, 4 violeta, 5 naranja, 6 cian, 7 amarillo, 8 blanco). Las banderas de paño rojo se izan con su pliegue y su brillo; las minas son bloques de ocho púas con su destello. Al estallar, el lienzo se sacude y la casilla asesina queda entera en rojo con la mina en negro. Al ganar, las banderas se izan en oleada y una franja de luz cruza el tablero una sola vez.
+La pantalla es una hoja de tinta: negro profundo, blancos duros y un rojo para la bandera, las minas y la casilla que estalla. Las celdas son bloques planos separados por la rejilla de un píxel, como en snake; las descubiertas se funden con el fondo y dejan su número plano, en la monoespaciada de la casa, con el color clásico del buscaminas (1 azul, 2 verde, 3 rojo, 4 violeta, 5 naranja, 6 cian, 7 amarillo, 8 blanco). Las banderas de paño rojo se izan con su pliegue y su muesca; las minas son bloques de ocho púas con su destello. Al estallar hay un **destello seco** y la hoja se va a negro; el campo queda al descubierto por completo y la pantalla de muerte se abre como una barra baja, con el tablero entero a la vista. Al ganar, las banderas se izan en oleada y una franja de luz cruza el tablero una sola vez.
 
 La portada juega sola: una partida automática del siguiente nivel de la Treinta se despeja en la vista previa mientras decides qué jugar. El logotipo «minesweeper.» es tipografía pura, como el resto de la casa.
 
@@ -39,16 +39,16 @@ Las tres dificultades fijas tienen **récord de tiempo** independiente y estadí
 
 ## La Treinta — el modo historia
 
-Treinta niveles dibujados a mano en cuatro actos, con un relato propio: **tu padre bajó a la mina antes que tú; tú bajas a buscarlo.** Cada nivel cuenta una línea de la historia, en pantalla, antes de picar:
+Treinta campos minados dibujados a mano en cuatro actos, con un único relato lineal: **la guerra te ha reclutado.** Nadie pregunta por qué. Nadie se ofrece. Cada nivel cuenta una línea del avance, en pantalla, antes de picar:
 
 | Acto | Nivel | Tableros |
 | --- | --- | --- |
-| I · el exterior | 1 – 6 | de 6×6/6 a 9×9/16 — la puerta de madera, los tres que no volvieron |
-| II · las galerías | 7 – 12 | de 10×10/18 a 14×14/40 — los relevos, los raíles y el recado |
-| III · el filón | 13 – 18 | de 14×14/44 a 16×16/66 — la veta empieza a cantar |
-| IV · el corazón | 19 – 30 | de 16×16/69 a 24×30/132 — el corazón late bajo la piedra |
+| I · alistamiento | 1 – 6 | de 6×6/6 a 9×9/16 — la carta, el cuartel, el juramento |
+| II · el frente | 7 – 12 | de 10×10/18 a 14×14/40 — el convoy, la zona, la guardia |
+| III · la operación | 13 – 18 | de 14×14/44 a 16×16/66 — operación puente, el asalto |
+| IV · el final del campo | 19 – 30 | de 16×16/69 a 24×30/132 — la traición, el expediente, la vuelta |
 
-Completar un nivel abre el siguiente y guarda tu **mejor tiempo** en su casilla; no hay estrellas, sólo tu marca. Al ganar cada nivel, el botón principal te lleva al siguiente capítulo; al cerrar el corazón de piedra, un epílogo cierra el viaje. El perfil cuenta la campaña como victorias, rachas y tiempo total, y la portada lleva directo a tu siguiente paso. Cada nivel tiene su ruta profunda (`/campaña/nivel-07`) y el botón atrás navega como en cualquier web.
+El relato es lineal y acompaña hasta el final: al cerrar el último campo, un epílogo cierra el viaje. Completar un nivel abre el siguiente y guarda tu **mejor tiempo** en su casilla; no hay estrellas, sólo tu marca. El perfil cuenta la campaña como victorias, rachas y tiempo total, y la portada lleva directo a tu siguiente paso. Cada nivel tiene su ruta profunda (`/campaña/nivel-07`) y el botón atrás navega como en cualquier web.
 
 ## Perfil
 
