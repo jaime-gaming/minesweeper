@@ -94,3 +94,6 @@ tools/check.mjs   pruebas de lógica, sin navegador
 ## Despliegue
 
 La publicación en el dominio, la caché y la comprobación posterior están en [DESPLIEGUE.md](DESPLIEGUE.md).
+
+## Creditos de assets
+Musica: LSplash
