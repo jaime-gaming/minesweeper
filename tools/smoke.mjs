@@ -211,10 +211,10 @@ try {
     console.log('tablero completo revelado tras la muerte:', todas);
     if (!todas) throw new Error('el tablero no se reveló por completo al morir');
     const panel = documentStub.querySelector('#overlay').innerHTML;
-    const datos = (panel.match(/muerte-dato/g) || []).length;
+    const datos = (panel.match(/fin-dato/g) || []).length;
     console.log('informe de baja: casillas de datos =', datos);
     if (datos < 3) throw new Error('el informe de baja no muestra las tres estadísticas');
-    if (!panel.includes('muerte-stats')) throw new Error('faltan las estadísticas de la pantalla de muerte');
+    if (!panel.includes('fin-stats')) throw new Error('faltan las estadísticas de la pantalla de muerte');
   }
 
   // reinicia con R y fuerza la victoria acorde a acorde

@@ -7,9 +7,9 @@ import {
   esDificultadFija,
   limitesMinas,
 } from './presets.js?v=1';
-import { audio } from './audio.js?v=5';
+import { audio } from './audio.js?v=6';
 import { attachInput, registrarConversorPunto } from './input.js?v=1';
-import { t, getLanguage, setLanguage, unitMinas, routeSlug, routeWords } from './i18n.js?v=9';
+import { t, getLanguage, setLanguage, unitMinas, routeSlug, routeWords } from './i18n.js?v=10';
 import { NIVELES, ACTOS, configNivel, nivelCampana, actoDe } from './campaign.js?v=7';
 
 const $ = (sel) => document.querySelector(sel);
@@ -34,7 +34,6 @@ function comprobarPiezas() {
 /* ------------------------------------------------------------- guardado */
 
 const CLAVE = 'minesweeper.v1';
-const ACENTO_LOGO = '#ff2b2b';
 
 function nuevoRegistro() {
   return {
@@ -192,13 +191,14 @@ const FOCO_SEL = '.row:not(.stat), .acciones button';
 let focoIndice = -1;
 
 function ponerOverlay(html, variante) {
-  const esMuerte = Boolean(html) && variante === 'muerte';
-  if (!esMuerte && huecoMuerte) {
-    huecoMuerte = 0;
+  const esBarra = Boolean(html) && (variante === 'muerte' || variante === 'victoria');
+  if (!esBarra && huecoFin) {
+    huecoFin = 0;
     el.stage.style.paddingBottom = '';
     ajustarLienzo();
   }
-  el.overlay.classList.toggle('muerte', esMuerte);
+  el.overlay.classList.toggle('muerte', Boolean(html) && variante === 'muerte');
+  el.overlay.classList.toggle('victoria', Boolean(html) && variante === 'victoria');
   if (!html) {
     el.overlay.classList.remove('abierto');
     el.overlay.innerHTML = '';
@@ -388,7 +388,7 @@ function actualizarMarcador() {
 
 /* -------------------------------------------------------- ajustar lienzo */
 
-let huecoMuerte = 0; // alto reservado bajo el tablero en la pantalla de muerte
+let huecoFin = 0; // alto reservado bajo el tablero en la barra de final de partida
 
 function ajustarLienzo() {
   const j = app.juego;
@@ -398,7 +398,7 @@ function ajustarLienzo() {
   const filas = j ? j.filas : 9;
   const margen = 4;
   const availW = Math.max(80, banda.width - margen);
-  const availH = Math.max(80, banda.height - margen - huecoMuerte);
+  const availH = Math.max(80, banda.height - margen - huecoFin);
   const cell = Math.max(8, Math.floor(Math.min(availW / columnas, availH / filas)));
   vista.cell = cell;
   vista.width = cell * columnas;
@@ -623,10 +623,10 @@ function dibujarLogo(canvas) {
   ctx.font = '900 88px ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
   // medir antes de pintar: el lienzo se ajusta al rótulo, nunca lo recorta
   const anchoTexto = Math.ceil(ctx.measureText(texto).width);
-  // la mini bomba: cuerpo rojo de 13 px, mecha escalonada y chispa en cruz
-  const radio = 13;
-  const centroX = anchoTexto + 6 + radio;
-  const ancho = Math.ceil(centroX + radio * 3.4); // el alabeo de la chispa nunca se recorta
+  // el punto es la mina del juego: bloque blanco de ocho púas, destello arriba-izq.
+  const u = 2.6; // unidad base de la mina
+  const centroX = anchoTexto + 8 + 6 * u;
+  const ancho = Math.ceil(centroX + 6 * u + 5);
   canvas.width = ancho * DPR;
   canvas.height = alto * DPR;
   ctx.scale(DPR, DPR);
@@ -637,20 +637,28 @@ function dibujarLogo(canvas) {
   ctx.textAlign = 'left';
   const y = alto / 2 + 2;
   ctx.fillText(texto, 0, y);
-  // mismas formas que el icono de la pestaña, a escala
+  // mismas coordenadas que _mina() del motor, a escala u
   ctx.save();
   ctx.translate(centroX, y);
-  ctx.scale(radio / 4.3, radio / 4.3);
-  ctx.translate(-7.3, -10.7);
-  ctx.fillStyle = ACENTO_LOGO;
-  ctx.beginPath();
-  ctx.arc(7.3, 10.7, 4.3, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillRect(9.6, 5.2, 2.6, 1.8);
-  ctx.fillRect(10.8, 3.9, 1.8, 1.7);
-  ctx.fillStyle = '#f5f5f0';
-  ctx.fillRect(11.7, 0.9, 1, 3.2);
-  ctx.fillRect(9.6, 1.85, 5.2, 1.3);
+  ctx.scale(u, u);
+  ctx.translate(-8, -8);
+  ctx.fillStyle = '#f2f2f2';
+  ctx.fillRect(5, 5, 6, 6);      // cuerpo
+  ctx.fillRect(4, 6, 8, 4);
+  ctx.fillRect(6, 4, 4, 8);
+  ctx.fillRect(7, 2, 2, 2);      // púas cardinales
+  ctx.fillRect(7, 12, 2, 2);
+  ctx.fillRect(2, 7, 2, 2);
+  ctx.fillRect(12, 7, 2, 2);
+  ctx.fillRect(3, 3, 1.5, 1.5);  // púas diagonales
+  ctx.fillRect(11.5, 3, 1.5, 1.5);
+  ctx.fillRect(3, 11.5, 1.5, 1.5);
+  ctx.fillRect(11.5, 11.5, 1.5, 1.5);
+  ctx.fillStyle = '#ffffff';      // destello especular
+  ctx.fillRect(6, 6, 2, 1);
+  ctx.fillRect(5, 7, 1, 1);
+  ctx.fillStyle = 'rgba(0,0,0,0.28)'; // sombra abajo-derecha
+  ctx.fillRect(9, 9, 2, 2);
   ctx.restore();
 }
 
@@ -941,15 +949,18 @@ function eventosJuego(tipo, datos) {
       break;
     case 'boom': {
       contabilizarFin(false);
-      audio.play('boom');
       if (typeof navigator.vibrate === 'function') navigator.vibrate([50, 40, 90]);
-      audio.musica('death', 200, 1.5);
+      audio.musica('death', 200, 1.2); // la pieza de derrota entra con el estallido
       const destello = document.getElementById('flash');
       if (destello) {
         destello.classList.remove('activo');
         void destello.offsetWidth; // reinicia la animación si quedaba a medias
         destello.classList.add('activo');
       }
+      // el golpe del estallido llega un instante después, como manda el usuario
+      setTimeout(() => {
+        if (app.juego === j && j.estado === 'perdido') audio.play('boom');
+      }, 200);
       setTimeout(() => {
         if (app.juego === j && j.estado === 'perdido') mostrarFinPerdida();
       }, 900);
@@ -957,9 +968,7 @@ function eventosJuego(tipo, datos) {
     }
     case 'win':
       contabilizarFin(true);
-      audio.play('win');
-      audio.musica('win', 150, 1.1);
-      if (app.record) setTimeout(() => audio.play('record'), 430);
+      audio.musica('win', 150, 1.1); // solo la pieza de victoria
       setTimeout(() => {
         if (app.juego === j && j.estado === 'ganado') mostrarFinGanada();
       }, 850);
@@ -1023,18 +1032,63 @@ function mostrarFinGanada() {
     enfocarPrimero();
     return;
   }
-  ponerOverlay(`<div class="panel fin">
+  const totalSeguras = j.cfg.filas * j.cfg.columnas - j.cfg.minas;
+  const despejadas = typeof j.tablero.despejadasPorJugador === 'number' ? j.tablero.despejadasPorJugador : totalSeguras;
+  let tercera;
+  if (enCampaña || fija) {
+    const mejorMs = enCampaña ? (guardado.campaign.best[app.nivel] || 0) : (guardado.best[app.modo] || 0);
+    tercera = datoFin(mejorMs > 0 ? formatoTiempo(mejorMs) : '—', t('statBest'));
+  } else {
+    tercera = datoFin(j.cfg.minas, t('statMines'));
+  }
+  const kicker = `${etiquetaPartida()} · ${t('clearedTag')}${app.record ? ` · ${t('newRecord')}` : ''}`;
+  ponerBarraFin({
+    variante: 'victoria',
+    kicker,
+    titulo: t('youWon'),
+    susurro: t('winWhisper'),
+    stats: `${datoFin(formatoTiempo(j.tiempoMs), t('statTime'))}${datoFin(`${despejadas}/${totalSeguras}`, t('statCleared'))}${tercera}`,
+    parcela: parcelaPartida(j, enCampaña),
+    acciones: accionesFin({ hayMas: true }),
+    pantallaId: 'won',
+  });
+}
+
+// la barra baja del final de partida: una sola pieza para victoria y derrota.
+// el tablero completo queda a la vista por encima; el lienzo reserva el alto.
+function datoFin(valor, etiqueta) {
+  return `<div class="fin-dato"><b>${valor}</b><span>${etiqueta}</span></div>`;
+}
+
+function parcelaPartida(j, enCampaña) {
+  return enCampaña
+    ? `${t('parcelTag')} · ${nombreNivel(app.nivel || 0)}`
+    : `${t('parcelTag')} · ${j.cfg.columnas} × ${j.cfg.filas} · ${j.cfg.minas} ${unitMinas(j.cfg.minas)}`;
+}
+
+function ponerBarraFin({ variante, kicker, titulo, susurro, stats, parcela, acciones, pantallaId }) {
+  ponerOverlay(`<div class="panel fin-barra fin-${variante}">
     <header class="fin-cabeza">
-      <p class="kicker">${etiquetaPartida()}</p>
-      <h2 class="cifra superado">${t('youWon')}</h2>
+      <p class="kicker">${kicker}</p>
+      <h2 class="cifra ${variante === 'victoria' ? 'limpia' : 'derrota'}">${titulo}</h2>
+      <p class="fin-susurro">${susurro}</p>
+      <div class="fin-stats">${stats}</div>
+      <p class="fin-parcela">${parcela}</p>
     </header>
-    <p class="nota">${t('clearedIn', { time: formatoTiempo(j.tiempoMs) })}${notaRecord ? `<br>${notaRecord}` : ''}</p>
     <div class="acciones">
-      ${accionesFin({ hayMas: true })}
+      ${acciones}
     </div>
-  </div>`);
-  pantalla('won');
+  </div>`, variante);
+  pantalla(pantallaId);
   enfocarPrimero();
+  // el tablero completo queda por encima de la barra: se reserva el alto real
+  const panel = el.overlay.querySelector('.fin-barra');
+  const alto = panel ? Math.ceil(panel.getBoundingClientRect().height) : 0;
+  if (alto > 0) {
+    huecoFin = alto;
+    el.stage.style.paddingBottom = `${alto}px`;
+    ajustarLienzo();
+  }
 }
 
 function mostrarFinPerdida() {
@@ -1044,39 +1098,19 @@ function mostrarFinPerdida() {
   const despejadas = typeof j.tablero.despejadasPorJugador === 'number' ? j.tablero.despejadasPorJugador : 0;
   const enCampaña = app.modo === 'campaign';
   const mejor = enCampaña ? (guardado.campaign.best[app.nivel] || 0) : 0;
-  const kicker = `${etiquetaPartida()} · ${t('casualtyTag')}`;
-  const parcela = enCampaña
-    ? `${t('parcelTag')} · ${nombreNivel(app.nivel || 0)}`
-    : `${t('parcelTag')} · ${j.cfg.columnas} × ${j.cfg.filas} · ${j.cfg.minas} ${unitMinas(j.cfg.minas)}`;
   const tercera = enCampaña
-    ? `<div class="muerte-dato"><b>${mejor > 0 ? formatoTiempo(mejor) : '—'}</b><span>${t('statBest')}</span></div>`
-    : `<div class="muerte-dato"><b>${j.cfg.minas}</b><span>${t('statMines')}</span></div>`;
-  ponerOverlay(`<div class="panel fin-muerte">
-    <header class="fin-cabeza">
-      <p class="kicker">${kicker}</p>
-      <h2 class="cifra derrota">${t('youLost')}</h2>
-      <p class="muerte-susurro">${t('deathWhisper')}</p>
-      <div class="muerte-stats">
-        <div class="muerte-dato"><b>${formatoTiempo(j.tiempoMs)}</b><span>${t('statTime')}</span></div>
-        <div class="muerte-dato"><b>${despejadas}/${totalSeguras}</b><span>${t('statCleared')}</span></div>
-        ${tercera}
-      </div>
-      <p class="muerte-parcela">${parcela}</p>
-    </header>
-    <div class="acciones">
-      ${accionesFin({ hayMas: false })}
-    </div>
-  </div>`, 'muerte');
-  pantalla('dead');
-  enfocarPrimero();
-  // el tablero completo queda por encima de la barra: se reserva el alto real
-  const panel = el.overlay.querySelector('.fin-muerte');
-  const alto = panel ? Math.ceil(panel.getBoundingClientRect().height) : 0;
-  if (alto > 0) {
-    huecoMuerte = alto;
-    el.stage.style.paddingBottom = `${alto}px`;
-    ajustarLienzo();
-  }
+    ? datoFin(mejor > 0 ? formatoTiempo(mejor) : '—', t('statBest'))
+    : datoFin(j.cfg.minas, t('statMines'));
+  ponerBarraFin({
+    variante: 'muerte',
+    kicker: `${etiquetaPartida()} · ${t('casualtyTag')}`,
+    titulo: t('youLost'),
+    susurro: t('deathWhisper'),
+    stats: `${datoFin(formatoTiempo(j.tiempoMs), t('statTime'))}${datoFin(`${despejadas}/${totalSeguras}`, t('statCleared'))}${tercera}`,
+    parcela: parcelaPartida(j, enCampaña),
+    acciones: accionesFin({ hayMas: false }),
+    pantallaId: 'dead',
+  });
 }
 
 /* ------------------------------------------------------- perfil y ajustes */

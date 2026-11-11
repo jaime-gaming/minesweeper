@@ -56,6 +56,8 @@ const STRINGS = {
     // final de partida
     youWon: 'despejado.',
     youLost: 'boom.',
+    clearedTag: 'despejada',
+    winWhisper: 'el campo queda en silencio.',
     deathWhisper: 'el campo no devuelve a nadie.',
     parcelTag: 'parcela',
     clearedIn: 'despejado en {time}',
@@ -226,6 +228,8 @@ const STRINGS = {
     // end of game
     youWon: 'cleared.',
     youLost: 'boom.',
+    clearedTag: 'cleared',
+    winWhisper: 'the field goes quiet.',
     deathWhisper: 'the field gives no one back.',
     parcelTag: 'parcel',
     clearedIn: 'cleared in {time}',

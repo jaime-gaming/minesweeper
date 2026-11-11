@@ -808,16 +808,6 @@ button.foco {
 }
 
 
-/* victoria: el aviso, en grande */
-.fin-cabeza .cifra.superado {
-  font-size: clamp(26px, 6.4vmin, 54px);
-  font-weight: 600;
-  line-height: 1.05;
-  letter-spacing: 0.01em;
-  text-transform: uppercase;
-  text-align: center;
-}
-
 /* filas de solo lectura del perfil */
 .row.peligro {
   margin-top: 14px;
@@ -1191,25 +1181,26 @@ button.foco {
     animation-duration: 0.2s;
   }
 
-  .panel.fin-muerte {
+  .panel.fin-barra {
     animation: none;
   }
 
-  .panel.fin-muerte .kicker,
-  .panel.fin-muerte .cifra,
-  .panel.fin-muerte .muerte-susurro,
-  .panel.fin-muerte .muerte-stats > :nth-child(1),
-  .panel.fin-muerte .muerte-stats > :nth-child(2),
-  .panel.fin-muerte .muerte-stats > :nth-child(3),
-  .panel.fin-muerte .muerte-parcela,
-  .panel.fin-muerte .acciones {
+  .panel.fin-barra .kicker,
+  .panel.fin-barra .cifra,
+  .panel.fin-barra .fin-susurro,
+  .panel.fin-barra .fin-stats > :nth-child(1),
+  .panel.fin-barra .fin-stats > :nth-child(2),
+  .panel.fin-barra .fin-stats > :nth-child(3),
+  .panel.fin-barra .fin-parcela,
+  .panel.fin-barra .acciones {
     animation: none;
   }
 }
 
 /* la muerte no tapa el campo: el tablero completo queda a la vista y el
    panel se queda abajo, en una barra negra de 1 px de borde */
-#overlay.muerte {
+#overlay.muerte,
+#overlay.victoria {
   background: linear-gradient(to bottom,
     rgba(0, 0, 0, 0) 0%,
     rgba(0, 0, 0, 0.22) 38%,
@@ -1221,7 +1212,7 @@ button.foco {
   transition: opacity 1.2s ease, visibility 1.2s;
 }
 
-.panel.fin-muerte {
+.panel.fin-barra {
   animation: subir-muerte 1.25s cubic-bezier(0.16, 0.84, 0.3, 1) 0.18s backwards;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -1236,17 +1227,17 @@ button.foco {
   background: #000;
 }
 
-.panel.fin-muerte .cifra {
+.panel.fin-barra .cifra {
   font-size: clamp(34px, 8vw, 52px);
   line-height: 0.9;
 }
 
-.panel.fin-muerte .acciones {
+.panel.fin-barra .acciones {
   min-width: min(320px, 100%);
 }
 
 @media (max-width: 700px) {
-  .panel.fin-muerte {
+  .panel.fin-barra {
     grid-template-columns: minmax(0, 1fr);
     align-items: stretch;
   }
@@ -1280,14 +1271,14 @@ button.foco {
   font-weight: 700;
 }
 
-.muerte-susurro {
+.fin-susurro {
   margin: 8px 0 0;
   font-size: 12px;
   letter-spacing: 0.02em;
   color: #9a9a9a;
 }
 
-.muerte-parcela {
+.fin-parcela {
   margin: 12px 0 0;
   font-family: var(--mono);
   font-size: 8.5px;
@@ -1296,14 +1287,14 @@ button.foco {
   color: var(--accent);
 }
 
-.muerte-stats {
+.fin-stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: clamp(10px, 2vw, 18px);
   margin-top: 10px;
 }
 
-.muerte-dato {
+.fin-dato {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -1312,7 +1303,7 @@ button.foco {
   min-width: 0;
 }
 
-.muerte-dato b {
+.fin-dato b {
   font-family: var(--mono);
   font-size: clamp(17px, 4vw, 24px);
   font-weight: 600;
@@ -1324,7 +1315,7 @@ button.foco {
   text-overflow: ellipsis;
 }
 
-.muerte-dato span {
+.fin-dato span {
   font-family: var(--mono);
   font-size: 8px;
   letter-spacing: 0.22em;
@@ -1332,9 +1323,17 @@ button.foco {
   color: var(--dim);
 }
 
-/* el borde superior de la barra de muerte va en el rojo del estallido */
+/* el borde superior de la barra habla: rojo en la muerte, blanco al despejar */
 .panel.fin-muerte {
   border-top: 1px solid var(--accent);
+}
+
+.panel.fin-victoria {
+  border-top: 1px solid var(--fg);
+}
+
+.cifra.limpia {
+  color: var(--fg);
 }
 
 /* intriga en capas: kicker, golpe, susurro, parte y parcela, en orden */
@@ -1349,35 +1348,35 @@ button.foco {
   }
 }
 
-.panel.fin-muerte .kicker {
+.panel.fin-barra .kicker {
   animation: aparecer 0.55s ease 0.30s backwards;
 }
 
-.panel.fin-muerte .cifra {
+.panel.fin-barra .cifra {
   animation: aparecer 0.6s ease 0.48s backwards;
 }
 
-.panel.fin-muerte .muerte-susurro {
+.panel.fin-barra .fin-susurro {
   animation: aparecer 0.6s ease 0.76s backwards;
 }
 
-.panel.fin-muerte .muerte-stats > :nth-child(1) {
+.panel.fin-barra .fin-stats > :nth-child(1) {
   animation: aparecer 0.55s ease 1.00s backwards;
 }
 
-.panel.fin-muerte .muerte-stats > :nth-child(2) {
+.panel.fin-barra .fin-stats > :nth-child(2) {
   animation: aparecer 0.55s ease 1.12s backwards;
 }
 
-.panel.fin-muerte .muerte-stats > :nth-child(3) {
+.panel.fin-barra .fin-stats > :nth-child(3) {
   animation: aparecer 0.55s ease 1.24s backwards;
 }
 
-.panel.fin-muerte .muerte-parcela {
+.panel.fin-barra .fin-parcela {
   animation: aparecer 0.6s ease 1.40s backwards;
 }
 
-.panel.fin-muerte .acciones {
+.panel.fin-barra .acciones {
   animation: aparecer 0.6s ease 1.55s backwards;
 }
 

@@ -116,15 +116,6 @@ function boomSintetico() {
     tono(41, 0.9, { tipo: 'triangle', vol: 0.15, fin: 26, delay: 0.22, release: 0.5 });
 }
 
-function secuencia(frecuencias, opts = {}) {
-  const { tipo = 'triangle', dur = 0.075, vol = 0.12, salto = 0.045 } = opts;
-  frecuencias.forEach((freq, i) => tono(freq, dur, {
-    tipo,
-    vol,
-    delay: i * salto,
-  }));
-}
-
 const MUSICA = {
   win: 'audio/Win.mp3',
   death: 'audio/Death.mp3',
@@ -233,12 +224,6 @@ const SONIDOS = {
       }
     }
     boomSintetico();
-  },
-  win() {
-    secuencia([523, 659, 784, 1047, 1319], { dur: 0.13, vol: 0.13, salto: 0.075 });
-  },
-  record() {
-    secuencia([784, 988, 1175, 1568], { tipo: 'sine', dur: 0.16, vol: 0.12, salto: 0.09 });
   },
   ui() {
     tono(460, 0.028, { tipo: 'square', vol: 0.045 });
