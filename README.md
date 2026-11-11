@@ -8,6 +8,10 @@ La pantalla es una hoja de tinta: negro profundo, blancos duros y un rojo para l
 
 La portada juega sola: una partida automática del siguiente nivel de la Treinta se despeja en la vista previa mientras decides qué jugar. El logotipo «minesweeper.» es tipografía pura, como el resto de la casa.
 
+## Sonido
+
+Los efectos van sintetizados en tiempo real (sin ficheros). La victoria y la derrota llevan su propia pieza, `Win.mp3` y `Death.mp3`, que entran y salen con fundidos: suenan sobre el estallido o la oleada de banderas y se apagan solas al empezar otra partida o volver a la portada. El interruptor de sonido (y la tecla `M`) las silencia con lo demás.
+
 ## Controles
 
 | Acción | Teclado | Ratón / táctil / mando |

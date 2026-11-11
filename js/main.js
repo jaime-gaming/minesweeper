@@ -1,4 +1,4 @@
-import { Game } from './engine.js?v=5';
+import { Game } from './engine.js?v=6';
 import {
   DIFICULTADES,
   DIFICULTAD_POR_DEFECTO,
@@ -7,10 +7,10 @@ import {
   esDificultadFija,
   limitesMinas,
 } from './presets.js?v=1';
-import { audio } from './audio.js?v=1';
+import { audio } from './audio.js?v=2';
 import { attachInput, registrarConversorPunto } from './input.js?v=1';
-import { t, getLanguage, setLanguage, unitMinas, routeSlug, routeWords } from './i18n.js?v=5';
-import { NIVELES, ACTOS, configNivel, nivelCampana, actoDe } from './campaign.js?v=4';
+import { t, getLanguage, setLanguage, unitMinas, routeSlug, routeWords } from './i18n.js?v=6';
+import { NIVELES, ACTOS, configNivel, nivelCampana, actoDe } from './campaign.js?v=5';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -192,7 +192,13 @@ const FOCO_SEL = '.row:not(.stat), .acciones button';
 let focoIndice = -1;
 
 function ponerOverlay(html, variante) {
-  el.overlay.classList.toggle('muerte', variante === 'muerte');
+  const esMuerte = Boolean(html) && variante === 'muerte';
+  if (!esMuerte && huecoMuerte) {
+    huecoMuerte = 0;
+    el.stage.style.paddingBottom = '';
+    ajustarLienzo();
+  }
+  el.overlay.classList.toggle('muerte', esMuerte);
   if (!html) {
     el.overlay.classList.remove('abierto');
     el.overlay.innerHTML = '';
@@ -382,6 +388,8 @@ function actualizarMarcador() {
 
 /* -------------------------------------------------------- ajustar lienzo */
 
+let huecoMuerte = 0; // alto reservado bajo el tablero en la pantalla de muerte
+
 function ajustarLienzo() {
   const j = app.juego;
   const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -390,7 +398,7 @@ function ajustarLienzo() {
   const filas = j ? j.filas : 9;
   const margen = 4;
   const availW = Math.max(80, banda.width - margen);
-  const availH = Math.max(80, banda.height - margen);
+  const availH = Math.max(80, banda.height - margen - huecoMuerte);
   const cell = Math.max(8, Math.floor(Math.min(availW / columnas, availH / filas)));
   vista.cell = cell;
   vista.width = cell * columnas;
@@ -567,6 +575,7 @@ function cabeceraPanel(titulo, extra = '') {
 const botonVolver = () => `<button class="ghost" type="button" data-accion="back">${t('back')}<kbd>Esc</kbd></button>`;
 
 function mostrarPortada() {
+  audio.pararMusica(0.4); // transición: adiós a la fanfarria
   app.juego = null;
   app.contado = false;
   const hechos = campañaHechos();
@@ -818,6 +827,7 @@ function empezarPartida(modo, nivel = null) {
     mostrarCampaña();
     return;
   }
+  audio.pararMusica(0.3); // transición: la fanfarria anterior se apaga sola
   app.juego = new Game(cfg, eventosJuego);
   app.record = false;
   app.contado = false;
@@ -917,6 +927,7 @@ function eventosJuego(tipo, datos) {
       contabilizarFin(false);
       audio.play('boom');
       if (typeof navigator.vibrate === 'function') navigator.vibrate([50, 40, 90]);
+      audio.musica('death', 120);
       const destello = document.getElementById('flash');
       if (destello) {
         destello.classList.remove('activo');
@@ -925,12 +936,13 @@ function eventosJuego(tipo, datos) {
       }
       setTimeout(() => {
         if (app.juego === j && j.estado === 'perdido') mostrarFinPerdida();
-      }, 750);
+      }, 480);
       break;
     }
     case 'win':
       contabilizarFin(true);
       audio.play('win');
+      audio.musica('win', 100);
       if (app.record) setTimeout(() => audio.play('record'), 430);
       setTimeout(() => {
         if (app.juego === j && j.estado === 'ganado') mostrarFinGanada();
@@ -1036,6 +1048,14 @@ function mostrarFinPerdida() {
   </div>`, 'muerte');
   pantalla('dead');
   enfocarPrimero();
+  // el tablero completo queda por encima de la barra: se reserva el alto real
+  const panel = el.overlay.querySelector('.fin-muerte');
+  const alto = panel ? Math.ceil(panel.getBoundingClientRect().height) : 0;
+  if (alto > 0) {
+    huecoMuerte = alto;
+    el.stage.style.paddingBottom = `${alto}px`;
+    ajustarLienzo();
+  }
 }
 
 /* ------------------------------------------------------- perfil y ajustes */

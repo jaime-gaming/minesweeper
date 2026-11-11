@@ -1,7 +1,9 @@
-// Sonido sintetizado en tiempo real: sin ficheros externos ni música de fondo.
+// Sonido sintetizado en tiempo real para los efectos; la victoria y la
+// derrota llevan su propia pieza (Win.mp3 / Death.mp3, en la raíz del repo).
 
 let ctx = null;
 let master = null;
+let musicGain = null;
 let noiseBuf = null;
 let roto = false;
 
@@ -18,7 +20,10 @@ function build() {
     ctx = new AC();
     master = ctx.createGain();
     master.gain.value = audio.enabled ? 0.15 : 0;
+    musicGain = ctx.createGain();
+    musicGain.gain.value = 1.5; // las piezas llegan bajas del archivo: aquí se equilibran
 
+    musicGain.connect(master);
     if (typeof ctx.createDynamicsCompressor === 'function') {
       const compresor = ctx.createDynamicsCompressor();
       compresor.threshold.value = -20;
@@ -102,6 +107,47 @@ function secuencia(frecuencias, opts = {}) {
   }));
 }
 
+const MUSICA = {
+  win: 'Win.mp3',
+  death: 'Death.mp3',
+};
+
+const buffersMusica = new Map();
+let actual = null; // { src, gan, nombre }
+let generacion = 0;
+
+function cargarMusica(nombre) {
+  if (buffersMusica.has(nombre)) return buffersMusica.get(nombre);
+  const c = build();
+  const promesa = fetch(MUSICA[nombre])
+    .then((r) => {
+      if (!r.ok) throw new Error(`audio ${r.status}`);
+      return r.arrayBuffer();
+    })
+    .then((ab) => c.decodeAudioData(ab));
+  buffersMusica.set(nombre, promesa);
+  promesa.catch(() => buffersMusica.delete(nombre));
+  return promesa;
+}
+
+function detenerMusicaActual(fade = 0.35) {
+  generacion += 1; // invalida cualquier carga en vuelo
+  const c = ctx;
+  const corriente = actual;
+  actual = null;
+  if (!c || !corriente) return;
+  const { src, gan } = corriente;
+  try {
+    const t = c.currentTime;
+    gan.gain.cancelScheduledValues(t);
+    gan.gain.setValueAtTime(Math.max(0.0001, gan.gain.value), t);
+    gan.gain.setTargetAtTime(0.0001, t, fade / 3);
+    src.stop(t + fade + 0.1);
+  } catch (err) {
+    try { src.stop(); } catch (err2) { /* silencio */ }
+  }
+}
+
 const SONIDOS = {
   start() {
     tono(260, 0.085, { tipo: 'triangle', vol: 0.16, fin: 430 });
@@ -171,6 +217,36 @@ export const audio = {
   toggle() {
     this.set(!this.enabled);
     return this.enabled;
+  },
+
+  // fanfarria de victoria o derrota: entra con fade, sale al siguiente paso
+  musica(nombre, retardoMs = 0) {
+    if (!this.enabled || !MUSICA[nombre]) return;
+    const c = build();
+    if (!c) return;
+    detenerMusicaActual(0.3);
+    const gen = generacion;
+    cargarMusica(nombre).then((buf) => {
+      if (gen !== generacion || !this.enabled) return; // se pidió otra cosa entretanto
+      const gan = c.createGain();
+      gan.gain.setValueAtTime(0.0001, c.currentTime);
+      gan.gain.exponentialRampToValueAtTime(1, c.currentTime + 0.45);
+      const src = c.createBufferSource();
+      src.buffer = buf;
+      src.connect(gan).connect(musicGain);
+      src.addEventListener('ended', () => {
+        if (actual && actual.src === src) actual = null;
+      });
+      src.start(c.currentTime + Math.max(0, retardoMs) / 1000);
+      actual = { src, gan, nombre };
+    }).catch(() => {
+      /* sin música no se rompe nada */
+    });
+  },
+
+  // transición fuera de la fanfarria: al empezar una partida o volver al menú
+  pararMusica(fade = 0.35) {
+    detenerMusicaActual(fade);
   },
 
   play(nombre, datos) {
