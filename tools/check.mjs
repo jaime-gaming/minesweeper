@@ -13,6 +13,7 @@ import {
   normalizarPersonalizada,
 } from '../js/presets.js';
 import { __testClaves, t, unitMinas } from '../js/i18n.js';
+import { ACTOS, NIVELES, configNivel, nivelCampana, actoDe } from '../js/campaign.js';
 
 let fallos = 0;
 let pruebas = 0;
@@ -237,6 +238,59 @@ prueba('pulsar abre o hace acorde según el estado de la casilla', () => {
   const r2 = tablero.pulsar(4);
   afirma(r2.reveladas.length > 0, 'pulsar sobre número abierto hace acorde');
   afirma(tablero.estado === 'ganado', 'y cierra la partida');
+});
+
+process.stdout.write('campaña\n');
+
+prueba('la treinta son 30 niveles en 4 actos', () => {
+  afirma(NIVELES.length === 30, `esperaba 30 niveles y hay ${NIVELES.length}`);
+  afirma(ACTOS.length === 4, 'cuatro actos');
+  const total = ACTOS.reduce((n, a) => n + NIVELES.filter((niv) => niv.act === a.id).length, 0);
+  afirma(total === 30, 'todos los niveles caen en un acto');
+  afirma(nivelCampana(0) && nivelCampana(29) && !nivelCampana(30), 'nivelCampana acota');
+  afirma(actoDe(0).id === 1 && actoDe(29).id === 4, 'actoDe reparte bien');
+  for (const a of ACTOS) {
+    for (const niv of NIVELES.filter((x) => x.act === a.id)) afirma(niv.act === a.id, 'acto coherente');
+  }
+});
+
+prueba('cada nivel de campaña es jugable y progresivo en actos', () => {
+  for (const n of NIVELES) {
+    afirma(n.filas >= 5 && n.filas <= 30, `filas ${n.filas}`);
+    afirma(n.columnas >= 5 && n.columnas <= 30, `columnas ${n.columnas}`);
+    afirma(n.minas >= 1 && n.minas < n.filas * n.columnas * 0.6, `minas ${n.minas}`);
+    afirma(n.nombreEs.trim() && n.nombreEn.trim(), 'nombre en ambos idiomas');
+    if (n.reloj) afirma(n.reloj >= 60 && n.reloj <= 900, `reloj ${n.reloj}s razonable`);
+    if (n.senal) afirma(n.senal >= 1 && n.senal < n.minas, `señal ${n.senal} < minas`);
+  }
+  // el acto IV es más duro que el acto I, y no por poco
+  const maxMinas = (act) => Math.max(...NIVELES.filter((n) => n.act === act).map((n) => n.minas));
+  afirma(maxMinas(4) > maxMinas(1), 'el corazón muerde más que el exterior');
+});
+
+prueba('configNivel mapea modificadores al motor', () => {
+  const plano = configNivel(0);
+  afirma(plano.filas === 6 && plano.columnas === 6 && plano.minas === 6, 'nivel 1 sin mods');
+  afirma(!plano.mods, 'sin modificadores donde no tocan');
+  const conReloj = NIVELES.findIndex((n) => n.reloj);
+  const cfgReloj = configNivel(conReloj);
+  afirma(cfgReloj.mods && cfgReloj.mods.relojMs === NIVELES[conReloj].reloj * 1000, 'reloj en ms');
+  const conSenal = NIVELES.findIndex((n) => n.senal);
+  const cfgSenal = configNivel(conSenal);
+  afirma(cfgSenal.mods && cfgSenal.mods.senal === NIVELES[conSenal].senal, 'señal al vuelo');
+  afirma(configNivel(99) === null, 'índice fuera de rango devuelve null');
+});
+
+prueba('la señal pre-marca exactamente N minas reales', () => {
+  const tablero = tableroConMinas(8, 8, [0, 1, 2, 9, 17]);
+  const marcadas = tablero.marcarSenal(2);
+  afirma(marcadas === 2, `marcó ${marcadas}`);
+  const banderas = tablero.celdas.filter((c) => c.bandera);
+  afirma(banderas.length === 2, 'dos banderas');
+  afirma(banderas.every((c) => c.mina), 'siempre sobre minas');
+  afirma(tablero.restantesMinas() === tablero.minas - 2, 'el contador descuenta las señales');
+  const cero = tablero.marcarSenal(0);
+  afirma(cero === 0, 'señal cero no marca nada');
 });
 
 process.stdout.write('idiomas\n');

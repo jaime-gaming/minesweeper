@@ -13,10 +13,10 @@ const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SALIDA = path.join(RAIZ, 'minesweeper.js');
 
 // orden de dependencias: cada módulo sólo usa los anteriores
-const ORDEN = ['board', 'presets', 'audio', 'input', 'engine', 'i18n', 'main'];
+const ORDEN = ['board', 'presets', 'audio', 'input', 'engine', 'i18n', 'campaign', 'main'];
 
 const RE_IMPORT = /^import\s*\{([^}]*)\}\s*from\s*'\.\/([a-z0-9]+)\.js[^']*';?$/gm;
-const RE_EXPORT = /^export\s+(const|let|var|class|function)\s+([A-Za-z_$][\w$]*)/gm;
+const RE_EXPORT = /^export\s+(const|let|var|class|function)\s+([^\s(]+)/gm;
 
 function transformar(id, fuente) {
   const exportados = [];

@@ -1,10 +1,12 @@
 # minesweeper
 
-El buscaminas clásico, de bloques en blanco y negro. Sin adornos, sin dependencias y sin llamadas a la red: la rejilla, las minas, el número de cada casilla y el rojo reservado para lo que estalla. La interfaz está en español y en inglés, y se puede jugar con ratón, teclado, táctil o mando. Comparte casa y estética con [snake](https://github.com/jaime-gaming/snake).
+El buscaminas clásico, de bloques en blanco y negro, con los números en neón y una luz de farol que sigue al puntero por el tablero. Sin dependencias y sin llamadas a la red: la rejilla, las minas, la treintena de niveles de **la Treinta** y el rojo reservado para lo que estalla. La interfaz está en español y en inglés, y se puede jugar con ratón, teclado, táctil o mando. Comparte casa y estética con [snake](https://github.com/jaime-gaming/snake).
 
 ## Idea visual
 
-La pantalla es una hoja de tinta: negro profundo, blancos duros y un rojo para la bandera, las minas y la casilla que estalla. Las celdas cerradas son bloques con un bisel mínimo; las descubiertas se funden con el fondo y dejan su número en monoespaciada, con un ramp de luz que solivian solo al 7 y al 8, que avisan en rojo. Al estallar, el lienzo se sacude y la casilla asesina queda entera en rojo con la mina en negro. Al ganar, las banderas se izan en oleada desde la esquina y una franja de luz cruza el tablero una sola vez.
+La pantalla es una hoja de tinta iluminada por un farol: negro profundo, blancos duros y un círculo de luz cálida que sigue al puntero por el tablero (se puede desactivar en ajustes). Los números ya no se ocultan en grises: cada cifra lleva su color clásico de buscaminas en versión neón, con un halo de luz propia. Las celdas cerradas son bloques con un bisel mínimo; las descubiertas se funden con el fondo. Al estallar, el lienzo se sacude y la casilla asesina queda entera en rojo con la mina en negro. Al ganar, las banderas se izan en oleada desde la esquina y una franja de luz cruza el tablero una sola vez.
+
+La portada juega sola: una partida automática del siguiente nivel de la Treinta se despeja en la vista previa mientras decides qué jugar, y el logotipo «minesweeper.» late con ondas de sonar.
 
 ## Controles
 
@@ -35,9 +37,22 @@ El primer clic nunca estalla y siempre abre hueco (la zona del clic y sus vecina
 
 Las tres dificultades fijas tienen **récord de tiempo** independiente y estadísticas; la personalizada sólo cuenta partidas, victorias y racha.
 
+## La Treinta — campaña
+
+Treinta niveles dibujados a mano en cuatro actos, como un descenso a la mina:
+
+| Acto | Nivel | Tableros |
+| --- | --- | --- |
+| I · el exterior | 1 – 6 | de 6×6/6 a 9×9/16 |
+| II · las galerías | 7 – 12 | de 10×10/18 a 14×14/40 |
+| III · el filón | 13 – 18 | de 14×14/44 a 16×16/66 |
+| IV · el corazón | 19 – 30 | de 16×16/69 a 24×30/132 |
+
+Cada nivel completado abre el siguiente y guarda tu **mejor tiempo** en su casilla; no hay estrellas, sólo tu marca. Dos modificadores aparecen en el descenso: **reloj** (la galería se cierra en su momento; el cronómetro late en rojo con diez segundos por delante) y **señal** (algunas minas ya vienen marcadas cuando abres: «alguien pasó por aquí antes que tú»). El perfil cuenta la campaña como victorias, rachas y tiempo total, y la portada enlaza directamente con tu siguiente paso. Cada nivel tiene su ruta profunda (`/campaña/nivel-07`), y el botón atrás navega por las pantallas como en cualquier web.
+
 ## Perfil
 
-La portada enlaza con el perfil: partidas, victorias, tasa de victorias, mejor racha, los tres mejores tiempos y un botón para **borrar todo el progreso** —récords, estadísticas y ajustes— con confirmación.
+La portada enlaza con el perfil: partidas, victorias, tasa de victorias, mejor racha, progreso en la Treinta (niveles despejados), los tres mejores tiempos y un botón para **borrar todo el progreso** —récords, estadísticas y ajustes— con confirmación. La ayuda y los ajustes viven en el pie de la portada, no como botones principales; la ayuda cubre el juego entero: reglas, modos, campaña, controles de teclado, ratón y táctil.
 
 ## Idioma
 
@@ -65,8 +80,9 @@ js/presets.js     las tres dificultades fijas y los límites de la personalizada
 js/engine.js      máquina de estados y dibujado en lienzo (bloques, no suavizado)
 js/input.js       teclado, gestos táctiles y mando; habla en acciones
 js/audio.js       sonido sintetizado por Web Audio: sin ficheros externos
-js/i18n.js        textos en ES/EN
-js/main.js        pantallas, HUD, récords en localStorage y arranque
+js/i18n.js        textos en ES/EN y slugs de ruta (jugar, campaña, …)
+js/campaign.js    la Treinta: actos, niveles, modificadores y mejoras
+js/main.js        pantallas, HUD, récords en localStorage, demo de portada, rutas y arranque
 tools/build.mjs   empaquetador sin dependencias
 tools/check.mjs   pruebas de lógica, sin navegador
 ```

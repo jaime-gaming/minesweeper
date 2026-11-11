@@ -231,6 +231,27 @@ export class Tablero {
     return this.minas - this.contarBanderas();
   }
 
+  // marca k minas al azar con banderas correctas (modificador de campaña
+  // «alguien pasó por aquí»). sólo después de sembrar; no toca banderas puestas.
+  marcarSenal(k) {
+    if (!this.sembradas) return 0;
+    let objetivo = Math.floor(Number(k));
+    if (!Number.isFinite(objetivo) || objetivo <= 0) return 0;
+    const candidatas = [];
+    for (let i = 0; i < this.total; i += 1) {
+      if (this.celdas[i].mina && !this.celdas[i].bandera) candidatas.push(i);
+    }
+    for (let i = candidatas.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(this.rng() * (i + 1));
+      const tmp = candidatas[i];
+      candidatas[i] = candidatas[j];
+      candidatas[j] = tmp;
+    }
+    const n = Math.min(objetivo, candidatas.length);
+    for (let i = 0; i < n; i += 1) this.celdas[candidatas[i]].bandera = true;
+    return n;
+  }
+
   // minas que quedan por descubrir/marcar al perder: para el motor
   minasOcultas() {
     const out = [];

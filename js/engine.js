@@ -6,9 +6,10 @@ import { Tablero } from './board.js?v=1';
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const ACENTO = '#ff2b2b';
 
-// números: blanco con un ramp de luz; el 7 y el 8 avisan en rojo
-const ALFA_NUMERO = [0, 0.56, 0.66, 0.76, 0.86, 0.93, 1, 1, 1];
-const COLOR_NUMERO = (n) => (n >= 7 ? ACENTO : `rgba(255,255,255,${ALFA_NUMERO[clamp(n, 1, 8)].toFixed(2)})`);
+// números: cada valor con su color, como manda el buscaminas de toda la vida,
+// pero en versión neón sobre la hoja de tinta
+const COLORES_NUMERO = ['', '#5aa2ff', '#3ddc84', '#ff5d5d', '#b78cff', '#ff8a3d', '#2dd4d4', '#f5d90a', '#ececec'];
+const COLOR_NUMERO = (n) => COLORES_NUMERO[clamp(n, 1, 8)] || ACENTO;
 
 export class Game {
   constructor(cfg, onEvent = () => {}) {
@@ -33,7 +34,17 @@ export class Game {
     this.shake = 0; // sacudida del lienzo al estallar
     this.explosionT = -1;
     this.winT = -1;
+
+    // modificadores de campaña: reloj (contratiempo) y señalización inicial
+    const mods = this.cfg.mods || {};
+    this.relojMax = Number(mods.relojMs) > 0 ? Math.floor(Number(mods.relojMs)) : 0;
+    this.restanteMs = this.relojMax;
+    this.senal = Number(mods.senal) > 0 ? Math.floor(Number(mods.senal)) : 0;
+    this.senalAplicada = false;
   }
+
+  get tieneReloj() { return this.relojMax > 0; }
+  get tiempoRestante() { return this.restanteMs; }
 
   emit(type, data) {
     this.onEvent(type, data);
@@ -89,7 +100,13 @@ export class Game {
       this.emit('win', { tiempoMs: this.tiempoMs });
       return;
     }
-    if (this.estado === 'antes' && this.tablero.sembradas) this.estado = 'jugando';
+    if (this.estado === 'antes' && this.tablero.sembradas) {
+      this.estado = 'jugando';
+      if (this.senal > 0 && !this.senalAplicada) {
+        this.senalAplicada = true;
+        this.tablero.marcarSenal(this.senal);
+      }
+    }
   }
 
   // destapa la casilla (x, y): si está cerrada la revela; si ya estaba abierta,
@@ -137,6 +154,15 @@ export class Game {
     this.reloj += paso;
     if (this.estado === 'jugando' && !this.pausado) this.tiempoMs += paso;
     else if (this.estado === 'antes' && !this.pausado && this.tablero.sembradas) this.tiempoMs += paso;
+    // modificador «reloj»: si la galería se cierra, se acabó
+    if (this.estado === 'jugando' && !this.pausado && this.relojMax > 0) {
+      this.restanteMs = Math.max(0, this.restanteMs - paso);
+      if (this.restanteMs === 0) {
+        this.estado = 'perdido';
+        this.explosionT = -1;
+        this.emit('timeOut', {});
+      }
+    }
     this.shake = Math.max(0, this.shake - paso * 0.05);
     if (this.flashes.length) {
       const limite = this.reloj - 450;
@@ -254,9 +280,12 @@ export class Game {
       }
     }
 
-    // marco exterior: dos trazos en las esquinas, como el resto de la casa
-    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+    // marco exterior: dos trazos en las esquinas, como el resto de la casa.
+    // con el modificador reloj, por debajo de los 10 s las esquinas laten en rojo
+    const urgente = this.tieneReloj && this.estado === 'jugando' && this.restanteMs < 10000;
+    ctx.strokeStyle = urgente ? ACENTO : 'rgba(255,255,255,0.85)';
     ctx.lineWidth = 2;
+    if (urgente) ctx.globalAlpha = 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(this.reloj / 160));
     const W = columnas * cell;
     const H = filas * cell;
     const tramo = Math.max(6, Math.round(cell * 0.7));
@@ -267,6 +296,7 @@ export class Game {
     ctx.moveTo(ox + b, oy + H - b - tramo); ctx.lineTo(ox + b, oy + H - b); ctx.lineTo(ox + b + tramo, oy + H - b);
     ctx.moveTo(ox + W - b - tramo, oy + H - b); ctx.lineTo(ox + W - b, oy + H - b); ctx.lineTo(ox + W - b, oy + H - b - tramo);
     ctx.stroke();
+    ctx.globalAlpha = 1;
 
     // cursor del teclado: cuatro marcas de esquina sobre cualquier casilla,
     // abierta o cerrada, para no perderlo de vista al destapar
@@ -311,10 +341,17 @@ export class Game {
     const n = celda.adj;
     if (n > 0) {
       const fuente = Math.round(lado * 0.56);
-      ctx.fillStyle = COLOR_NUMERO(n);
-      ctx.font = `600 ${fuente}px ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace`;
+      const color = COLOR_NUMERO(n);
+      ctx.fillStyle = color;
+      ctx.font = `700 ${fuente}px ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
+      // neón suave: el halo respira con el propio color del número
+      ctx.save();
+      ctx.shadowColor = color;
+      ctx.shadowBlur = Math.round(lado * 0.22);
+      ctx.fillText(String(n), X + lado / 2, Y + lado / 2 + Math.round(lado * 0.04));
+      ctx.restore();
       ctx.fillText(String(n), X + lado / 2, Y + lado / 2 + Math.round(lado * 0.04));
     }
   }
