@@ -1,4 +1,4 @@
-/* minesweeper — un solo fichero, sin módulos. generado por tools/build.mjs (2026-11-11 · v2).
+/* minesweeper — un solo fichero, sin módulos. generado por tools/build.mjs (2026-11-11 · v3).
    no lo edites a mano: cambia js/*.js y vuelve a ejecutar node tools/build.mjs */
 (function () {
 'use strict';
@@ -238,27 +238,6 @@ class Tablero {
 
   restantesMinas() {
     return this.minas - this.contarBanderas();
-  }
-
-  // marca k minas al azar con banderas correctas (modificador de campaña
-  // «alguien pasó por aquí»). sólo después de sembrar; no toca banderas puestas.
-  marcarSenal(k) {
-    if (!this.sembradas) return 0;
-    let objetivo = Math.floor(Number(k));
-    if (!Number.isFinite(objetivo) || objetivo <= 0) return 0;
-    const candidatas = [];
-    for (let i = 0; i < this.total; i += 1) {
-      if (this.celdas[i].mina && !this.celdas[i].bandera) candidatas.push(i);
-    }
-    for (let i = candidatas.length - 1; i > 0; i -= 1) {
-      const j = Math.floor(this.rng() * (i + 1));
-      const tmp = candidatas[i];
-      candidatas[i] = candidatas[j];
-      candidatas[j] = tmp;
-    }
-    const n = Math.min(objetivo, candidatas.length);
-    for (let i = 0; i < n; i += 1) this.celdas[candidatas[i]].bandera = true;
-    return n;
   }
 
   // minas que quedan por descubrir/marcar al perder: para el motor
@@ -712,10 +691,12 @@ const { Tablero } = modulos['board'];
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const ACENTO = '#ff2b2b';
+// la monoespaciada de la casa (var(--mono) en styles.css)
+const FUENTE_MONO = 'ui-monospace, "SFMono-Regular", "SF Mono", "Roboto Mono", Menlo, Consolas, monospace';
 
-// números: cada valor con su color, como manda el buscaminas de toda la vida,
-// pero en versión neón sobre la hoja de tinta
-const COLORES_NUMERO = ['', '#5aa2ff', '#3ddc84', '#ff5d5d', '#b78cff', '#ff8a3d', '#2dd4d4', '#f5d90a', '#ececec'];
+// números: el color clásico del buscaminas sobre la tinta, planos, en la
+// monoespaciada de la casa — sin halos
+const COLORES_NUMERO = ['', '#4aa3ff', '#35d07f', '#ff4d4d', '#8f7bff', '#ff7a1f', '#22c8c8', '#ffd60a', '#f2f2f2'];
 const COLOR_NUMERO = (n) => COLORES_NUMERO[clamp(n, 1, 8)] || ACENTO;
 
 class Game {
@@ -741,17 +722,7 @@ class Game {
     this.shake = 0; // sacudida del lienzo al estallar
     this.explosionT = -1;
     this.winT = -1;
-
-    // modificadores de campaña: reloj (contratiempo) y señalización inicial
-    const mods = this.cfg.mods || {};
-    this.relojMax = Number(mods.relojMs) > 0 ? Math.floor(Number(mods.relojMs)) : 0;
-    this.restanteMs = this.relojMax;
-    this.senal = Number(mods.senal) > 0 ? Math.floor(Number(mods.senal)) : 0;
-    this.senalAplicada = false;
   }
-
-  get tieneReloj() { return this.relojMax > 0; }
-  get tiempoRestante() { return this.restanteMs; }
 
   emit(type, data) {
     this.onEvent(type, data);
@@ -807,13 +778,7 @@ class Game {
       this.emit('win', { tiempoMs: this.tiempoMs });
       return;
     }
-    if (this.estado === 'antes' && this.tablero.sembradas) {
-      this.estado = 'jugando';
-      if (this.senal > 0 && !this.senalAplicada) {
-        this.senalAplicada = true;
-        this.tablero.marcarSenal(this.senal);
-      }
-    }
+    if (this.estado === 'antes' && this.tablero.sembradas) this.estado = 'jugando';
   }
 
   // destapa la casilla (x, y): si está cerrada la revela; si ya estaba abierta,
@@ -861,15 +826,6 @@ class Game {
     this.reloj += paso;
     if (this.estado === 'jugando' && !this.pausado) this.tiempoMs += paso;
     else if (this.estado === 'antes' && !this.pausado && this.tablero.sembradas) this.tiempoMs += paso;
-    // modificador «reloj»: si la galería se cierra, se acabó
-    if (this.estado === 'jugando' && !this.pausado && this.relojMax > 0) {
-      this.restanteMs = Math.max(0, this.restanteMs - paso);
-      if (this.restanteMs === 0) {
-        this.estado = 'perdido';
-        this.explosionT = -1;
-        this.emit('timeOut', {});
-      }
-    }
     this.shake = Math.max(0, this.shake - paso * 0.05);
     if (this.flashes.length) {
       const limite = this.reloj - 450;
@@ -987,12 +943,9 @@ class Game {
       }
     }
 
-    // marco exterior: dos trazos en las esquinas, como el resto de la casa.
-    // con el modificador reloj, por debajo de los 10 s las esquinas laten en rojo
-    const urgente = this.tieneReloj && this.estado === 'jugando' && this.restanteMs < 10000;
-    ctx.strokeStyle = urgente ? ACENTO : 'rgba(255,255,255,0.85)';
+    // marco exterior: dos trazos en las esquinas, como el resto de la casa
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
     ctx.lineWidth = 2;
-    if (urgente) ctx.globalAlpha = 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(this.reloj / 160));
     const W = columnas * cell;
     const H = filas * cell;
     const tramo = Math.max(6, Math.round(cell * 0.7));
@@ -1026,20 +979,34 @@ class Game {
   }
 
   _celdaCerrada(ctx, X, Y, lado, gap, hover) {
-    ctx.fillStyle = hover ? '#1d1d1d' : '#141414';
-    ctx.fillRect(X + gap, Y + gap, lado - gap * 2, lado - gap * 2);
-    // bisel: un trazo de luz arriba-izquierda y uno de sombra abajo-derecha
-    ctx.fillStyle = hover ? '#333' : '#2a2a2a';
-    ctx.fillRect(X + gap, Y + gap, lado - gap * 2, 1);
-    ctx.fillRect(X + gap, Y + gap, 1, lado - gap * 2);
-    ctx.fillStyle = '#080808';
-    ctx.fillRect(X + gap, Y + lado - gap - 1, lado - gap * 2, 1);
-    ctx.fillRect(X + lado - gap - 1, Y + gap, 1, lado - gap * 2);
+    const ix = X + gap;
+    const iy = Y + gap;
+    const w = lado - gap * 2;
+    // bloque de roca: cuerpo, plano de luz arriba y plano de sombra abajo,
+    // más un filo interior para que el bisel se lea también en casillas grandes
+    ctx.fillStyle = hover ? '#1e1e1e' : '#151515';
+    ctx.fillRect(ix, iy, w, w);
+    ctx.fillStyle = hover ? '#2b2b2b' : '#222222';
+    ctx.fillRect(ix, iy, w, 1);
+    ctx.fillRect(ix, iy, 1, w);
+    ctx.fillStyle = hover ? '#383838' : '#2e2e2e';
+    ctx.fillRect(ix + 1, iy + 1, w - 2, 1);
+    ctx.fillRect(ix + 1, iy + 1, 1, w - 2);
+    ctx.fillStyle = '#040404';
+    ctx.fillRect(ix, iy + w - 1, w, 1);
+    ctx.fillRect(ix + w - 1, iy, 1, w);
+    ctx.fillStyle = hover ? '#101010' : '#0d0d0d';
+    ctx.fillRect(ix + 1, iy + w - 2, w - 2, 1);
+    ctx.fillRect(ix + w - 2, iy + 1, 1, w - 2);
   }
 
   _celdaAbierta(ctx, X, Y, lado, gap, celda, i, forzada = false) {
-    ctx.fillStyle = '#060606';
+    ctx.fillStyle = '#070707';
     ctx.fillRect(X + gap, Y + gap, lado - gap * 2, lado - gap * 2);
+    // un rasgo hundido arriba: la casilla abierta se hunde en la hoja
+    ctx.fillStyle = '#050505';
+    ctx.fillRect(X + gap, Y + gap, lado - gap * 2, 1);
+    ctx.fillRect(X + gap, Y + gap, 1, lado - gap * 2);
 
     if (celda.mina) {
       this._mina(ctx, X, Y, lado, '#f2f2f2');
@@ -1047,19 +1014,12 @@ class Game {
     }
     const n = celda.adj;
     if (n > 0) {
-      const fuente = Math.round(lado * 0.56);
-      const color = COLOR_NUMERO(n);
-      ctx.fillStyle = color;
-      ctx.font = `700 ${fuente}px ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace`;
+      const fuente = Math.round(lado * 0.58);
+      ctx.fillStyle = COLOR_NUMERO(n);
+      ctx.font = `700 ${fuente}px ${FUENTE_MONO}`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      // neón suave: el halo respira con el propio color del número
-      ctx.save();
-      ctx.shadowColor = color;
-      ctx.shadowBlur = Math.round(lado * 0.22);
-      ctx.fillText(String(n), X + lado / 2, Y + lado / 2 + Math.round(lado * 0.04));
-      ctx.restore();
-      ctx.fillText(String(n), X + lado / 2, Y + lado / 2 + Math.round(lado * 0.04));
+      ctx.fillText(String(n), X + lado / 2, Y + lado / 2 + Math.round(lado * 0.05));
     }
   }
 
@@ -1067,28 +1027,40 @@ class Game {
     const u = Math.max(1, Math.round(lado / 16)); // unidad base de la mina
     const cx = X + lado / 2;
     const cy = Y + lado / 2;
+    const tono = color === '#000' ? '#000' : null; // cuerpo plano cuando se pinta sobre rojo
+    // halo de profundidad bajo el cuerpo
+    ctx.fillStyle = tono || 'rgba(0,0,0,0.35)';
+    ctx.fillRect(Math.round(cx - 4 * u), Math.round(cy - 2 * u) + 1, 8 * u, 5 * u);
+    // cuerpo: bloque grueso con cruz ampliada
     ctx.fillStyle = color;
-    // cuerpo: un bloque central grueso
     ctx.fillRect(Math.round(cx - 3 * u), Math.round(cy - 3 * u), 6 * u, 6 * u);
     ctx.fillRect(Math.round(cx - 4 * u), Math.round(cy - 2 * u), 8 * u, 4 * u);
     ctx.fillRect(Math.round(cx - 2 * u), Math.round(cy - 4 * u), 4 * u, 8 * u);
-    // púas cardinales
-    ctx.fillRect(Math.round(cx - u / 2), Math.round(cy - 6 * u), u, 2 * u);
-    ctx.fillRect(Math.round(cx - u / 2), Math.round(cy + 4 * u), u, 2 * u);
-    ctx.fillRect(Math.round(cx - 6 * u), Math.round(cy - u / 2), 2 * u, u);
-    ctx.fillRect(Math.round(cx + 4 * u), Math.round(cy - u / 2), 2 * u, u);
-    // púas diagonales: un píxel de bloque
-    ctx.fillRect(Math.round(cx - 5 * u), Math.round(cy - 5 * u), u, u);
-    ctx.fillRect(Math.round(cx + 4 * u), Math.round(cy - 5 * u), u, u);
-    ctx.fillRect(Math.round(cx - 5 * u), Math.round(cy + 4 * u), u, u);
-    ctx.fillRect(Math.round(cx + 4 * u), Math.round(cy + 4 * u), u, u);
+    // púas cardinales, más anchas que un píxel de bloque
+    ctx.fillRect(Math.round(cx - u), Math.round(cy - 6 * u), 2 * u, 2 * u);
+    ctx.fillRect(Math.round(cx - u), Math.round(cy + 4 * u), 2 * u, 2 * u);
+    ctx.fillRect(Math.round(cx - 6 * u), Math.round(cy - u), 2 * u, 2 * u);
+    ctx.fillRect(Math.round(cx + 4 * u), Math.round(cy - u), 2 * u, 2 * u);
+    // púas diagonales
+    ctx.fillRect(Math.round(cx - 5 * u), Math.round(cy - 5 * u), u + (u >> 1), u + (u >> 1));
+    ctx.fillRect(Math.round(cx + 4 * u) - (u >> 1), Math.round(cy - 5 * u), u + (u >> 1), u + (u >> 1));
+    ctx.fillRect(Math.round(cx - 5 * u), Math.round(cy + 4 * u) - (u >> 1), u + (u >> 1), u + (u >> 1));
+    ctx.fillRect(Math.round(cx + 4 * u) - (u >> 1), Math.round(cy + 4 * u) - (u >> 1), u + (u >> 1), u + (u >> 1));
+    if (!tono) {
+      // destello especular arriba-izquierda y sombra abajo-derecha
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(Math.round(cx - 2 * u), Math.round(cy - 2 * u), 2 * u, u);
+      ctx.fillRect(Math.round(cx - 3 * u), Math.round(cy - u), u, u);
+      ctx.fillStyle = 'rgba(0,0,0,0.28)';
+      ctx.fillRect(Math.round(cx + u), Math.round(cy + u), 2 * u, 2 * u);
+    }
   }
 
   _bandera(ctx, X, Y, lado, escala = 1) {
     if (escala <= 0.02) return;
     const u = Math.max(1, Math.round(lado / 16));
     const cx = Math.round(X + lado / 2);
-    const base = Math.round(Y + lado - 4 * u);
+    const base = Math.round(Y + lado - 3 * u);
     const cima = Math.round(Y + 3.5 * u);
     ctx.save();
     if (escala < 1) {
@@ -1096,17 +1068,36 @@ class Game {
       ctx.scale(escala, escala);
       ctx.translate(-cx, -(base + cima) / 2);
     }
-    // asta
+    // asta: cuerpo claro con filo de sombra a la derecha
+    ctx.fillStyle = '#e8e8e8';
+    ctx.fillRect(cx - u, cima, 2 * u, base - cima);
+    ctx.fillStyle = '#8f8f8f';
+    ctx.fillRect(cx + u - 1, cima, 1, base - cima);
+    // remate del asta
     ctx.fillStyle = '#f2f2f2';
-    ctx.fillRect(cx - u, cima, 2 * u > 1 ? 2 : 1, base - cima);
-    // base del asta
-    ctx.fillRect(cx - 3 * u, base, 6 * u, u);
-    // paño rojo: escalones que estrechan hacia la izquierda
+    ctx.fillRect(cx - u, cima - u, 2 * u, u);
+    // paño rojo con pliegue y luz: tres tramos escalonados hacia el asta
+    const px = cx + u; // el paño cuelga a la derecha del asta
     ctx.fillStyle = ACENTO;
-    ctx.fillRect(cx - 6 * u, cima, 5 * u, u);
-    ctx.fillRect(cx - 6 * u, cima + u, 4 * u, u);
-    ctx.fillRect(cx - 6 * u, cima + 2 * u, 3 * u, u);
-    ctx.fillRect(cx - 6 * u, cima + 3 * u, 2 * u, u);
+    ctx.fillRect(px, cima + u, 5 * u, u);
+    ctx.fillRect(px, cima + 2 * u, 6 * u, u);
+    ctx.fillRect(px, cima + 3 * u, 5 * u, u);
+    // luz del paño
+    ctx.fillStyle = '#ff7a7a';
+    ctx.fillRect(px, cima + u, 5 * u, 1);
+    ctx.fillRect(px, cima + 2 * u, 6 * u, 1);
+    // pliegue en sombra
+    ctx.fillStyle = '#a31212';
+    ctx.fillRect(px, cima + 3 * u, 5 * u, 1);
+    ctx.fillRect(px + 4 * u, cima + 2 * u, 2 * u, u);
+    // muesca de golondrina en el vuelo del paño
+    ctx.fillStyle = '#070707';
+    ctx.fillRect(px + 5 * u, cima + 2 * u, u, u);
+    // base del asta: zócalo claro con sombra
+    ctx.fillStyle = '#d8d8d8';
+    ctx.fillRect(cx - 3 * u, base, 6 * u, u);
+    ctx.fillStyle = '#4a4a4a';
+    ctx.fillRect(cx - 3 * u, base + u - 1, 6 * u, 1);
     ctx.restore();
   }
 
@@ -1145,7 +1136,7 @@ const KEY = 'minesweeper.language';
 const STRINGS = {
   es: {
     documentTitle: 'Minesweeper',
-    description: 'Buscaminas de bloques en blanco y negro con números de neón: tres dificultades, la Treinta (campaña de treinta niveles), banderas, récords locales.',
+    description: 'Buscaminas de bloques en blanco y negro con una historia en treinta niveles: la Treinta. Tres dificultades, banderas y récords locales.',
     language: 'Idioma',
     brandTagline: 'el buscaminas de bloques en blanco y negro.',
     sound: 'sonido',
@@ -1257,41 +1248,38 @@ const STRINGS = {
     hintProfile: 'récords y estadísticas · Esc vuelve',
     hintHelp: 'Esc vuelve',
     hintSettings: 'M silencia · Esc vuelve',
-    hintCampaign: 'elige nivel · ↵ juega · Esc vuelve',
+    hintCampaign: 'elige nivel · ↵ ve la historia · Esc vuelve',
+    hintStory: '↵ descender · Esc vuelve',
     // campaña · la treinta
     campaign: 'campaña',
-    campaignTag: 'La Treinta · treinta niveles, cuatro actos',
-    campaignIntro: 'desciende treinta niveles buscando el filón padre. cada uno abre el siguiente.',
-    campaignProgress: 'campaña · {done}/30',
+    campaignTag: 'la treinta · una historia en treinta niveles',
     campaignLocked: 'cierra primero el nivel anterior',
     campaignCleared: 'nivel despejado',
-    campaignNext: 'siguiente nivel',
-    campaignDone: 'el filón padre es tuyo. la treinta está completa.',
+    campaignNext: 'siguiente capítulo',
     campaignHud: 'nivel {n} · {name}',
+    campaignTagShort: 'elige tu descenso',
+    campaignPrologue: 'treinta niveles separan la luz del corazón de piedra. tu padre bajó primero. tú bajas detrás.',
     actLabel: 'acto {n} · {name}',
     levelCell: 'nivel {n}',
-    modRelojTag: 'la galería se cierra en {s} s',
-    modSenalTag: '{n} minas ya marcadas al abrir',
-    relojShort: 'reloj',
-    senalShort: 'señal',
-    timeOut: 'sin tiempo.',
-    timeOutNote: 'la galería se cerró con el reloj en {time}.',
+    descend: 'descender',
+    descendAgain: 'volver a descender',
+    epilogueKicker: 'epílogo',
+    epilogueTitle: 'el filón padre es tuyo.',
+    epilogueText: 'treinta niveles por un nombre. el filón padre no era metal: era tu padre esperando en la oscuridad. subís juntos a la boca, y la luz ya no tiembla.',
+    epilogueCta: 'volver a la boca',
     statsCampaign: 'campaña',
     statsCampaignTag: 'niveles despejados',
     preview: 'vista previa',
     previewNote: 'jugando: nivel {n} · {name}',
-    // ajustes: luz de farol
-    settingLamp: 'luz de farol',
-    settingLampTag: 'el círculo de luz que sigue al puntero por el tablero',
     // ayuda completa
     modesTitle: 'modos',
     modeRule1: 'jugar: principiante, intermedio, experto y una personalizada. las tres fijas guardan su récord.',
-    modeRule2: 'campaña · la treinta: treinta niveles en cuatro actos (el exterior, las galerías, el filón, el corazón). completar uno abre el siguiente y guarda tu mejor tiempo.',
-    modeRule3: 'modificadores de campaña: «reloj» — la galería se cierra en su momento; «señal» — algunas minas ya vienen marcadas al abrir.',
+    modeRule2: 'campaña · la treinta: una historia en treinta niveles, de la boca al corazón de piedra. completar uno abre el siguiente.',
+    modeRule3: 'cada nivel cuenta una línea del relato. el perfil guarda tu mejor tiempo en cada uno y cuenta tus victorias y rachas.',
     campaignRulesTitle: 'la treinta',
-    campaignRule1: 'avanza acto a acto: de seis por seis hasta treinta por veinticuatro.',
-    campaignRule2: 'completar un nivel desbloquea el siguiente; no hay estrellas, sólo tu mejor tiempo en cada casilla.',
-    campaignRule3: 'el perfil cuenta la campaña como una partida normal: victorias, rachas y tiempo total también suman.',
+    campaignRule1: 'desciende acto a acto: el exterior, las galerías, el filón y el corazón. de seis por seis a veinticuatro por treinta.',
+    campaignRule2: 'completar un nivel abre el siguiente; no hay estrellas, sólo tu mejor tiempo en cada casilla.',
+    campaignRule3: 'tu padre bajó antes que tú. en cada nivel hay una línea del relato; léetela antes de picar.',
     ctrlNavigate: 'moverse por los menús y ajustar los pasos',
     ctrlHelp: 'abrir y cerrar la ayuda',
     ctrlScroll: 'desplazar los paneles largos',
@@ -1308,9 +1296,9 @@ const STRINGS = {
   },
   en: {
     documentTitle: 'Minesweeper',
-    description: 'A black-and-white block minesweeper with neon numbers: three difficulties, The Thirty (a thirty-level campaign), flags, local records.',
+    description: 'A black-and-white block minesweeper with a story in thirty levels: The Thirty. Three difficulties, flags and local records.',
     language: 'Language',
-    brandTagline: 'a block minesweeper in black and white.',
+    brandTagline: 'thirty levels separate the light from the stone heart.',
     sound: 'sound',
     soundOn: 'on',
     soundOff: 'muted',
@@ -1420,41 +1408,38 @@ const STRINGS = {
     hintProfile: 'records and stats · Esc goes back',
     hintHelp: 'Esc goes back',
     hintSettings: 'M mutes · Esc goes back',
-    hintCampaign: 'pick a level · ↵ plays · Esc goes back',
+    hintCampaign: 'pick a level · ↵ reads the story · Esc goes back',
+    hintStory: '↵ descend · Esc goes back',
     // campaign · the thirty
     campaign: 'campaign',
-    campaignTag: 'The Thirty · thirty levels, four acts',
-    campaignIntro: 'descend thirty levels in search of the father lode. each one opens the next.',
-    campaignProgress: 'campaign · {done}/30',
+    campaignTag: 'the thirty · a story in thirty levels',
     campaignLocked: 'beat the previous level first',
     campaignCleared: 'level cleared',
-    campaignNext: 'next level',
-    campaignDone: 'the father lode is yours. the Thirty is complete.',
+    campaignNext: 'next chapter',
     campaignHud: 'level {n} · {name}',
+    campaignTagShort: 'choose your descent',
+    campaignPrologue: 'thirty levels stand between the light and the stone heart. your father went in first. you follow.',
     actLabel: 'act {n} · {name}',
     levelCell: 'level {n}',
-    modRelojTag: 'the gallery closes in {s}s',
-    modSenalTag: '{n} mines already flagged when you open',
-    relojShort: 'timer',
-    senalShort: 'mark',
-    timeOut: 'out of time.',
-    timeOutNote: 'the gallery closed with the clock at {time}.',
+    descend: 'descend',
+    descendAgain: 'descend again',
+    epilogueKicker: 'epilogue',
+    epilogueTitle: 'the father lode is yours.',
+    epilogueText: 'thirty levels for a name. the father lode was never metal: it was your father waiting in the dark. you walk up together, and the light no longer trembles.',
+    epilogueCta: 'back to the mouth',
     statsCampaign: 'campaign',
     statsCampaignTag: 'levels cleared',
     preview: 'preview',
     previewNote: 'playing: level {n} · {name}',
-    // settings: lantern light
-    settingLamp: 'lantern light',
-    settingLampTag: 'the circle of light that follows the pointer across the board',
     // full help
     modesTitle: 'modes',
-    modeRule1: 'play: beginner, intermediate, expert and a custom board. the three fixed ones keep records.',
-    modeRule2: 'campaign · the thirty: thirty levels in four acts (the outside, the galleries, the vein, the heart). clearing one opens the next and saves your best time.',
-    modeRule3: 'campaign modifiers: “timer” — the gallery closes at its moment; “marked” — some mines already come flagged when you open.',
+    modeRule1: 'play: beginner, intermediate, expert and a custom board. the three fixed ones keep their records.',
+    modeRule2: 'campaign · the thirty: a story in thirty levels, from the mouth to the stone heart. clearing one opens the next.',
+    modeRule3: 'each level tells one line of the tale. the profile keeps your best time on each and counts your wins and streaks.',
     campaignRulesTitle: 'the thirty',
-    campaignRule1: 'advance act by act: from six by six up to thirty by twenty-four.',
+    campaignRule1: 'descend act by act: the outside, the galleries, the vein and the heart — from six by six to twenty-four by thirty.',
     campaignRule2: 'clearing a level unlocks the next one; no stars, just your best time on every tile.',
-    campaignRule3: 'the profile counts the campaign like a normal game: wins, streaks and total play time add up too.',
+    campaignRule3: 'your father went in before you. each level holds a line of the story; read it before you dig.',
     ctrlNavigate: 'move through menus and adjust steps',
     ctrlHelp: 'open and close help',
     ctrlScroll: 'scroll the long panels',
@@ -1543,56 +1528,115 @@ function routeWords() {
 // ---- campaign ----
 (function (modulo) {
 'use strict';
-// campaña "La Treinta": treinta niveles dibujados a mano en cuatro actos.
-// cada nivel fija tamaño, minas y modificadores. completar uno abre el siguiente.
+// la treinta — el modo historia del juego.
+// treinta niveles en cuatro actos, con su pequeña historia:
+// tu padre bajó a la mina antes que tú. tú bajas a buscarlo.
+// cada nivel guarda una línea del relato; las citas van en ES y EN.
 //
-// modificadores:
-//   reloj  — segundos antes de que la galería se cierre (contratiempo)
-//   señal  — casillas marcadas con bandera correcta al primer clic
-//            ("alguien pasó por aquí antes que tú")
+// los niveles fijan tamaño y minas; completar uno abre el siguiente.
 
 const ACTOS = [
-  { id: 1, inicio: 0, nombreEs: 'el exterior', nombreEn: 'the outside', subEs: 'sol a ras de suelo, primera roca', subEn: 'sun at ground level, first rock' },
-  { id: 2, inicio: 6, nombreEs: 'las galerías', nombreEn: 'the galleries', subEs: 'a oscuras, siguiendo las vetas', subEn: 'in the dark, following the veins' },
-  { id: 3, inicio: 12, nombreEs: 'el filón', nombreEn: 'the vein', subEs: 'el metal canta, la roca aguanta', subEn: 'the metal sings, the rock holds' },
-  { id: 4, inicio: 18, nombreEs: 'el corazón', nombreEn: 'the heart', subEs: 'donde la mina no perdona', subEn: 'where the mine shows no mercy' },
+  { id: 1, inicio: 0, nombreEs: 'el exterior', nombreEn: 'the outside', subEs: 'la puerta de madera y los tres que no volvieron', subEn: 'the wooden door and the three who never came back' },
+  { id: 2, inicio: 6, nombreEs: 'las galerías', nombreEn: 'the galleries', subEs: 'los relevos, los raíles y el recado', subEn: 'the shifts, the rails and the note' },
+  { id: 3, inicio: 12, nombreEs: 'el filón', nombreEn: 'the vein', subEs: 'la veta empieza a cantar', subEn: 'the seam begins to sing' },
+  { id: 4, inicio: 18, nombreEs: 'el corazón', nombreEn: 'the heart', subEs: 'el corazón late bajo la piedra', subEn: 'the heart beats beneath the stone' },
 ];
 
 const NIVELES = [
   // acto I — el exterior
-  { act: 1, nombreEs: 'la boca', nombreEn: 'the mouth', filas: 6, columnas: 6, minas: 6 },
-  { act: 1, nombreEs: 'el sendero', nombreEn: 'the path', filas: 7, columnas: 7, minas: 9 },
-  { act: 1, nombreEs: 'primer desmonte', nombreEn: 'first cut', filas: 8, columnas: 8, minas: 10 },
-  { act: 1, nombreEs: 'el cargador', nombreEn: 'the loader', filas: 8, columnas: 8, minas: 14 },
-  { act: 1, nombreEs: 'mina honda', nombreEn: 'the deep mine', filas: 9, columnas: 9, minas: 12, senal: 1 },
-  { act: 1, nombreEs: 'el capataz', nombreEn: 'the foreman', filas: 9, columnas: 9, minas: 16 },
+  { act: 1, nombreEs: 'la boca', nombreEn: 'the mouth', filas: 6, columnas: 6, minas: 6,
+    historiaEs: 'El viento empuja la puerta de madera y el cerro se traga la luz. Tu padre bajó hace tres días. Sus botas siguen en el barro.',
+    historiaEn: 'The wind pushes the wooden door and the hill swallows the light. Your father went down three days ago. His boots are still in the mud.' },
+  { act: 1, nombreEs: 'el sendero', nombreEn: 'the path', filas: 7, columnas: 7, minas: 9,
+    historiaEs: 'El camino de grava baja en espiral. Alguien clavó clavos en la corteza de los castaños para marcar la dirección.',
+    historiaEn: 'The gravel path spirals downward. Someone nailed spikes into the chestnut bark to mark the way.' },
+  { act: 1, nombreEs: 'primer desmonte', nombreEn: 'first cut', filas: 8, columnas: 8, minas: 10,
+    historiaEs: 'La cuadrilla de siete. Los nombres de la tabla todavía huelen a aceite. Tres no volvieron del talud.',
+    historiaEn: 'The crew of seven. The names on the board still smell of oil. Three never came back from the scree.' },
+  { act: 1, nombreEs: 'el cargador', nombreEn: 'the loader', filas: 8, columnas: 8, minas: 14,
+    historiaEs: 'El cargador tiene las palas abiertas, como una boca esperando. Te quedas quieta y escuchas el hueco.',
+    historiaEn: 'The loader sits with its bucket open, like a mouth that expects something. You stay still and listen to the hollow.' },
+  { act: 1, nombreEs: 'mina honda', nombreEn: 'the deep mine', filas: 9, columnas: 9, minas: 12,
+    historiaEs: 'El primer pozo propiamente dicho. La guía del sindicato marcaba aquí con pintura blanca. La pintura sigue fresca.',
+    historiaEn: 'The first proper shaft. The union guide marked it here with white paint. The paint is still fresh.' },
+  { act: 1, nombreEs: 'el capataz', nombreEn: 'the foreman', filas: 9, columnas: 9, minas: 16,
+    historiaEs: 'La cabaña del capataz, tu padre: recibos, órdenes y una carta a medio escribir. La última línea dice tu nombre.',
+    historiaEn: "The foreman's cabin — your father's: receipts, orders, and a half-written letter. The last line says your name." },
   // acto II — las galerías
-  { act: 2, nombreEs: 'la galería norte', nombreEn: 'north gallery', filas: 10, columnas: 10, minas: 18 },
-  { act: 2, nombreEs: 'el relevo', nombreEn: 'the relief', filas: 10, columnas: 10, minas: 22, senal: 1 },
-  { act: 2, nombreEs: 'carbón y cal', nombreEn: 'coal and lime', filas: 12, columnas: 12, minas: 26 },
-  { act: 2, nombreEs: 'el pozo ciego', nombreEn: 'the blind shaft', filas: 12, columnas: 12, minas: 31 },
-  { act: 2, nombreEs: 'vía muerta', nombreEn: 'dead track', filas: 14, columnas: 14, minas: 34, senal: 2 },
-  { act: 2, nombreEs: 'el ventilador', nombreEn: 'the fan', filas: 14, columnas: 14, minas: 40 },
+  { act: 2, nombreEs: 'la galería norte', nombreEn: 'north gallery', filas: 10, columnas: 10, minas: 18,
+    historiaEs: 'El aire se vuelve mecha. Un raíl torcido apunta hacia adentro como un dedo índice.',
+    historiaEn: 'The air turns to wick. A twisted rail points inward like an index finger.' },
+  { act: 2, nombreEs: 'el relevo', nombreEn: 'the relief', filas: 10, columnas: 10, minas: 22,
+    historiaEs: 'Aquí la cuadrilla se partía en relevos. Uno dejó marcadas dos minas y un recado: «vuelve por el camino de las banderas».',
+    historiaEn: 'This is where the crew split into shifts. One of them marked two mines and left a note: “come back by the flags.”' },
+  { act: 2, nombreEs: 'carbón y cal', nombreEn: 'coal and lime', filas: 12, columnas: 12, minas: 26,
+    historiaEs: 'El carbón mancha la cal de las paredes. Entre las huellas grandes, otras pequeñas: ¿una cabra? No hay cabras ahí abajo.',
+    historiaEn: 'The coal stains the lime on the walls. Among the big footprints, small ones: a goat? There are no goats down there.' },
+  { act: 2, nombreEs: 'el pozo ciego', nombreEn: 'the blind shaft', filas: 12, columnas: 12, minas: 31,
+    historiaEs: 'Bajada a pico y sin mapa oficial. En los cuadernos el pozo ciego nunca figura como «explorado», pero nombra minas ahí abajo.',
+    historiaEn: 'Picked out by hand, no official map. The notebooks never list the blind shaft as “explored”, yet the mines down there have names.' },
+  { act: 2, nombreEs: 'vía muerta', nombreEn: 'dead track', filas: 14, columnas: 14, minas: 34,
+    historiaEs: 'Vagones parados con la carga a medio camino. El metal conserva el calor de otra época.',
+    historiaEn: 'Wagons stalled mid-track with their loads. The metal still keeps the warmth of another era.' },
+  { act: 2, nombreEs: 'el ventilador', nombreEn: 'the fan', filas: 14, columnas: 14, minas: 40,
+    historiaEs: 'El ventilador de hierro sigue girando. Alguien lo engrasó. Alguien quería que no se detuviera nunca.',
+    historiaEn: 'The iron fan is still turning. Someone oiled it. Someone wanted it never to stop.' },
   // acto III — el filón
-  { act: 3, nombreEs: 'el óxido', nombreEn: 'the rust', filas: 14, columnas: 14, minas: 44 },
-  { act: 3, nombreEs: 'la luz del farol', nombreEn: 'lantern light', filas: 16, columnas: 16, minas: 40, reloj: 150 },
-  { act: 3, nombreEs: 'galería estrecha', nombreEn: 'narrow gallery', filas: 16, columnas: 16, minas: 48 },
-  { act: 3, nombreEs: 'agua fría', nombreEn: 'cold water', filas: 16, columnas: 16, minas: 55, senal: 2 },
-  { act: 3, nombreEs: 'el escurridor', nombreEn: 'the drain', filas: 16, columnas: 16, minas: 61 },
-  { act: 3, nombreEs: 'vena gruesa', nombreEn: 'thick vein', filas: 16, columnas: 16, minas: 66, reloj: 240 },
+  { act: 3, nombreEs: 'el óxido', nombreEn: 'the rust', filas: 14, columnas: 14, minas: 44,
+    historiaEs: 'El óxido pinta la roca de sangre seca. Las primeras vetas asoman como vértebras.',
+    historiaEn: 'Rust paints the rock with dry blood. The first veins show through like vertebrae.' },
+  { act: 3, nombreEs: 'la luz del farol', nombreEn: 'lantern light', filas: 16, columnas: 16, minas: 40,
+    historiaEs: 'La veta empieza aquí, sangrando luz. A partir de este punto, la montaña manda en las luces.',
+    historiaEn: 'The seam begins here, bleeding light. From this point on, the mountain rules the lanterns.' },
+  { act: 3, nombreEs: 'galería estrecha', nombreEn: 'narrow gallery', filas: 16, columnas: 16, minas: 48,
+    historiaEs: 'Un metro de techo. Gateas. La mochila roza y algo se derrama: tu padre llevaba sal. Para la sed o para el susto.',
+    historiaEn: 'A metre of ceiling. You crawl. The pack scrapes and something spills: your father carried salt. For thirst, or for courage.' },
+  { act: 3, nombreEs: 'agua fría', nombreEn: 'cold water', filas: 16, columnas: 16, minas: 55,
+    historiaEs: 'El agua te sube por los tobillos, fría como una deuda. La corriente empuja hacia afuera. La montaña te echa.',
+    historiaEn: 'The water climbs your ankles, cold as a debt. The current pushes outward. The mountain is telling you to leave.' },
+  { act: 3, nombreEs: 'el escurridor', nombreEn: 'the drain', filas: 16, columnas: 16, minas: 61,
+    historiaEs: 'El agua se traga por los escurridores cantando bajo tus pies. No miras abajo.',
+    historiaEn: 'The water swallows itself through the drains, singing beneath your boots. You do not look down.' },
+  { act: 3, nombreEs: 'vena gruesa', nombreEn: 'thick vein', filas: 16, columnas: 16, minas: 66,
+    historiaEs: 'La veta entera, desnuda. Tu padre dibujó este mismo mapa hace años. Las minas están donde él las dejó anotadas.',
+    historiaEn: 'The whole seam, naked. Your father drew this very map years ago. The mines are where he wrote them down.' },
   // acto IV — el corazón
-  { act: 4, nombreEs: 'el corazón de la mina', nombreEn: 'heart of the mine', filas: 16, columnas: 16, minas: 69 },
-  { act: 4, nombreEs: 'el guardián', nombreEn: 'the warden', filas: 18, columnas: 18, minas: 72 },
-  { act: 4, nombreEs: 'polvo y pólvora', nombreEn: 'dust and powder', filas: 16, columnas: 20, minas: 70 },
-  { act: 4, nombreEs: 'la sala de máquinas', nombreEn: 'the engine room', filas: 20, columnas: 20, minas: 78, reloj: 300 },
-  { act: 4, nombreEs: 'tres picos', nombreEn: 'three peaks', filas: 18, columnas: 22, minas: 76 },
-  { act: 4, nombreEs: 'el último rellano', nombreEn: 'the last landing', filas: 22, columnas: 22, minas: 84, senal: 3 },
-  { act: 4, nombreEs: 'la veta maestra', nombreEn: 'the master seam', filas: 20, columnas: 24, minas: 88 },
-  { act: 4, nombreEs: 'minas de agua', nombreEn: 'water mines', filas: 22, columnas: 24, minas: 96, reloj: 420 },
-  { act: 4, nombreEs: 'el juicio del filón', nombreEn: "the seam's trial", filas: 24, columnas: 24, minas: 104 },
-  { act: 4, nombreEs: 'la noche cerrada', nombreEn: 'the black night', filas: 26, columnas: 24, minas: 112 },
-  { act: 4, nombreEs: 'el filón padre', nombreEn: 'the father lode', filas: 26, columnas: 28, minas: 124, senal: 3 },
-  { act: 4, nombreEs: 'el corazón de piedra', nombreEn: 'the stone heart', filas: 24, columnas: 30, minas: 132, reloj: 600 },
+  { act: 4, nombreEs: 'el corazón de la mina', nombreEn: 'heart of the mine', filas: 16, columnas: 16, minas: 69,
+    historiaEs: 'A partir de aquí todo late: el aire, el metal, tu pulso. La roca hierve en silencio.',
+    historiaEn: 'From here on everything beats: the air, the metal, your pulse. The rock boils in silence.' },
+  { act: 4, nombreEs: 'el guardián', nombreEn: 'the warden', filas: 18, columnas: 18, minas: 72,
+    historiaEs: 'El guardián de la boca, una estatua de sal en la oscuridad. La cuadrilla decía que señaliza el camino.',
+    historiaEn: 'The warden of the mouth — a salt statue in the dark. The crew said it marks the path.' },
+  { act: 4, nombreEs: 'polvo y pólvora', nombreEn: 'dust and powder', filas: 16, columnas: 20, minas: 70,
+    historiaEs: 'El polvo se alza como nieve negra con cada respiración. Aquí la pólvora decidió no estallar. No para ti.',
+    historiaEn: 'The dust rises like black snow with every breath. Here the powder decided not to explode. Not for you.' },
+  { act: 4, nombreEs: 'la sala de máquinas', nombreEn: 'the engine room', filas: 20, columnas: 20, minas: 78,
+    historiaEs: 'El corazón mecánico. Las máquinas paran una a una a tu paso, como queriendo escuchar.',
+    historiaEn: 'The mechanical heart. The machines stop one by one as you pass, as if trying to listen.' },
+  { act: 4, nombreEs: 'tres picos', nombreEn: 'three peaks', filas: 18, columnas: 22, minas: 76,
+    historiaEs: 'Tres picos clavados en el muro: los tres de los que se fueron. El tuyo espera su sitio.',
+    historiaEn: 'Three picks nailed to the wall — the three of them, gone. Yours waits for its place.' },
+  { act: 4, nombreEs: 'el último rellano', nombreEn: 'the last landing', filas: 22, columnas: 22, minas: 84,
+    historiaEs: 'El último rellano antes del filón padre. Desde aquí se oye el corazón. Tu padre escuchó este mismo sonido.',
+    historiaEn: 'The last landing before the father lode. From here you can hear the heart. Your father heard this same sound.' },
+  { act: 4, nombreEs: 'la veta maestra', nombreEn: 'the master seam', filas: 20, columnas: 24, minas: 88,
+    historiaEs: 'La veta maestra late con tu pulso. Una sola capa de piedra te separa de todo lo que dejaste atrás.',
+    historiaEn: 'The master seam beats with your pulse. A single layer of stone stands between you and everything you left behind.' },
+  { act: 4, nombreEs: 'minas de agua', nombreEn: 'water mines', filas: 22, columnas: 24, minas: 96,
+    historiaEs: 'El agua sube. La mina entera respira contra ti. Corre.',
+    historiaEn: 'The water rises. The whole mine breathes against you. Run.' },
+  { act: 4, nombreEs: 'el juicio del filón', nombreEn: "the seam's trial", filas: 24, columnas: 24, minas: 104,
+    historiaEs: 'El juicio. La montaña pesa el motivo de tu bajada. Aún no sabe que ya has ganado.',
+    historiaEn: 'The trial. The mountain weighs the reason for your descent. It does not yet know you have already won.' },
+  { act: 4, nombreEs: 'la noche cerrada', nombreEn: 'the black night', filas: 26, columnas: 24, minas: 112,
+    historiaEs: 'Oscuridad entera. Lo único encendido es tu farol y tu nombre en la carta del capataz.',
+    historiaEn: "Total darkness. The only lights left are your lantern and your name in the foreman's letter." },
+  { act: 4, nombreEs: 'el filón padre', nombreEn: 'the father lode', filas: 26, columnas: 28, minas: 124,
+    historiaEs: 'El filón padre. Lo que el valle soñó. El metal canta en voz baja, como acunando lo que tu padre guardó aquí.',
+    historiaEn: 'The father lode. What the valley dreamed of. The metal sings low, like a lullaby for what your father kept here.' },
+  { act: 4, nombreEs: 'el corazón de piedra', nombreEn: 'the stone heart', filas: 24, columnas: 30, minas: 132,
+    historiaEs: 'El corazón de piedra abre, y dentro late tu padre, esperando. Treinta niveles no son nada cuando se baja por alguien.',
+    historiaEn: 'The stone heart opens, and inside your father waits, still beating. Thirty levels are nothing when you descend for someone.' },
 ];
 
 function nivelCampana(indice) {
@@ -1604,19 +1648,26 @@ function actoDe(indice) {
   return nivel ? ACTOS.find((a) => a.id === nivel.act) || null : null;
 }
 
+function nombreNivel(indice, idioma) {
+  const nivel = NIVELES[indice];
+  if (!nivel) return '';
+  return idioma === 'en' ? nivel.nombreEn : nivel.nombreEs;
+}
+
+function historiaNivel(indice, idioma) {
+  const nivel = NIVELES[indice];
+  if (!nivel) return '';
+  return idioma === 'en' ? nivel.historiaEn : nivel.historiaEs;
+}
+
 // configuración de motor para un nivel de campaña
 function configNivel(indice) {
   const nivel = NIVELES[indice];
   if (!nivel) return null;
-  const cfg = { filas: nivel.filas, columnas: nivel.columnas, minas: nivel.minas };
-  const mods = {};
-  if (nivel.reloj) mods.relojMs = nivel.reloj * 1000;
-  if (nivel.senal) mods.senal = nivel.senal;
-  if (Object.keys(mods).length) cfg.mods = mods;
-  return cfg;
+  return { filas: nivel.filas, columnas: nivel.columnas, minas: nivel.minas };
 }
 
-  Object.assign(modulo, { ACTOS, NIVELES, nivelCampana, actoDe, configNivel });
+  Object.assign(modulo, { ACTOS, NIVELES, nivelCampana, actoDe, nombreNivel, historiaNivel, configNivel });
 })(modulos['campaign']);
 
 // ---- main ----
@@ -1627,7 +1678,7 @@ const { DIFICULTADES, DIFICULTAD_POR_DEFECTO, normalizarPersonalizada, dificulta
 const { audio } = modulos['audio'];
 const { attachInput, registrarConversorPunto } = modulos['input'];
 const { t, getLanguage, setLanguage, unitMinas, routeSlug, routeWords } = modulos['i18n'];
-const { NIVELES, ACTOS, configNivel, nivelCampana } = modulos['campaign'];
+const { NIVELES, ACTOS, configNivel, nivelCampana, actoDe } = modulos['campaign'];
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -1651,6 +1702,7 @@ function comprobarPiezas() {
 /* ------------------------------------------------------------- guardado */
 
 const CLAVE = 'minesweeper.v1';
+const ACENTO_LOGO = '#ff2b2b';
 
 function nuevoRegistro() {
   return {
@@ -1658,7 +1710,6 @@ function nuevoRegistro() {
     stats: { games: 0, wins: 0, streak: 0, bestStreak: 0 },
     sound: true,
     trama: true,
-    lamp: true,
     custom: { filas: 9, columnas: 16, minas: 40 },
     campaign: { unlocked: 1, best: {} }, // unlocked: niveles alcanzables; best: ms por nivel
   };
@@ -1684,7 +1735,6 @@ function leerGuardado() {
   }
   if (typeof bruto.sound === 'boolean') datos.sound = bruto.sound;
   if (typeof bruto.trama === 'boolean') datos.trama = bruto.trama;
-  if (typeof bruto.lamp === 'boolean') datos.lamp = bruto.lamp;
   if (bruto.custom && typeof bruto.custom === 'object') {
     datos.custom = normalizarPersonalizada(bruto.custom);
   }
@@ -1723,13 +1773,12 @@ const app = {
   juego: null,
   modo: DIFICULTAD_POR_DEFECTO,
   nivel: null, // índice del nivel de campaña cuando modo === 'campaign'
+  historia: null, // índice del nivel cuya historia se está contando
   record: false, // la última partida ganada fue récord
   flagMode: false,
-  causa: 'explosion', // por qué se perdió: 'explosion' | 'tiempo'
   demo: null, // partida automática de fondo en la portada
   demoAcum: 0,
-  faseLogo: 0,
-  hud: { meta: '', score: '', mult: '', best: '', urgente: false },
+  hud: { meta: '', score: '', mult: '', best: '' },
 };
 
 const BASE_PATH = (typeof location !== 'undefined' && location.protocol === 'file:') ? './' : '/';
@@ -1756,8 +1805,6 @@ const el = {
   flagToggle: $('#flag-toggle'),
   barrido: $('#barrido'),
   demoCtx: null,
-  effects: $('#effects'),
-  lampara: $('#lampara'),
 };
 
 const dosDigitos = (n) => String(n).padStart(2, '0');
@@ -1809,7 +1856,7 @@ function esTactil() {
 
 /* --------------------------------------------------------- overlay/pantallas */
 
-const FOCO_SEL = '.row:not(.stat), .acciones button, .celda-nivel:not([disabled])';
+const FOCO_SEL = '.row:not(.stat), .acciones button';
 let focoIndice = -1;
 
 function ponerOverlay(html) {
@@ -1945,6 +1992,7 @@ const PISTAS = {
   help: 'hintHelp',
   settings: 'hintSettings',
   campaign: 'hintCampaign',
+  story: 'hintStory',
 };
 
 function actualizarPista() {
@@ -1961,7 +2009,6 @@ function pantalla(nombre) {
   app.pantalla = nombre;
   document.body.dataset.screen = nombre;
   el.flagToggle.hidden = !(nombre === 'playing' && esTactil());
-  if (el.lampara) el.lampara.hidden = !(nombre === 'playing' && guardado.lamp);
   if (nombre !== 'playing') el.senal.classList.remove('visible');
   if (antes !== nombre) taparPantalla();
   actualizarPista();
@@ -1970,23 +2017,18 @@ function pantalla(nombre) {
 
 /* ------------------------------------------------------------------ HUD */
 
-function escribirHud(meta, score, mult, best, urgente = false) {
+function escribirHud(meta, score, mult, best) {
   const hud = app.hud;
   if (hud.meta !== meta) { el.meta.textContent = meta; hud.meta = meta; }
   if (hud.score !== score) { el.score.textContent = score; hud.score = score; }
   if (hud.mult !== mult) { el.mult.textContent = mult; hud.mult = mult; }
   if (hud.best !== best) { el.best.textContent = best; hud.best = best; }
-  if (hud.urgente !== urgente) {
-    hud.urgente = urgente;
-    el.mult.classList.toggle('urgente', urgente);
-  }
 }
 
 function actualizarMarcador() {
   const j = app.juego;
   if (!j) {
-    escribirHud('—', '—', '', '', false);
-    actualizarChips();
+    escribirHud('—', '—', '', '');
     return;
   }
   let meta;
@@ -2002,36 +2044,7 @@ function actualizarMarcador() {
       ? (bestMs > 0 ? `${t('record')} ${formatoTiempo(bestMs)}` : t('noRecord'))
       : t('diffCustom');
   }
-  let mult;
-  let urgente = false;
-  if (j.tieneReloj) {
-    mult = formatoTiempo(j.tiempoRestante);
-    urgente = j.tiempoRestante < 10000 && j.estado === 'jugando';
-  } else {
-    mult = formatoTiempo(j.tiempoMs);
-  }
-  escribirHud(meta, String(j.minasRestantes), mult, bestTxt, urgente);
-  actualizarChips();
-}
-
-// fichas de modificadores activos, al pie (p. ej. «reloj 2:30», «señal ×2»)
-function actualizarChips() {
-  const cont = el.effects;
-  if (!cont) return;
-  const j = app.juego;
-  const nivel = app.modo === 'campaign' && app.nivel !== null ? nivelCampana(app.nivel) : null;
-  let html = '';
-  if (j && j.tieneReloj) {
-    html += `<li class="chip"><i></i>${t('relojShort')} ${formatoTiempo(j.tiempoRestante)}</li>`;
-  }
-  if (nivel && nivel.senal) {
-    html += `<li class="chip"><i></i>${t('senalShort')} ×${nivel.senal}</li>`;
-  }
-  cont.hidden = html === '';
-  if (cont.dataset.html !== html) {
-    cont.dataset.html = html;
-    cont.innerHTML = html;
-  }
+  escribirHud(meta, String(j.minasRestantes), formatoTiempo(j.tiempoMs), bestTxt);
 }
 
 /* -------------------------------------------------------- ajustar lienzo */
@@ -2194,10 +2207,11 @@ function renderDemo() {
 }
 /* ------------------------------------------------------------ pantallas */
 
-function filaHTML({ accion = null, campo = null, idx, nombre, detalle = '', derecha = '', peligro = false, stat = false }) {
+function filaHTML({ accion = null, campo = null, idx, nombre, detalle = '', derecha = '', peligro = false, stat = false, dim = false }) {
   const clases = ['row'];
   if (peligro) clases.push('peligro');
   if (stat) clases.push('stat');
+  if (dim) clases.push('dim');
   const attrs = ['type="button"', `class="${clases.join(' ')}"`];
   if (accion) attrs.push(`data-accion="${accion}"`);
   if (campo) attrs.push(`data-campo="${campo}"`);
@@ -2248,17 +2262,18 @@ function mostrarPortada() {
   escribirHud('—', '—', '', '');
   pantalla('home');
   pintarLienzoVacio();
+  const logo = document.getElementById('logo-mine');
+  if (logo) dibujarLogo(logo);
   crearDemo();
   enfocarPrimero();
 }
 
-// logotipo «minesweeper.» pintado en canvas: el punto rojo late y emite una onda
-function dibujarLogo(canvas, fase = 0) {
+// logotipo «minesweeper.» pintado en canvas, como la casa de snake: estático
+function dibujarLogo(canvas) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
   const W = canvas.width;
   const H = canvas.height;
-  const pulso = 0.5 + 0.5 * Math.sin(fase * Math.PI * 2);
   ctx.clearRect(0, 0, W, H);
   ctx.fillStyle = '#f5f5f0';
   ctx.font = '900 92px ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
@@ -2268,28 +2283,10 @@ function dibujarLogo(canvas, fase = 0) {
   const ancho = ctx.measureText(texto).width;
   const y = H / 2 + 4;
   ctx.fillText(texto, 0, y);
+  // el único color de la casa es este punto
+  ctx.fillStyle = ACENTO_LOGO;
   const radio = 13;
-  const cx = ancho + radio + 4;
-  // halo que respira
-  const halo = 2.3 + pulso * 1.1;
-  const grad = ctx.createRadialGradient(cx, y, 1, cx, y, radio * halo);
-  grad.addColorStop(0, `rgba(255, 93, 93, ${0.55 + pulso * 0.35})`);
-  grad.addColorStop(1, 'rgba(255,93,93,0)');
-  ctx.fillStyle = grad;
-  ctx.fillRect(cx - radio * 4, y - radio * 4, radio * 8, radio * 8);
-  // onda que se expande y se desvanece, una vez por latido
-  const onda = (fase % 1);
-  const rOnda = radio + onda * 30;
-  ctx.strokeStyle = `rgba(255, 93, 93, ${(0.5 * (1 - onda)).toFixed(3)})`;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(cx, y, rOnda, 0, Math.PI * 2);
-  ctx.stroke();
-  // núcleo
-  ctx.fillStyle = '#ff5d5d';
-  ctx.beginPath();
-  ctx.arc(cx, y, radio, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.fillRect(Math.round(ancho + 5), Math.round(y - radio), radio * 2, radio * 2);
 }
 
 function detalleCustom() {
@@ -2305,49 +2302,74 @@ function densidadCustom() {
 function mostrarCampaña() {
   app.juego = null;
   const hechos = campañaHechos();
-  const bloques = ACTOS.map((acto) => {
-    const niveles = [];
+  const secciones = ACTOS.map((acto) => {
+    const rows = [];
     for (let i = 0; i < NIVELES.length; i += 1) {
       const nivel = NIVELES[i];
       if (nivel.act !== acto.id) continue;
       const desbloqueado = i < guardado.campaign.unlocked;
       const mejor = guardado.campaign.best[i] || 0;
       const nombre = getLanguage() === 'en' ? nivel.nombreEn : nivel.nombreEs;
-      const mods = [];
-      if (nivel.reloj) mods.push(`${t('relojShort')} ${Math.floor(nivel.reloj / 60)}:${dosDigitos(nivel.reloj % 60)}`);
-      if (nivel.senal) mods.push(`${t('senalShort')} ×${nivel.senal}`);
-      const sub = mods.length ? mods.join(' · ') : `${nivel.filas}×${nivel.columnas} · ${nivel.minas} ${unitMinas(nivel.minas)}`;
-      const derecha = mejor > 0 ? formatoTiempo(mejor) : (desbloqueado ? '' : '✕');
-      const pistas = [t('levelCell', { n: i + 1 }), nombre];
-      if (desbloqueado) pistas.push(mejor > 0 ? t('campaignCleared') : t('campaign'));
-      else pistas.push(t('campaignLocked'));
-      if (nivel.reloj) pistas.push(t('modRelojTag', { s: nivel.reloj }));
-      if (nivel.senal) pistas.push(t('modSenalTag', { n: nivel.senal }));
-      niveles.push(`<button class="celda-nivel${desbloqueado ? '' : ' bloqueada'}${mejor > 0 ? ' superada' : ''}" type="button"
-        title="${pistas.join(' · ')}"
-        ${desbloqueado ? `data-accion="playCampaign:${i}"` : 'disabled aria-disabled="true"'}
-        aria-label="${t('levelCell', { n: i + 1 })} · ${nombre}">
-        <span class="cn-num">${dosDigitos(i + 1)}</span>
-        <span class="cn-nombre">${nombre}<small>${sub}</small></span>
-        <span class="cn-mejor">${derecha}</span>
-      </button>`);
+      const detalle = `${nivel.filas}×${nivel.columnas} · ${nivel.minas} ${unitMinas(nivel.minas)}`;
+      if (desbloqueado) {
+        const derecha = mejor > 0 ? formatoTiempo(mejor) : '↵';
+        rows.push(filaHTML({
+          accion: `playCampaign:${i}`,
+          idx: i,
+          nombre,
+          detalle,
+          derecha,
+        }));
+      } else {
+        rows.push(filaHTML({ idx: i, nombre: '· · ·', detalle, derecha: '✕', stat: true, dim: true }));
+      }
     }
-    return `<section class="acto">
-      <header class="acto-cabeza">
-        <p class="kicker">${t('actLabel', { n: acto.id, name: nombreActo(acto) })}</p>
-        <p class="acto-sub">${getLanguage() === 'en' ? acto.subEn : acto.subEs}</p>
-      </header>
-      <div class="niveles">${niveles.join('')}</div>
-    </section>`;
+    const nombreActoTxt = getLanguage() === 'en' ? acto.nombreEn : acto.nombreEs;
+    const lore = getLanguage() === 'en' ? acto.subEn : acto.subEs;
+    return `<div class="acto">
+      <p class="grupo acto-grupo">${t('actLabel', { n: acto.id, name: nombreActoTxt })}</p>
+      <p class="acto-lore">${lore}</p>
+      <div class="filas">${rows.join('')}</div>
+    </div>`;
   }).join('');
   ponerOverlay(`<div class="panel campana">
-    ${cabeceraPanel(t('campaign'), botonVolver())}
-    <p class="campana-intro">${t('campaignIntro')}
-      <span class="campana-progreso">${t('campaign')} · <b id="campana-cifra">00</b>/30</span></p>
-    <div class="actos">${bloques}</div>
+    <div class="niveles-cabeza">
+      <div>
+        <p class="kicker">${t('campaign')} · <b id="campana-cifra">00</b>/30</p>
+        <h2 class="campana-titulo">${t('campaignTagShort')}</h2>
+      </div>
+      ${botonVolver()}
+    </div>
+    <p class="prologo">${t('campaignPrologue')}</p>
+    ${secciones}
   </div>`);
   pantalla('campaign');
   animarCifra(document.getElementById('campana-cifra'), hechos, (v) => dosDigitos(Math.round(v)));
+  enfocarPrimero();
+}
+
+function mostrarHistoria(indice) {
+  const nivel = nivelCampana(indice);
+  if (!nivel || indice >= guardado.campaign.unlocked) {
+    mostrarCampaña();
+    return;
+  }
+  app.historia = indice;
+  const nombre = getLanguage() === 'en' ? nivel.nombreEn : nivel.nombreEs;
+  const texto = getLanguage() === 'en' ? nivel.historiaEn : nivel.historiaEs;
+  const acto = actoDe(indice);
+  const nombreActoTxt = getLanguage() === 'en' ? acto.nombreEn : acto.nombreEs;
+  const completado = (guardado.campaign.best[indice] || 0) > 0;
+  ponerOverlay(`<div class="panel historia">
+    <p class="kicker">${t('actLabel', { n: acto.id, name: nombreActoTxt })} · ${t('levelCell', { n: indice + 1 })}</p>
+    <h2 class="historia-titulo">${nombre}</h2>
+    <p class="historia-texto">${texto}</p>
+    <div class="acciones">
+      <button class="principal" type="button" data-accion="descend"><span>${completado ? t('descendAgain') : t('descend')}</span><kbd>↵</kbd></button>
+      <button type="button" data-accion="back"><span>${t('back')}</span><kbd>Esc</kbd></button>
+    </div>
+  </div>`);
+  pantalla('story');
   enfocarPrimero();
 }
 
@@ -2454,7 +2476,6 @@ function empezarPartida(modo, nivel = null) {
   app.juego = new Game(cfg, eventosJuego);
   app.record = false;
   app.contado = false;
-  app.causa = 'explosion';
   app.flagMode = false;
   el.flagToggle.setAttribute('aria-pressed', 'false');
   el.flagToggle.classList.remove('activo');
@@ -2548,22 +2569,12 @@ function eventosJuego(tipo, datos) {
       audio.play('unflag');
       break;
     case 'boom':
-      app.causa = 'explosion';
       contabilizarFin(false);
       audio.play('boom');
       if (typeof navigator.vibrate === 'function') navigator.vibrate([50, 40, 90]);
       setTimeout(() => {
         if (app.juego === j && j.estado === 'perdido') mostrarFinPerdida();
       }, 750);
-      break;
-    case 'timeOut':
-      app.causa = 'tiempo';
-      contabilizarFin(false);
-      audio.play('locked');
-      if (typeof navigator.vibrate === 'function') navigator.vibrate(30);
-      setTimeout(() => {
-        if (app.juego === j && j.estado === 'perdido') mostrarFinPerdida();
-      }, 350);
       break;
     case 'win':
       contabilizarFin(true);
@@ -2586,11 +2597,15 @@ function etiquetaPartida() {
   return nombreDificultad(app.modo);
 }
 
+function haySiguienteNivel() {
+  return app.modo === 'campaign' && app.nivel !== null && app.nivel + 1 < NIVELES.length;
+}
+
 function accionesFin({ hayMas }) {
-  // en campaña, al ganar (o perder), el atajo lógico es el siguiente nivel o reintentar
+  // en campaña, al ganar, el atajo es el siguiente capítulo; al perder, reintentar
   if (app.modo === 'campaign') {
-    const siguiente = hayMas && app.nivel !== null && app.nivel + 1 < NIVELES.length && app.nivel + 1 < guardado.campaign.unlocked
-      ? `<button class="principal" type="button" data-accion="nextLevel"><span>${t('campaignNext')}</span><kbd>R</kbd></button>`
+    const siguiente = hayMas && haySiguienteNivel()
+      ? `<button class="principal" type="button" data-accion="nextLevel"><span>${t('campaignNext')}</span><kbd>↵</kbd></button>`
       : `<button class="principal" type="button" data-accion="restart"><span>${t('again')}</span><kbd>R</kbd></button>`;
     return `${siguiente}
       <button type="button" data-accion="campaign"><span>${t('campaign')}</span><kbd>Esc</kbd></button>`;
@@ -2611,14 +2626,29 @@ function mostrarFinGanada() {
     : app.record
       ? `<span class="record-tag">${t('newRecord')}</span>`
       : `<span>${t('yourRecord', { time: formatoTiempo(bestMs) })}</span>`;
-  const cierre = enCampaña && app.nivel === NIVELES.length - 1 ? `<p class="nota promesa">${t('campaignDone')}</p>` : '';
+  if (enCampaña && app.nivel === NIVELES.length - 1) {
+    // se cerró el corazón: epílogo del viaje
+    ponerOverlay(`<div class="panel fin">
+      <header class="fin-cabeza">
+        <p class="kicker">${t('epilogueKicker')}</p>
+        <h2 class="historia-titulo">${t('epilogueTitle')}</h2>
+      </header>
+      <p class="historia-texto">${t('epilogueText')}</p>
+      <p class="nota">${t('clearedIn', { time: formatoTiempo(j.tiempoMs) })}${notaRecord ? `<br>${notaRecord}` : ''}</p>
+      <div class="acciones">
+        <button class="principal" type="button" data-accion="toMenu"><span>${t('epilogueCta')}</span><kbd>↵</kbd></button>
+      </div>
+    </div>`);
+    pantalla('won');
+    enfocarPrimero();
+    return;
+  }
   ponerOverlay(`<div class="panel fin">
     <header class="fin-cabeza">
       <p class="kicker">${etiquetaPartida()}</p>
       <h2 class="cifra superado">${t('youWon')}</h2>
     </header>
     <p class="nota">${t('clearedIn', { time: formatoTiempo(j.tiempoMs) })}${notaRecord ? `<br>${notaRecord}` : ''}</p>
-    ${cierre}
     <div class="acciones">
       ${accionesFin({ hayMas: true })}
     </div>
@@ -2630,17 +2660,12 @@ function mostrarFinGanada() {
 function mostrarFinPerdida() {
   const j = app.juego;
   if (!j) return;
-  const porTiempo = app.causa === 'tiempo';
-  const titular = porTiempo ? t('timeOut') : t('youLost');
-  const detalle = porTiempo
-    ? t('timeOutNote', { time: formatoTiempo(j.cfg.mods && j.cfg.mods.relojMs ? j.cfg.mods.relojMs : j.tiempoMs) })
-    : `${formatoTiempo(j.tiempoMs)} · ${t('minesExploded', { count: j.cfg.minas })}`;
   ponerOverlay(`<div class="panel fin">
     <header class="fin-cabeza">
       <p class="kicker">${etiquetaPartida()}</p>
-      <h2 class="cifra derrota">${titular}</h2>
+      <h2 class="cifra derrota">${t('youLost')}</h2>
     </header>
-    <p class="nota">${detalle}</p>
+    <p class="nota">${formatoTiempo(j.tiempoMs)} · ${t('minesExploded', { count: j.cfg.minas })}</p>
     <div class="acciones">
       ${accionesFin({ hayMas: false })}
     </div>
@@ -2730,11 +2755,9 @@ function borrarTodo() {
 function mostrarAjustes() {
   const sonido = guardado.sound ? t('soundOn') : t('soundOff');
   const trama = guardado.trama ? t('on') : t('off');
-  const lampara = guardado.lamp ? t('on') : t('off');
   const filas = [
     filaHTML({ accion: 'toggleSound', idx: 0, nombre: t('settingSound'), detalle: 'M', derecha: sonido }),
     filaHTML({ accion: 'toggleTrama', idx: 1, nombre: t('settingTrama'), detalle: t('settingTramaTag'), derecha: trama }),
-    filaHTML({ accion: 'toggleLamp', idx: 2, nombre: t('settingLamp'), detalle: t('settingLampTag'), derecha: lampara }),
   ].join('');
   ponerOverlay(`<div class="panel">
     ${cabeceraPanel(t('settingsTitle'), botonVolver())}
@@ -2796,34 +2819,33 @@ function ejecutar(nombre) {
   if (nombre.startsWith('playCampaign:')) {
     const i = Number(nombre.slice(13));
     if (Number.isInteger(i) && i >= 0 && i < guardado.campaign.unlocked && i < NIVELES.length) {
-      empezarPartida('campaign', i);
+      mostrarHistoria(i);
     }
     return;
   }
   switch (nombre) {
     case 'play': mostrarDificultades(); return;
     case 'campaign': mostrarCampaña(); return;
+    case 'descend':
+      if (app.historia !== null && app.historia !== undefined) empezarPartida('campaign', app.historia);
+      return;
     case 'nextLevel':
-      if (app.nivel !== null && app.nivel + 1 < NIVELES.length) empezarPartida('campaign', app.nivel + 1);
+      if (haySiguienteNivel()) mostrarHistoria(app.nivel + 1);
       return;
     case 'profile': mostrarPerfil(); return;
     case 'help': mostrarAyuda(); return;
     case 'settings': mostrarAjustes(); return;
-    case 'toggleLamp':
-      guardado.lamp = !guardado.lamp;
-      if (el.lampara) el.lampara.hidden = !(app.pantalla === 'playing' && guardado.lamp);
-      guardar();
-      mostrarAjustes();
-      audio.play('ui');
-      return;
     case 'playCustom': mostrarPersonalizada(); return;
     case 'customStart': empezarPartida('custom'); return;
     case 'resume': reanudar(); return;
     case 'restart': reiniciarPartida(); return;
-    case 'toMenu':
-      if (app.modo === 'campaign') mostrarCampaña();
+    case 'toMenu': {
+      const epilogo = app.modo === 'campaign' && app.nivel === NIVELES.length - 1 && app.pantalla === 'won';
+      if (epilogo) mostrarPortada();
+      else if (app.modo === 'campaign') mostrarCampaña();
       else mostrarPortada();
       return;
+    }
     case 'toggleSound':
       guardado.sound = !guardado.sound;
       aplicarSonido();
@@ -2865,6 +2887,7 @@ function volverAtras() {
     case 'modes': mostrarPortada(); return;
     case 'custom': mostrarDificultades(); return;
     case 'campaign': mostrarPortada(); return;
+    case 'story': mostrarCampaña(); return;
     case 'profile':
     case 'help':
     case 'settings':
@@ -2943,8 +2966,8 @@ function accion(nombre, repetido = false, datos) {
     case 'right': ajustarPasoFocused(1); return;
     case 'confirm': activarFoco(); return;
     case 'restart':
-      if (app.pantalla === 'won' && app.modo === 'campaign' && app.nivel !== null && app.nivel + 1 < NIVELES.length) {
-        empezarPartida('campaign', app.nivel + 1);
+      if (app.pantalla === 'won' && haySiguienteNivel()) {
+        mostrarHistoria(app.nivel + 1);
         return;
       }
       if (app.pantalla === 'dead' || app.pantalla === 'won') reiniciarPartida();
@@ -3026,6 +3049,9 @@ function rutaDeEstado() {
   if (app.pantalla === 'modes') return slug('play');
   if (app.pantalla === 'custom') return slug('custom');
   if (app.pantalla === 'campaign') return slug('campaign');
+  if (app.pantalla === 'story' && app.historia !== null) {
+    return `${slug('campaign')}/nivel-${dosDigitos(app.historia + 1)}`;
+  }
   if (app.pantalla === 'help') return slug('help');
   if (app.pantalla === 'settings') return slug('settings');
   if (app.pantalla === 'profile') return slug('profile');
@@ -3057,7 +3083,7 @@ function mostrarRuta(ruta) {
   if (ruta.tipo === 'campaign-level') {
     const i = ruta.nivel;
     if (Number.isInteger(i) && i >= 0 && i < NIVELES.length) {
-      if (i < guardado.campaign.unlocked) { empezarPartida('campaign', i); return; }
+      if (i < guardado.campaign.unlocked) { mostrarHistoria(i); return; }
       mostrarCampaña();
       return;
     }
@@ -3114,11 +3140,6 @@ function bucle(t) {
       }
       renderDemo();
     }
-    const logo = document.getElementById('logo-mine');
-    if (logo) {
-      app.faseLogo = (app.faseLogo + dt / 1500) % 1;
-      dibujarLogo(logo, app.faseLogo);
-    }
   }
 }
 
@@ -3146,6 +3167,7 @@ function aplicarIdiomaBase() {
 const REPINTAR = {
   home: mostrarPortada,
   campaign: mostrarCampaña,
+  story: () => mostrarHistoria(app.historia === null ? 0 : app.historia),
   modes: mostrarDificultades,
   custom: () => mostrarPersonalizada(),
   profile: mostrarPerfil,
@@ -3192,11 +3214,6 @@ function arrancar() {
 
   el.canvas.addEventListener('pointermove', (evento) => {
     const j = app.juego;
-    const caja = el.stage.getBoundingClientRect();
-    if (el.lampara && !el.lampara.hidden) {
-      el.lampara.style.setProperty('--mx', `${Math.round(evento.clientX - caja.left)}px`);
-      el.lampara.style.setProperty('--my', `${Math.round(evento.clientY - caja.top)}px`);
-    }
     if (!j) return;
     j.cursorVisible = false;
     j.hover = conversorDePuntos(evento.clientX, evento.clientY);

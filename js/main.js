@@ -1,4 +1,4 @@
-import { Game } from './engine.js?v=2';
+import { Game } from './engine.js?v=3';
 import {
   DIFICULTADES,
   DIFICULTAD_POR_DEFECTO,
@@ -9,8 +9,8 @@ import {
 } from './presets.js?v=1';
 import { audio } from './audio.js?v=1';
 import { attachInput, registrarConversorPunto } from './input.js?v=1';
-import { t, getLanguage, setLanguage, unitMinas, routeSlug, routeWords } from './i18n.js?v=2';
-import { NIVELES, ACTOS, configNivel, nivelCampana } from './campaign.js?v=1';
+import { t, getLanguage, setLanguage, unitMinas, routeSlug, routeWords } from './i18n.js?v=3';
+import { NIVELES, ACTOS, configNivel, nivelCampana, actoDe } from './campaign.js?v=2';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -34,6 +34,7 @@ function comprobarPiezas() {
 /* ------------------------------------------------------------- guardado */
 
 const CLAVE = 'minesweeper.v1';
+const ACENTO_LOGO = '#ff2b2b';
 
 function nuevoRegistro() {
   return {
@@ -41,7 +42,6 @@ function nuevoRegistro() {
     stats: { games: 0, wins: 0, streak: 0, bestStreak: 0 },
     sound: true,
     trama: true,
-    lamp: true,
     custom: { filas: 9, columnas: 16, minas: 40 },
     campaign: { unlocked: 1, best: {} }, // unlocked: niveles alcanzables; best: ms por nivel
   };
@@ -67,7 +67,6 @@ function leerGuardado() {
   }
   if (typeof bruto.sound === 'boolean') datos.sound = bruto.sound;
   if (typeof bruto.trama === 'boolean') datos.trama = bruto.trama;
-  if (typeof bruto.lamp === 'boolean') datos.lamp = bruto.lamp;
   if (bruto.custom && typeof bruto.custom === 'object') {
     datos.custom = normalizarPersonalizada(bruto.custom);
   }
@@ -106,13 +105,12 @@ const app = {
   juego: null,
   modo: DIFICULTAD_POR_DEFECTO,
   nivel: null, // índice del nivel de campaña cuando modo === 'campaign'
+  historia: null, // índice del nivel cuya historia se está contando
   record: false, // la última partida ganada fue récord
   flagMode: false,
-  causa: 'explosion', // por qué se perdió: 'explosion' | 'tiempo'
   demo: null, // partida automática de fondo en la portada
   demoAcum: 0,
-  faseLogo: 0,
-  hud: { meta: '', score: '', mult: '', best: '', urgente: false },
+  hud: { meta: '', score: '', mult: '', best: '' },
 };
 
 const BASE_PATH = (typeof location !== 'undefined' && location.protocol === 'file:') ? './' : '/';
@@ -139,8 +137,6 @@ const el = {
   flagToggle: $('#flag-toggle'),
   barrido: $('#barrido'),
   demoCtx: null,
-  effects: $('#effects'),
-  lampara: $('#lampara'),
 };
 
 const dosDigitos = (n) => String(n).padStart(2, '0');
@@ -192,7 +188,7 @@ function esTactil() {
 
 /* --------------------------------------------------------- overlay/pantallas */
 
-const FOCO_SEL = '.row:not(.stat), .acciones button, .celda-nivel:not([disabled])';
+const FOCO_SEL = '.row:not(.stat), .acciones button';
 let focoIndice = -1;
 
 function ponerOverlay(html) {
@@ -328,6 +324,7 @@ const PISTAS = {
   help: 'hintHelp',
   settings: 'hintSettings',
   campaign: 'hintCampaign',
+  story: 'hintStory',
 };
 
 function actualizarPista() {
@@ -344,7 +341,6 @@ function pantalla(nombre) {
   app.pantalla = nombre;
   document.body.dataset.screen = nombre;
   el.flagToggle.hidden = !(nombre === 'playing' && esTactil());
-  if (el.lampara) el.lampara.hidden = !(nombre === 'playing' && guardado.lamp);
   if (nombre !== 'playing') el.senal.classList.remove('visible');
   if (antes !== nombre) taparPantalla();
   actualizarPista();
@@ -353,23 +349,18 @@ function pantalla(nombre) {
 
 /* ------------------------------------------------------------------ HUD */
 
-function escribirHud(meta, score, mult, best, urgente = false) {
+function escribirHud(meta, score, mult, best) {
   const hud = app.hud;
   if (hud.meta !== meta) { el.meta.textContent = meta; hud.meta = meta; }
   if (hud.score !== score) { el.score.textContent = score; hud.score = score; }
   if (hud.mult !== mult) { el.mult.textContent = mult; hud.mult = mult; }
   if (hud.best !== best) { el.best.textContent = best; hud.best = best; }
-  if (hud.urgente !== urgente) {
-    hud.urgente = urgente;
-    el.mult.classList.toggle('urgente', urgente);
-  }
 }
 
 function actualizarMarcador() {
   const j = app.juego;
   if (!j) {
-    escribirHud('—', '—', '', '', false);
-    actualizarChips();
+    escribirHud('—', '—', '', '');
     return;
   }
   let meta;
@@ -385,36 +376,7 @@ function actualizarMarcador() {
       ? (bestMs > 0 ? `${t('record')} ${formatoTiempo(bestMs)}` : t('noRecord'))
       : t('diffCustom');
   }
-  let mult;
-  let urgente = false;
-  if (j.tieneReloj) {
-    mult = formatoTiempo(j.tiempoRestante);
-    urgente = j.tiempoRestante < 10000 && j.estado === 'jugando';
-  } else {
-    mult = formatoTiempo(j.tiempoMs);
-  }
-  escribirHud(meta, String(j.minasRestantes), mult, bestTxt, urgente);
-  actualizarChips();
-}
-
-// fichas de modificadores activos, al pie (p. ej. «reloj 2:30», «señal ×2»)
-function actualizarChips() {
-  const cont = el.effects;
-  if (!cont) return;
-  const j = app.juego;
-  const nivel = app.modo === 'campaign' && app.nivel !== null ? nivelCampana(app.nivel) : null;
-  let html = '';
-  if (j && j.tieneReloj) {
-    html += `<li class="chip"><i></i>${t('relojShort')} ${formatoTiempo(j.tiempoRestante)}</li>`;
-  }
-  if (nivel && nivel.senal) {
-    html += `<li class="chip"><i></i>${t('senalShort')} ×${nivel.senal}</li>`;
-  }
-  cont.hidden = html === '';
-  if (cont.dataset.html !== html) {
-    cont.dataset.html = html;
-    cont.innerHTML = html;
-  }
+  escribirHud(meta, String(j.minasRestantes), formatoTiempo(j.tiempoMs), bestTxt);
 }
 
 /* -------------------------------------------------------- ajustar lienzo */
@@ -577,10 +539,11 @@ function renderDemo() {
 }
 /* ------------------------------------------------------------ pantallas */
 
-function filaHTML({ accion = null, campo = null, idx, nombre, detalle = '', derecha = '', peligro = false, stat = false }) {
+function filaHTML({ accion = null, campo = null, idx, nombre, detalle = '', derecha = '', peligro = false, stat = false, dim = false }) {
   const clases = ['row'];
   if (peligro) clases.push('peligro');
   if (stat) clases.push('stat');
+  if (dim) clases.push('dim');
   const attrs = ['type="button"', `class="${clases.join(' ')}"`];
   if (accion) attrs.push(`data-accion="${accion}"`);
   if (campo) attrs.push(`data-campo="${campo}"`);
@@ -631,17 +594,18 @@ function mostrarPortada() {
   escribirHud('—', '—', '', '');
   pantalla('home');
   pintarLienzoVacio();
+  const logo = document.getElementById('logo-mine');
+  if (logo) dibujarLogo(logo);
   crearDemo();
   enfocarPrimero();
 }
 
-// logotipo «minesweeper.» pintado en canvas: el punto rojo late y emite una onda
-function dibujarLogo(canvas, fase = 0) {
+// logotipo «minesweeper.» pintado en canvas, como la casa de snake: estático
+function dibujarLogo(canvas) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
   const W = canvas.width;
   const H = canvas.height;
-  const pulso = 0.5 + 0.5 * Math.sin(fase * Math.PI * 2);
   ctx.clearRect(0, 0, W, H);
   ctx.fillStyle = '#f5f5f0';
   ctx.font = '900 92px ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
@@ -651,28 +615,10 @@ function dibujarLogo(canvas, fase = 0) {
   const ancho = ctx.measureText(texto).width;
   const y = H / 2 + 4;
   ctx.fillText(texto, 0, y);
+  // el único color de la casa es este punto
+  ctx.fillStyle = ACENTO_LOGO;
   const radio = 13;
-  const cx = ancho + radio + 4;
-  // halo que respira
-  const halo = 2.3 + pulso * 1.1;
-  const grad = ctx.createRadialGradient(cx, y, 1, cx, y, radio * halo);
-  grad.addColorStop(0, `rgba(255, 93, 93, ${0.55 + pulso * 0.35})`);
-  grad.addColorStop(1, 'rgba(255,93,93,0)');
-  ctx.fillStyle = grad;
-  ctx.fillRect(cx - radio * 4, y - radio * 4, radio * 8, radio * 8);
-  // onda que se expande y se desvanece, una vez por latido
-  const onda = (fase % 1);
-  const rOnda = radio + onda * 30;
-  ctx.strokeStyle = `rgba(255, 93, 93, ${(0.5 * (1 - onda)).toFixed(3)})`;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(cx, y, rOnda, 0, Math.PI * 2);
-  ctx.stroke();
-  // núcleo
-  ctx.fillStyle = '#ff5d5d';
-  ctx.beginPath();
-  ctx.arc(cx, y, radio, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.fillRect(Math.round(ancho + 5), Math.round(y - radio), radio * 2, radio * 2);
 }
 
 function detalleCustom() {
@@ -688,49 +634,74 @@ function densidadCustom() {
 function mostrarCampaña() {
   app.juego = null;
   const hechos = campañaHechos();
-  const bloques = ACTOS.map((acto) => {
-    const niveles = [];
+  const secciones = ACTOS.map((acto) => {
+    const rows = [];
     for (let i = 0; i < NIVELES.length; i += 1) {
       const nivel = NIVELES[i];
       if (nivel.act !== acto.id) continue;
       const desbloqueado = i < guardado.campaign.unlocked;
       const mejor = guardado.campaign.best[i] || 0;
       const nombre = getLanguage() === 'en' ? nivel.nombreEn : nivel.nombreEs;
-      const mods = [];
-      if (nivel.reloj) mods.push(`${t('relojShort')} ${Math.floor(nivel.reloj / 60)}:${dosDigitos(nivel.reloj % 60)}`);
-      if (nivel.senal) mods.push(`${t('senalShort')} ×${nivel.senal}`);
-      const sub = mods.length ? mods.join(' · ') : `${nivel.filas}×${nivel.columnas} · ${nivel.minas} ${unitMinas(nivel.minas)}`;
-      const derecha = mejor > 0 ? formatoTiempo(mejor) : (desbloqueado ? '' : '✕');
-      const pistas = [t('levelCell', { n: i + 1 }), nombre];
-      if (desbloqueado) pistas.push(mejor > 0 ? t('campaignCleared') : t('campaign'));
-      else pistas.push(t('campaignLocked'));
-      if (nivel.reloj) pistas.push(t('modRelojTag', { s: nivel.reloj }));
-      if (nivel.senal) pistas.push(t('modSenalTag', { n: nivel.senal }));
-      niveles.push(`<button class="celda-nivel${desbloqueado ? '' : ' bloqueada'}${mejor > 0 ? ' superada' : ''}" type="button"
-        title="${pistas.join(' · ')}"
-        ${desbloqueado ? `data-accion="playCampaign:${i}"` : 'disabled aria-disabled="true"'}
-        aria-label="${t('levelCell', { n: i + 1 })} · ${nombre}">
-        <span class="cn-num">${dosDigitos(i + 1)}</span>
-        <span class="cn-nombre">${nombre}<small>${sub}</small></span>
-        <span class="cn-mejor">${derecha}</span>
-      </button>`);
+      const detalle = `${nivel.filas}×${nivel.columnas} · ${nivel.minas} ${unitMinas(nivel.minas)}`;
+      if (desbloqueado) {
+        const derecha = mejor > 0 ? formatoTiempo(mejor) : '↵';
+        rows.push(filaHTML({
+          accion: `playCampaign:${i}`,
+          idx: i,
+          nombre,
+          detalle,
+          derecha,
+        }));
+      } else {
+        rows.push(filaHTML({ idx: i, nombre: '· · ·', detalle, derecha: '✕', stat: true, dim: true }));
+      }
     }
-    return `<section class="acto">
-      <header class="acto-cabeza">
-        <p class="kicker">${t('actLabel', { n: acto.id, name: nombreActo(acto) })}</p>
-        <p class="acto-sub">${getLanguage() === 'en' ? acto.subEn : acto.subEs}</p>
-      </header>
-      <div class="niveles">${niveles.join('')}</div>
-    </section>`;
+    const nombreActoTxt = getLanguage() === 'en' ? acto.nombreEn : acto.nombreEs;
+    const lore = getLanguage() === 'en' ? acto.subEn : acto.subEs;
+    return `<div class="acto">
+      <p class="grupo acto-grupo">${t('actLabel', { n: acto.id, name: nombreActoTxt })}</p>
+      <p class="acto-lore">${lore}</p>
+      <div class="filas">${rows.join('')}</div>
+    </div>`;
   }).join('');
   ponerOverlay(`<div class="panel campana">
-    ${cabeceraPanel(t('campaign'), botonVolver())}
-    <p class="campana-intro">${t('campaignIntro')}
-      <span class="campana-progreso">${t('campaign')} · <b id="campana-cifra">00</b>/30</span></p>
-    <div class="actos">${bloques}</div>
+    <div class="niveles-cabeza">
+      <div>
+        <p class="kicker">${t('campaign')} · <b id="campana-cifra">00</b>/30</p>
+        <h2 class="campana-titulo">${t('campaignTagShort')}</h2>
+      </div>
+      ${botonVolver()}
+    </div>
+    <p class="prologo">${t('campaignPrologue')}</p>
+    ${secciones}
   </div>`);
   pantalla('campaign');
   animarCifra(document.getElementById('campana-cifra'), hechos, (v) => dosDigitos(Math.round(v)));
+  enfocarPrimero();
+}
+
+function mostrarHistoria(indice) {
+  const nivel = nivelCampana(indice);
+  if (!nivel || indice >= guardado.campaign.unlocked) {
+    mostrarCampaña();
+    return;
+  }
+  app.historia = indice;
+  const nombre = getLanguage() === 'en' ? nivel.nombreEn : nivel.nombreEs;
+  const texto = getLanguage() === 'en' ? nivel.historiaEn : nivel.historiaEs;
+  const acto = actoDe(indice);
+  const nombreActoTxt = getLanguage() === 'en' ? acto.nombreEn : acto.nombreEs;
+  const completado = (guardado.campaign.best[indice] || 0) > 0;
+  ponerOverlay(`<div class="panel historia">
+    <p class="kicker">${t('actLabel', { n: acto.id, name: nombreActoTxt })} · ${t('levelCell', { n: indice + 1 })}</p>
+    <h2 class="historia-titulo">${nombre}</h2>
+    <p class="historia-texto">${texto}</p>
+    <div class="acciones">
+      <button class="principal" type="button" data-accion="descend"><span>${completado ? t('descendAgain') : t('descend')}</span><kbd>↵</kbd></button>
+      <button type="button" data-accion="back"><span>${t('back')}</span><kbd>Esc</kbd></button>
+    </div>
+  </div>`);
+  pantalla('story');
   enfocarPrimero();
 }
 
@@ -837,7 +808,6 @@ function empezarPartida(modo, nivel = null) {
   app.juego = new Game(cfg, eventosJuego);
   app.record = false;
   app.contado = false;
-  app.causa = 'explosion';
   app.flagMode = false;
   el.flagToggle.setAttribute('aria-pressed', 'false');
   el.flagToggle.classList.remove('activo');
@@ -931,22 +901,12 @@ function eventosJuego(tipo, datos) {
       audio.play('unflag');
       break;
     case 'boom':
-      app.causa = 'explosion';
       contabilizarFin(false);
       audio.play('boom');
       if (typeof navigator.vibrate === 'function') navigator.vibrate([50, 40, 90]);
       setTimeout(() => {
         if (app.juego === j && j.estado === 'perdido') mostrarFinPerdida();
       }, 750);
-      break;
-    case 'timeOut':
-      app.causa = 'tiempo';
-      contabilizarFin(false);
-      audio.play('locked');
-      if (typeof navigator.vibrate === 'function') navigator.vibrate(30);
-      setTimeout(() => {
-        if (app.juego === j && j.estado === 'perdido') mostrarFinPerdida();
-      }, 350);
       break;
     case 'win':
       contabilizarFin(true);
@@ -969,11 +929,15 @@ function etiquetaPartida() {
   return nombreDificultad(app.modo);
 }
 
+function haySiguienteNivel() {
+  return app.modo === 'campaign' && app.nivel !== null && app.nivel + 1 < NIVELES.length;
+}
+
 function accionesFin({ hayMas }) {
-  // en campaña, al ganar (o perder), el atajo lógico es el siguiente nivel o reintentar
+  // en campaña, al ganar, el atajo es el siguiente capítulo; al perder, reintentar
   if (app.modo === 'campaign') {
-    const siguiente = hayMas && app.nivel !== null && app.nivel + 1 < NIVELES.length && app.nivel + 1 < guardado.campaign.unlocked
-      ? `<button class="principal" type="button" data-accion="nextLevel"><span>${t('campaignNext')}</span><kbd>R</kbd></button>`
+    const siguiente = hayMas && haySiguienteNivel()
+      ? `<button class="principal" type="button" data-accion="nextLevel"><span>${t('campaignNext')}</span><kbd>↵</kbd></button>`
       : `<button class="principal" type="button" data-accion="restart"><span>${t('again')}</span><kbd>R</kbd></button>`;
     return `${siguiente}
       <button type="button" data-accion="campaign"><span>${t('campaign')}</span><kbd>Esc</kbd></button>`;
@@ -994,14 +958,29 @@ function mostrarFinGanada() {
     : app.record
       ? `<span class="record-tag">${t('newRecord')}</span>`
       : `<span>${t('yourRecord', { time: formatoTiempo(bestMs) })}</span>`;
-  const cierre = enCampaña && app.nivel === NIVELES.length - 1 ? `<p class="nota promesa">${t('campaignDone')}</p>` : '';
+  if (enCampaña && app.nivel === NIVELES.length - 1) {
+    // se cerró el corazón: epílogo del viaje
+    ponerOverlay(`<div class="panel fin">
+      <header class="fin-cabeza">
+        <p class="kicker">${t('epilogueKicker')}</p>
+        <h2 class="historia-titulo">${t('epilogueTitle')}</h2>
+      </header>
+      <p class="historia-texto">${t('epilogueText')}</p>
+      <p class="nota">${t('clearedIn', { time: formatoTiempo(j.tiempoMs) })}${notaRecord ? `<br>${notaRecord}` : ''}</p>
+      <div class="acciones">
+        <button class="principal" type="button" data-accion="toMenu"><span>${t('epilogueCta')}</span><kbd>↵</kbd></button>
+      </div>
+    </div>`);
+    pantalla('won');
+    enfocarPrimero();
+    return;
+  }
   ponerOverlay(`<div class="panel fin">
     <header class="fin-cabeza">
       <p class="kicker">${etiquetaPartida()}</p>
       <h2 class="cifra superado">${t('youWon')}</h2>
     </header>
     <p class="nota">${t('clearedIn', { time: formatoTiempo(j.tiempoMs) })}${notaRecord ? `<br>${notaRecord}` : ''}</p>
-    ${cierre}
     <div class="acciones">
       ${accionesFin({ hayMas: true })}
     </div>
@@ -1013,17 +992,12 @@ function mostrarFinGanada() {
 function mostrarFinPerdida() {
   const j = app.juego;
   if (!j) return;
-  const porTiempo = app.causa === 'tiempo';
-  const titular = porTiempo ? t('timeOut') : t('youLost');
-  const detalle = porTiempo
-    ? t('timeOutNote', { time: formatoTiempo(j.cfg.mods && j.cfg.mods.relojMs ? j.cfg.mods.relojMs : j.tiempoMs) })
-    : `${formatoTiempo(j.tiempoMs)} · ${t('minesExploded', { count: j.cfg.minas })}`;
   ponerOverlay(`<div class="panel fin">
     <header class="fin-cabeza">
       <p class="kicker">${etiquetaPartida()}</p>
-      <h2 class="cifra derrota">${titular}</h2>
+      <h2 class="cifra derrota">${t('youLost')}</h2>
     </header>
-    <p class="nota">${detalle}</p>
+    <p class="nota">${formatoTiempo(j.tiempoMs)} · ${t('minesExploded', { count: j.cfg.minas })}</p>
     <div class="acciones">
       ${accionesFin({ hayMas: false })}
     </div>
@@ -1113,11 +1087,9 @@ function borrarTodo() {
 function mostrarAjustes() {
   const sonido = guardado.sound ? t('soundOn') : t('soundOff');
   const trama = guardado.trama ? t('on') : t('off');
-  const lampara = guardado.lamp ? t('on') : t('off');
   const filas = [
     filaHTML({ accion: 'toggleSound', idx: 0, nombre: t('settingSound'), detalle: 'M', derecha: sonido }),
     filaHTML({ accion: 'toggleTrama', idx: 1, nombre: t('settingTrama'), detalle: t('settingTramaTag'), derecha: trama }),
-    filaHTML({ accion: 'toggleLamp', idx: 2, nombre: t('settingLamp'), detalle: t('settingLampTag'), derecha: lampara }),
   ].join('');
   ponerOverlay(`<div class="panel">
     ${cabeceraPanel(t('settingsTitle'), botonVolver())}
@@ -1179,34 +1151,33 @@ function ejecutar(nombre) {
   if (nombre.startsWith('playCampaign:')) {
     const i = Number(nombre.slice(13));
     if (Number.isInteger(i) && i >= 0 && i < guardado.campaign.unlocked && i < NIVELES.length) {
-      empezarPartida('campaign', i);
+      mostrarHistoria(i);
     }
     return;
   }
   switch (nombre) {
     case 'play': mostrarDificultades(); return;
     case 'campaign': mostrarCampaña(); return;
+    case 'descend':
+      if (app.historia !== null && app.historia !== undefined) empezarPartida('campaign', app.historia);
+      return;
     case 'nextLevel':
-      if (app.nivel !== null && app.nivel + 1 < NIVELES.length) empezarPartida('campaign', app.nivel + 1);
+      if (haySiguienteNivel()) mostrarHistoria(app.nivel + 1);
       return;
     case 'profile': mostrarPerfil(); return;
     case 'help': mostrarAyuda(); return;
     case 'settings': mostrarAjustes(); return;
-    case 'toggleLamp':
-      guardado.lamp = !guardado.lamp;
-      if (el.lampara) el.lampara.hidden = !(app.pantalla === 'playing' && guardado.lamp);
-      guardar();
-      mostrarAjustes();
-      audio.play('ui');
-      return;
     case 'playCustom': mostrarPersonalizada(); return;
     case 'customStart': empezarPartida('custom'); return;
     case 'resume': reanudar(); return;
     case 'restart': reiniciarPartida(); return;
-    case 'toMenu':
-      if (app.modo === 'campaign') mostrarCampaña();
+    case 'toMenu': {
+      const epilogo = app.modo === 'campaign' && app.nivel === NIVELES.length - 1 && app.pantalla === 'won';
+      if (epilogo) mostrarPortada();
+      else if (app.modo === 'campaign') mostrarCampaña();
       else mostrarPortada();
       return;
+    }
     case 'toggleSound':
       guardado.sound = !guardado.sound;
       aplicarSonido();
@@ -1248,6 +1219,7 @@ function volverAtras() {
     case 'modes': mostrarPortada(); return;
     case 'custom': mostrarDificultades(); return;
     case 'campaign': mostrarPortada(); return;
+    case 'story': mostrarCampaña(); return;
     case 'profile':
     case 'help':
     case 'settings':
@@ -1326,8 +1298,8 @@ function accion(nombre, repetido = false, datos) {
     case 'right': ajustarPasoFocused(1); return;
     case 'confirm': activarFoco(); return;
     case 'restart':
-      if (app.pantalla === 'won' && app.modo === 'campaign' && app.nivel !== null && app.nivel + 1 < NIVELES.length) {
-        empezarPartida('campaign', app.nivel + 1);
+      if (app.pantalla === 'won' && haySiguienteNivel()) {
+        mostrarHistoria(app.nivel + 1);
         return;
       }
       if (app.pantalla === 'dead' || app.pantalla === 'won') reiniciarPartida();
@@ -1409,6 +1381,9 @@ function rutaDeEstado() {
   if (app.pantalla === 'modes') return slug('play');
   if (app.pantalla === 'custom') return slug('custom');
   if (app.pantalla === 'campaign') return slug('campaign');
+  if (app.pantalla === 'story' && app.historia !== null) {
+    return `${slug('campaign')}/nivel-${dosDigitos(app.historia + 1)}`;
+  }
   if (app.pantalla === 'help') return slug('help');
   if (app.pantalla === 'settings') return slug('settings');
   if (app.pantalla === 'profile') return slug('profile');
@@ -1440,7 +1415,7 @@ function mostrarRuta(ruta) {
   if (ruta.tipo === 'campaign-level') {
     const i = ruta.nivel;
     if (Number.isInteger(i) && i >= 0 && i < NIVELES.length) {
-      if (i < guardado.campaign.unlocked) { empezarPartida('campaign', i); return; }
+      if (i < guardado.campaign.unlocked) { mostrarHistoria(i); return; }
       mostrarCampaña();
       return;
     }
@@ -1497,11 +1472,6 @@ function bucle(t) {
       }
       renderDemo();
     }
-    const logo = document.getElementById('logo-mine');
-    if (logo) {
-      app.faseLogo = (app.faseLogo + dt / 1500) % 1;
-      dibujarLogo(logo, app.faseLogo);
-    }
   }
 }
 
@@ -1529,6 +1499,7 @@ function aplicarIdiomaBase() {
 const REPINTAR = {
   home: mostrarPortada,
   campaign: mostrarCampaña,
+  story: () => mostrarHistoria(app.historia === null ? 0 : app.historia),
   modes: mostrarDificultades,
   custom: () => mostrarPersonalizada(),
   profile: mostrarPerfil,
@@ -1575,11 +1546,6 @@ function arrancar() {
 
   el.canvas.addEventListener('pointermove', (evento) => {
     const j = app.juego;
-    const caja = el.stage.getBoundingClientRect();
-    if (el.lampara && !el.lampara.hidden) {
-      el.lampara.style.setProperty('--mx', `${Math.round(evento.clientX - caja.left)}px`);
-      el.lampara.style.setProperty('--my', `${Math.round(evento.clientY - caja.top)}px`);
-    }
     if (!j) return;
     j.cursorVisible = false;
     j.hover = conversorDePuntos(evento.clientX, evento.clientY);

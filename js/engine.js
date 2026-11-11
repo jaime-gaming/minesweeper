@@ -1,14 +1,16 @@
 // motor del buscaminas: máquina de estados + dibujado en lienzo.
 // la lógica del tablero vive en board.js; aquí se anima y se pinta.
 
-import { Tablero } from './board.js?v=1';
+import { Tablero } from './board.js?v=2';
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const ACENTO = '#ff2b2b';
+// la monoespaciada de la casa (var(--mono) en styles.css)
+const FUENTE_MONO = 'ui-monospace, "SFMono-Regular", "SF Mono", "Roboto Mono", Menlo, Consolas, monospace';
 
-// números: cada valor con su color, como manda el buscaminas de toda la vida,
-// pero en versión neón sobre la hoja de tinta
-const COLORES_NUMERO = ['', '#5aa2ff', '#3ddc84', '#ff5d5d', '#b78cff', '#ff8a3d', '#2dd4d4', '#f5d90a', '#ececec'];
+// números: el color clásico del buscaminas sobre la tinta, planos, en la
+// monoespaciada de la casa — sin halos
+const COLORES_NUMERO = ['', '#4aa3ff', '#35d07f', '#ff4d4d', '#8f7bff', '#ff7a1f', '#22c8c8', '#ffd60a', '#f2f2f2'];
 const COLOR_NUMERO = (n) => COLORES_NUMERO[clamp(n, 1, 8)] || ACENTO;
 
 export class Game {
@@ -34,17 +36,7 @@ export class Game {
     this.shake = 0; // sacudida del lienzo al estallar
     this.explosionT = -1;
     this.winT = -1;
-
-    // modificadores de campaña: reloj (contratiempo) y señalización inicial
-    const mods = this.cfg.mods || {};
-    this.relojMax = Number(mods.relojMs) > 0 ? Math.floor(Number(mods.relojMs)) : 0;
-    this.restanteMs = this.relojMax;
-    this.senal = Number(mods.senal) > 0 ? Math.floor(Number(mods.senal)) : 0;
-    this.senalAplicada = false;
   }
-
-  get tieneReloj() { return this.relojMax > 0; }
-  get tiempoRestante() { return this.restanteMs; }
 
   emit(type, data) {
     this.onEvent(type, data);
@@ -100,13 +92,7 @@ export class Game {
       this.emit('win', { tiempoMs: this.tiempoMs });
       return;
     }
-    if (this.estado === 'antes' && this.tablero.sembradas) {
-      this.estado = 'jugando';
-      if (this.senal > 0 && !this.senalAplicada) {
-        this.senalAplicada = true;
-        this.tablero.marcarSenal(this.senal);
-      }
-    }
+    if (this.estado === 'antes' && this.tablero.sembradas) this.estado = 'jugando';
   }
 
   // destapa la casilla (x, y): si está cerrada la revela; si ya estaba abierta,
@@ -154,15 +140,6 @@ export class Game {
     this.reloj += paso;
     if (this.estado === 'jugando' && !this.pausado) this.tiempoMs += paso;
     else if (this.estado === 'antes' && !this.pausado && this.tablero.sembradas) this.tiempoMs += paso;
-    // modificador «reloj»: si la galería se cierra, se acabó
-    if (this.estado === 'jugando' && !this.pausado && this.relojMax > 0) {
-      this.restanteMs = Math.max(0, this.restanteMs - paso);
-      if (this.restanteMs === 0) {
-        this.estado = 'perdido';
-        this.explosionT = -1;
-        this.emit('timeOut', {});
-      }
-    }
     this.shake = Math.max(0, this.shake - paso * 0.05);
     if (this.flashes.length) {
       const limite = this.reloj - 450;
@@ -280,12 +257,9 @@ export class Game {
       }
     }
 
-    // marco exterior: dos trazos en las esquinas, como el resto de la casa.
-    // con el modificador reloj, por debajo de los 10 s las esquinas laten en rojo
-    const urgente = this.tieneReloj && this.estado === 'jugando' && this.restanteMs < 10000;
-    ctx.strokeStyle = urgente ? ACENTO : 'rgba(255,255,255,0.85)';
+    // marco exterior: dos trazos en las esquinas, como el resto de la casa
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
     ctx.lineWidth = 2;
-    if (urgente) ctx.globalAlpha = 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(this.reloj / 160));
     const W = columnas * cell;
     const H = filas * cell;
     const tramo = Math.max(6, Math.round(cell * 0.7));
@@ -319,20 +293,34 @@ export class Game {
   }
 
   _celdaCerrada(ctx, X, Y, lado, gap, hover) {
-    ctx.fillStyle = hover ? '#1d1d1d' : '#141414';
-    ctx.fillRect(X + gap, Y + gap, lado - gap * 2, lado - gap * 2);
-    // bisel: un trazo de luz arriba-izquierda y uno de sombra abajo-derecha
-    ctx.fillStyle = hover ? '#333' : '#2a2a2a';
-    ctx.fillRect(X + gap, Y + gap, lado - gap * 2, 1);
-    ctx.fillRect(X + gap, Y + gap, 1, lado - gap * 2);
-    ctx.fillStyle = '#080808';
-    ctx.fillRect(X + gap, Y + lado - gap - 1, lado - gap * 2, 1);
-    ctx.fillRect(X + lado - gap - 1, Y + gap, 1, lado - gap * 2);
+    const ix = X + gap;
+    const iy = Y + gap;
+    const w = lado - gap * 2;
+    // bloque de roca: cuerpo, plano de luz arriba y plano de sombra abajo,
+    // más un filo interior para que el bisel se lea también en casillas grandes
+    ctx.fillStyle = hover ? '#1e1e1e' : '#151515';
+    ctx.fillRect(ix, iy, w, w);
+    ctx.fillStyle = hover ? '#2b2b2b' : '#222222';
+    ctx.fillRect(ix, iy, w, 1);
+    ctx.fillRect(ix, iy, 1, w);
+    ctx.fillStyle = hover ? '#383838' : '#2e2e2e';
+    ctx.fillRect(ix + 1, iy + 1, w - 2, 1);
+    ctx.fillRect(ix + 1, iy + 1, 1, w - 2);
+    ctx.fillStyle = '#040404';
+    ctx.fillRect(ix, iy + w - 1, w, 1);
+    ctx.fillRect(ix + w - 1, iy, 1, w);
+    ctx.fillStyle = hover ? '#101010' : '#0d0d0d';
+    ctx.fillRect(ix + 1, iy + w - 2, w - 2, 1);
+    ctx.fillRect(ix + w - 2, iy + 1, 1, w - 2);
   }
 
   _celdaAbierta(ctx, X, Y, lado, gap, celda, i, forzada = false) {
-    ctx.fillStyle = '#060606';
+    ctx.fillStyle = '#070707';
     ctx.fillRect(X + gap, Y + gap, lado - gap * 2, lado - gap * 2);
+    // un rasgo hundido arriba: la casilla abierta se hunde en la hoja
+    ctx.fillStyle = '#050505';
+    ctx.fillRect(X + gap, Y + gap, lado - gap * 2, 1);
+    ctx.fillRect(X + gap, Y + gap, 1, lado - gap * 2);
 
     if (celda.mina) {
       this._mina(ctx, X, Y, lado, '#f2f2f2');
@@ -340,19 +328,12 @@ export class Game {
     }
     const n = celda.adj;
     if (n > 0) {
-      const fuente = Math.round(lado * 0.56);
-      const color = COLOR_NUMERO(n);
-      ctx.fillStyle = color;
-      ctx.font = `700 ${fuente}px ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace`;
+      const fuente = Math.round(lado * 0.58);
+      ctx.fillStyle = COLOR_NUMERO(n);
+      ctx.font = `700 ${fuente}px ${FUENTE_MONO}`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      // neón suave: el halo respira con el propio color del número
-      ctx.save();
-      ctx.shadowColor = color;
-      ctx.shadowBlur = Math.round(lado * 0.22);
-      ctx.fillText(String(n), X + lado / 2, Y + lado / 2 + Math.round(lado * 0.04));
-      ctx.restore();
-      ctx.fillText(String(n), X + lado / 2, Y + lado / 2 + Math.round(lado * 0.04));
+      ctx.fillText(String(n), X + lado / 2, Y + lado / 2 + Math.round(lado * 0.05));
     }
   }
 
@@ -360,28 +341,40 @@ export class Game {
     const u = Math.max(1, Math.round(lado / 16)); // unidad base de la mina
     const cx = X + lado / 2;
     const cy = Y + lado / 2;
+    const tono = color === '#000' ? '#000' : null; // cuerpo plano cuando se pinta sobre rojo
+    // halo de profundidad bajo el cuerpo
+    ctx.fillStyle = tono || 'rgba(0,0,0,0.35)';
+    ctx.fillRect(Math.round(cx - 4 * u), Math.round(cy - 2 * u) + 1, 8 * u, 5 * u);
+    // cuerpo: bloque grueso con cruz ampliada
     ctx.fillStyle = color;
-    // cuerpo: un bloque central grueso
     ctx.fillRect(Math.round(cx - 3 * u), Math.round(cy - 3 * u), 6 * u, 6 * u);
     ctx.fillRect(Math.round(cx - 4 * u), Math.round(cy - 2 * u), 8 * u, 4 * u);
     ctx.fillRect(Math.round(cx - 2 * u), Math.round(cy - 4 * u), 4 * u, 8 * u);
-    // púas cardinales
-    ctx.fillRect(Math.round(cx - u / 2), Math.round(cy - 6 * u), u, 2 * u);
-    ctx.fillRect(Math.round(cx - u / 2), Math.round(cy + 4 * u), u, 2 * u);
-    ctx.fillRect(Math.round(cx - 6 * u), Math.round(cy - u / 2), 2 * u, u);
-    ctx.fillRect(Math.round(cx + 4 * u), Math.round(cy - u / 2), 2 * u, u);
-    // púas diagonales: un píxel de bloque
-    ctx.fillRect(Math.round(cx - 5 * u), Math.round(cy - 5 * u), u, u);
-    ctx.fillRect(Math.round(cx + 4 * u), Math.round(cy - 5 * u), u, u);
-    ctx.fillRect(Math.round(cx - 5 * u), Math.round(cy + 4 * u), u, u);
-    ctx.fillRect(Math.round(cx + 4 * u), Math.round(cy + 4 * u), u, u);
+    // púas cardinales, más anchas que un píxel de bloque
+    ctx.fillRect(Math.round(cx - u), Math.round(cy - 6 * u), 2 * u, 2 * u);
+    ctx.fillRect(Math.round(cx - u), Math.round(cy + 4 * u), 2 * u, 2 * u);
+    ctx.fillRect(Math.round(cx - 6 * u), Math.round(cy - u), 2 * u, 2 * u);
+    ctx.fillRect(Math.round(cx + 4 * u), Math.round(cy - u), 2 * u, 2 * u);
+    // púas diagonales
+    ctx.fillRect(Math.round(cx - 5 * u), Math.round(cy - 5 * u), u + (u >> 1), u + (u >> 1));
+    ctx.fillRect(Math.round(cx + 4 * u) - (u >> 1), Math.round(cy - 5 * u), u + (u >> 1), u + (u >> 1));
+    ctx.fillRect(Math.round(cx - 5 * u), Math.round(cy + 4 * u) - (u >> 1), u + (u >> 1), u + (u >> 1));
+    ctx.fillRect(Math.round(cx + 4 * u) - (u >> 1), Math.round(cy + 4 * u) - (u >> 1), u + (u >> 1), u + (u >> 1));
+    if (!tono) {
+      // destello especular arriba-izquierda y sombra abajo-derecha
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(Math.round(cx - 2 * u), Math.round(cy - 2 * u), 2 * u, u);
+      ctx.fillRect(Math.round(cx - 3 * u), Math.round(cy - u), u, u);
+      ctx.fillStyle = 'rgba(0,0,0,0.28)';
+      ctx.fillRect(Math.round(cx + u), Math.round(cy + u), 2 * u, 2 * u);
+    }
   }
 
   _bandera(ctx, X, Y, lado, escala = 1) {
     if (escala <= 0.02) return;
     const u = Math.max(1, Math.round(lado / 16));
     const cx = Math.round(X + lado / 2);
-    const base = Math.round(Y + lado - 4 * u);
+    const base = Math.round(Y + lado - 3 * u);
     const cima = Math.round(Y + 3.5 * u);
     ctx.save();
     if (escala < 1) {
@@ -389,17 +382,36 @@ export class Game {
       ctx.scale(escala, escala);
       ctx.translate(-cx, -(base + cima) / 2);
     }
-    // asta
+    // asta: cuerpo claro con filo de sombra a la derecha
+    ctx.fillStyle = '#e8e8e8';
+    ctx.fillRect(cx - u, cima, 2 * u, base - cima);
+    ctx.fillStyle = '#8f8f8f';
+    ctx.fillRect(cx + u - 1, cima, 1, base - cima);
+    // remate del asta
     ctx.fillStyle = '#f2f2f2';
-    ctx.fillRect(cx - u, cima, 2 * u > 1 ? 2 : 1, base - cima);
-    // base del asta
-    ctx.fillRect(cx - 3 * u, base, 6 * u, u);
-    // paño rojo: escalones que estrechan hacia la izquierda
+    ctx.fillRect(cx - u, cima - u, 2 * u, u);
+    // paño rojo con pliegue y luz: tres tramos escalonados hacia el asta
+    const px = cx + u; // el paño cuelga a la derecha del asta
     ctx.fillStyle = ACENTO;
-    ctx.fillRect(cx - 6 * u, cima, 5 * u, u);
-    ctx.fillRect(cx - 6 * u, cima + u, 4 * u, u);
-    ctx.fillRect(cx - 6 * u, cima + 2 * u, 3 * u, u);
-    ctx.fillRect(cx - 6 * u, cima + 3 * u, 2 * u, u);
+    ctx.fillRect(px, cima + u, 5 * u, u);
+    ctx.fillRect(px, cima + 2 * u, 6 * u, u);
+    ctx.fillRect(px, cima + 3 * u, 5 * u, u);
+    // luz del paño
+    ctx.fillStyle = '#ff7a7a';
+    ctx.fillRect(px, cima + u, 5 * u, 1);
+    ctx.fillRect(px, cima + 2 * u, 6 * u, 1);
+    // pliegue en sombra
+    ctx.fillStyle = '#a31212';
+    ctx.fillRect(px, cima + 3 * u, 5 * u, 1);
+    ctx.fillRect(px + 4 * u, cima + 2 * u, 2 * u, u);
+    // muesca de golondrina en el vuelo del paño
+    ctx.fillStyle = '#070707';
+    ctx.fillRect(px + 5 * u, cima + 2 * u, u, u);
+    // base del asta: zócalo claro con sombra
+    ctx.fillStyle = '#d8d8d8';
+    ctx.fillRect(cx - 3 * u, base, 6 * u, u);
+    ctx.fillStyle = '#4a4a4a';
+    ctx.fillRect(cx - 3 * u, base + u - 1, 6 * u, 1);
     ctx.restore();
   }
 

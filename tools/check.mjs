@@ -268,29 +268,23 @@ prueba('cada nivel de campaña es jugable y progresivo en actos', () => {
   afirma(maxMinas(4) > maxMinas(1), 'el corazón muerde más que el exterior');
 });
 
-prueba('configNivel mapea modificadores al motor', () => {
+prueba('configNivel entrega una configuración limpia de motor', () => {
   const plano = configNivel(0);
-  afirma(plano.filas === 6 && plano.columnas === 6 && plano.minas === 6, 'nivel 1 sin mods');
-  afirma(!plano.mods, 'sin modificadores donde no tocan');
-  const conReloj = NIVELES.findIndex((n) => n.reloj);
-  const cfgReloj = configNivel(conReloj);
-  afirma(cfgReloj.mods && cfgReloj.mods.relojMs === NIVELES[conReloj].reloj * 1000, 'reloj en ms');
-  const conSenal = NIVELES.findIndex((n) => n.senal);
-  const cfgSenal = configNivel(conSenal);
-  afirma(cfgSenal.mods && cfgSenal.mods.senal === NIVELES[conSenal].senal, 'señal al vuelo');
+  afirma(plano.filas === 6 && plano.columnas === 6 && plano.minas === 6, 'nivel 1 tal cual');
+  afirma(Object.keys(plano).length === 3, 'sin campos extra');
+  for (let i = 0; i < NIVELES.length; i += 1) {
+    const cfg = configNivel(i);
+    const nivel = NIVELES[i];
+    afirma(cfg.minas === nivel.minas && cfg.filas === nivel.filas && cfg.columnas === nivel.columnas, `nivel ${i + 1} mapea exacto`);
+  }
   afirma(configNivel(99) === null, 'índice fuera de rango devuelve null');
 });
 
-prueba('la señal pre-marca exactamente N minas reales', () => {
-  const tablero = tableroConMinas(8, 8, [0, 1, 2, 9, 17]);
-  const marcadas = tablero.marcarSenal(2);
-  afirma(marcadas === 2, `marcó ${marcadas}`);
-  const banderas = tablero.celdas.filter((c) => c.bandera);
-  afirma(banderas.length === 2, 'dos banderas');
-  afirma(banderas.every((c) => c.mina), 'siempre sobre minas');
-  afirma(tablero.restantesMinas() === tablero.minas - 2, 'el contador descuenta las señales');
-  const cero = tablero.marcarSenal(0);
-  afirma(cero === 0, 'señal cero no marca nada');
+prueba('cada nivel trae su línea de la historia en ES y EN', () => {
+  for (const [i, n] of NIVELES.entries()) {
+    afirma(typeof n.historiaEs === 'string' && n.historiaEs.trim().length > 12, `historiaEs nivel ${i + 1}`);
+    afirma(typeof n.historiaEn === 'string' && n.historiaEn.trim().length > 12, `historiaEn nivel ${i + 1}`);
+  }
 });
 
 process.stdout.write('idiomas\n');

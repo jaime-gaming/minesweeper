@@ -1,12 +1,12 @@
 # minesweeper
 
-El buscaminas clásico, de bloques en blanco y negro, con los números en neón y una luz de farol que sigue al puntero por el tablero. Sin dependencias y sin llamadas a la red: la rejilla, las minas, la treintena de niveles de **la Treinta** y el rojo reservado para lo que estalla. La interfaz está en español y en inglés, y se puede jugar con ratón, teclado, táctil o mando. Comparte casa y estética con [snake](https://github.com/jaime-gaming/snake).
+El buscaminas clásico, de bloques en blanco y negro y muy poco más: la rejilla, las minas, los números en su color de siempre y el rojo reservado para lo que estalla. Sin dependencias y sin llamadas a la red. La interfaz está en español y en inglés, y se puede jugar con ratón, teclado, táctil o mando. Comparte casa y estética con [snake](https://github.com/jaime-gaming/snake).
 
 ## Idea visual
 
-La pantalla es una hoja de tinta iluminada por un farol: negro profundo, blancos duros y un círculo de luz cálida que sigue al puntero por el tablero (se puede desactivar en ajustes). Los números ya no se ocultan en grises: cada cifra lleva su color clásico de buscaminas en versión neón, con un halo de luz propia. Las celdas cerradas son bloques con un bisel mínimo; las descubiertas se funden con el fondo. Al estallar, el lienzo se sacude y la casilla asesina queda entera en rojo con la mina en negro. Al ganar, las banderas se izan en oleada desde la esquina y una franja de luz cruza el tablero una sola vez.
+La pantalla es una hoja de tinta: negro profundo, blancos duros y un rojo para la bandera, las minas y la casilla que estalla. Las celdas cerradas son bloques con un bisel doble; las descubiertas se funden con el fondo y dejan su número plano, en la monoespaciada de la casa, con el color clásico del buscaminas (1 azul, 2 verde, 3 rojo, 4 violeta, 5 naranja, 6 cian, 7 amarillo, 8 blanco). Las banderas de paño rojo se izan con su pliegue y su brillo; las minas son bloques de ocho púas con su destello. Al estallar, el lienzo se sacude y la casilla asesina queda entera en rojo con la mina en negro. Al ganar, las banderas se izan en oleada y una franja de luz cruza el tablero una sola vez.
 
-La portada juega sola: una partida automática del siguiente nivel de la Treinta se despeja en la vista previa mientras decides qué jugar, y el logotipo «minesweeper.» late con ondas de sonar.
+La portada juega sola: una partida automática del siguiente nivel de la Treinta se despeja en la vista previa mientras decides qué jugar. El logotipo «minesweeper.» es tipografía pura, como el resto de la casa.
 
 ## Controles
 
@@ -37,18 +37,18 @@ El primer clic nunca estalla y siempre abre hueco (la zona del clic y sus vecina
 
 Las tres dificultades fijas tienen **récord de tiempo** independiente y estadísticas; la personalizada sólo cuenta partidas, victorias y racha.
 
-## La Treinta — campaña
+## La Treinta — el modo historia
 
-Treinta niveles dibujados a mano en cuatro actos, como un descenso a la mina:
+Treinta niveles dibujados a mano en cuatro actos, con un relato propio: **tu padre bajó a la mina antes que tú; tú bajas a buscarlo.** Cada nivel cuenta una línea de la historia, en pantalla, antes de picar:
 
 | Acto | Nivel | Tableros |
 | --- | --- | --- |
-| I · el exterior | 1 – 6 | de 6×6/6 a 9×9/16 |
-| II · las galerías | 7 – 12 | de 10×10/18 a 14×14/40 |
-| III · el filón | 13 – 18 | de 14×14/44 a 16×16/66 |
-| IV · el corazón | 19 – 30 | de 16×16/69 a 24×30/132 |
+| I · el exterior | 1 – 6 | de 6×6/6 a 9×9/16 — la puerta de madera, los tres que no volvieron |
+| II · las galerías | 7 – 12 | de 10×10/18 a 14×14/40 — los relevos, los raíles y el recado |
+| III · el filón | 13 – 18 | de 14×14/44 a 16×16/66 — la veta empieza a cantar |
+| IV · el corazón | 19 – 30 | de 16×16/69 a 24×30/132 — el corazón late bajo la piedra |
 
-Cada nivel completado abre el siguiente y guarda tu **mejor tiempo** en su casilla; no hay estrellas, sólo tu marca. Dos modificadores aparecen en el descenso: **reloj** (la galería se cierra en su momento; el cronómetro late en rojo con diez segundos por delante) y **señal** (algunas minas ya vienen marcadas cuando abres: «alguien pasó por aquí antes que tú»). El perfil cuenta la campaña como victorias, rachas y tiempo total, y la portada enlaza directamente con tu siguiente paso. Cada nivel tiene su ruta profunda (`/campaña/nivel-07`), y el botón atrás navega por las pantallas como en cualquier web.
+Completar un nivel abre el siguiente y guarda tu **mejor tiempo** en su casilla; no hay estrellas, sólo tu marca. Al ganar cada nivel, el botón principal te lleva al siguiente capítulo; al cerrar el corazón de piedra, un epílogo cierra el viaje. El perfil cuenta la campaña como victorias, rachas y tiempo total, y la portada lleva directo a tu siguiente paso. Cada nivel tiene su ruta profunda (`/campaña/nivel-07`) y el botón atrás navega como en cualquier web.
 
 ## Perfil
 
@@ -81,7 +81,7 @@ js/engine.js      máquina de estados y dibujado en lienzo (bloques, no suavizad
 js/input.js       teclado, gestos táctiles y mando; habla en acciones
 js/audio.js       sonido sintetizado por Web Audio: sin ficheros externos
 js/i18n.js        textos en ES/EN y slugs de ruta (jugar, campaña, …)
-js/campaign.js    la Treinta: actos, niveles, modificadores y mejoras
+js/campaign.js    la Treinta: el relato, los actos, los treinta niveles y sus líneas de historia
 js/main.js        pantallas, HUD, récords en localStorage, demo de portada, rutas y arranque
 tools/build.mjs   empaquetador sin dependencias
 tools/check.mjs   pruebas de lógica, sin navegador

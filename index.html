@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-store">
 <meta name="theme-color" content="#000000">
 <link rel="canonical" href="https://minesweeper.jaime-gaming.com/">
-<meta id="meta-description" name="description" content="Buscaminas de bloques en blanco y negro con números de neón: tres dificultades, la Treinta (campaña de treinta niveles), banderas, récords locales.">
+<meta id="meta-description" name="description" content="Buscaminas de bloques en blanco y negro con una historia en treinta niveles: la Treinta. Tres dificultades, banderas y récords locales.">
 <title>Minesweeper</title>
 <script>
   (function () {
@@ -15,7 +15,7 @@
   })();
 </script>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23000'/%3E%3Crect x='7' y='1' width='2' height='4' fill='%23fff'/%3E%3Crect x='7' y='11' width='2' height='4' fill='%23fff'/%3E%3Crect x='1' y='7' width='4' height='2' fill='%23fff'/%3E%3Crect x='11' y='7' width='4' height='2' fill='%23fff'/%3E%3Ccircle cx='8' cy='8' r='4' fill='%23fff'/%3E%3Crect x='7.1' y='7.1' width='1.8' height='1.8' fill='%23ff2b2b'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="styles.css?v=2">
+<link rel="stylesheet" href="styles.css?v=3">
 </head>
 <body data-screen="home">
   <div id="app">
@@ -40,7 +40,6 @@
 
     <main id="stage">
       <canvas id="board" data-i18n-aria="board" aria-label="tablero"></canvas>
-      <div id="lampara" hidden aria-hidden="true"></div>
       <div id="senal" data-i18n="startSignal">despeja el campo</div>
       <button id="flag-toggle" type="button" hidden aria-pressed="false" data-i18n-aria="flagMode" aria-label="poner banderas al tocar">
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 15V2h1.6v3.4H12l-2.4 3.2L12 11.8H4.6V15H3z" fill="currentColor"/></svg>
@@ -53,7 +52,6 @@
     <footer id="footer">
       <div class="foot-row">
         <p id="hint"></p>
-        <ul id="effects" class="effects" hidden></ul>
       </div>
     </footer>
   </div>
@@ -116,6 +114,6 @@
     })();
   </script>
 
-  <script src="minesweeper.js?v=2"></script>
+  <script src="minesweeper.js?v=3"></script>
 </body>
 </html>

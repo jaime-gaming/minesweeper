@@ -487,20 +487,6 @@ h1 .dot {
   border-color: var(--line2);
 }
 
-.inicio-demo {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding-top: 4px;
-}
-
-.inicio-demo canvas {
-  display: block;
-  width: 100%;
-  max-width: 232px;
-  box-shadow: 0 0 0 1px var(--line2);
-}
-
 /* foco de teclado: un marco de 2 px, sin sombras ni adornos */
 
 button.foco {
@@ -540,13 +526,6 @@ button.foco {
   display: flex;
   flex-direction: column;
   gap: clamp(12px, 2vh, 18px);
-}
-
-.niveles-cabeza {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 14px;
 }
 
 .ghost {
@@ -1049,78 +1028,6 @@ button.foco {
    la treinta · campaña, luz de farol y números de neón
    ================================================================= */
 
-/* la luz de farol: un círculo cálido que sigue al puntero por el tablero */
-#lampara {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  background:
-    radial-gradient(circle 175px at var(--mx, 50%) var(--my, 45%),
-      rgba(255, 216, 146, 0.17),
-      rgba(255, 216, 146, 0.06) 46%,
-      transparent 72%);
-}
-
-/* la mina respira por los bordes: viñeta permanente sobre el escenario */
-#stage::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  pointer-events: none;
-  background: radial-gradient(115% 88% at 50% 44%, transparent 52%, rgba(0, 0, 0, 0.52) 100%);
-}
-
-#senal {
-  z-index: 3;
-}
-
-/* el cronómetro late en rojo con el reloj de la galería por acabarse */
-.mult.urgente {
-  color: var(--accent);
-  min-width: 5ch;
-  animation: latido 0.55s steps(2, jump-none) infinite;
-}
-
-@keyframes latido {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
-}
-
-/* fichas de modificadores activos, en el pie */
-.effects {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  flex: none;
-}
-
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 2px 6px;
-  border: 1px solid var(--line2);
-  font-family: var(--mono);
-  font-size: 8px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: #dcdcdc;
-  font-variant-numeric: tabular-nums;
-}
-
-.chip i {
-  display: block;
-  width: 6px;
-  height: 6px;
-  background: var(--accent);
-  border-radius: 50%;
-}
-
 /* portada: logotipo pintado en canvas + demo en vivo de tu siguiente nivel */
 .logo-canvas {
   display: block;
@@ -1149,163 +1056,83 @@ button.foco {
   letter-spacing: 0.18em;
 }
 
-.campana-progreso b {
-  color: var(--accent);
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-/* la treinta: intro y progreso */
+/* la treinta: portada con el relato y actos como secciones */
 .campana {
-  max-width: 880px;
+  max-width: 780px;
 }
 
-.campana-intro {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  margin: 2px 0 12px;
-  font-size: 11px;
-  line-height: 1.6;
-  color: var(--muted);
-}
-
-.campana-progreso {
-  font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.2em;
-  color: var(--fg);
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-
-/* actos */
-.actos {
-  display: flex;
-  flex-direction: column;
-  gap: clamp(12px, 2vh, 20px);
-}
-
-.acto-cabeza {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 6px 16px;
-  padding: 6px 0 5px;
-  border-top: 1px solid var(--line2);
-}
-
-.acto:first-child .acto-cabeza {
-  border-top: 0;
-  padding-top: 0;
-}
-
-.acto-cabeza .kicker {
-  color: var(--fg);
-}
-
-.acto-sub {
-  margin: 0;
-  font-size: 8px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--dim);
-}
-
-/* rejilla de niveles */
-.niveles {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(172px, 1fr));
-  gap: 6px;
-  padding: 4px 0 2px;
-}
-
-.celda-nivel {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  padding: 9px 10px;
-  background: #050505;
-  border: 1px solid var(--line2);
-  color: var(--fg);
-  text-align: left;
-  cursor: pointer;
-  transition: border-color 0.12s, background 0.12s;
-}
-
-.celda-nivel:hover:not(.bloqueada),
-.celda-nivel:focus-visible:not(.bloqueada) {
-  border-color: var(--fg);
-  background: #0c0c0c;
-}
-
-.cn-num {
-  font-family: var(--mono);
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--dim);
-  font-variant-numeric: tabular-nums;
-}
-
-.cn-nombre {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  font-size: 11px;
+.campana-titulo {
+  margin: 4px 0 0;
+  font-size: clamp(20px, 5vw, 28px);
   font-weight: 600;
-  letter-spacing: 0.02em;
-  line-height: 1.25;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
 }
 
-.cn-nombre small {
-  font-family: var(--mono);
-  font-weight: 400;
-  font-size: 8px;
-  letter-spacing: 0.08em;
-  color: var(--muted);
-  white-space: nowrap;
+.niveles-cabeza {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
 }
 
-.cn-mejor {
-  margin-left: auto;
-  font-family: var(--mono);
-  font-size: 11px;
-  color: var(--fg);
+.niveles-cabeza b {
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
 }
 
-/* nivel ya despejado: la marca verde de siempre, apagada */
-.celda-nivel.superada {
-  border-color: rgba(61, 220, 132, 0.4);
-}
-
-.celda-nivel.superada .cn-num,
-.celda-nivel.superada .cn-mejor {
-  color: #3ddc84;
-}
-
-/* nivel bajo llave */
-.celda-nivel.bloqueada {
-  cursor: not-allowed;
-  opacity: 0.34;
-}
-
-.celda-nivel.bloqueada .cn-mejor {
-  color: var(--muted);
-  font-size: 12px;
-}
-
-/* pantalla final: cierre del corazón */
-.promesa {
-  border-left: 2px solid var(--accent);
+/* el prólogo del relato, en voz baja */
+.prologo {
+  margin: 2px 0 14px;
   padding-left: 10px;
-  margin-top: 9px;
-  color: var(--fg) !important;
+  border-left: 1px solid var(--line2);
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--muted);
+}
+
+.acto-grupo {
+  margin-top: 14px;
+  color: var(--fg);
+}
+
+.acto-lore {
+  margin: -6px 0 6px;
+  font-size: 10px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--dim);
+}
+
+/* filas cerradas: índices y textos atenuados */
+.row.dim {
+  cursor: default;
+  opacity: 0.32;
+}
+
+/* la historia de un nivel, antes de picar */
+.historia {
+  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 2vh, 16px);
+}
+
+.historia-titulo {
+  margin: 0;
+  font-size: clamp(40px, 10vw, 62px);
+  font-weight: 600;
+  letter-spacing: -0.05em;
+  line-height: 0.92;
+}
+
+.historia-texto {
+  margin: 0;
+  font-size: clamp(14px, 2.6vw, 17px);
+  line-height: 1.7;
+  color: var(--fg);
+  max-width: 34ch;
 }
 
 /* ayuda: tabla de teclas */
@@ -1327,12 +1154,3 @@ button.foco {
   }
 }
 
-/* el punto de la marca en la barra, latiendo como el del logotipo */
-.brand .dot {
-  animation: puntoLate 1.5s ease-in-out infinite;
-}
-
-@keyframes puntoLate {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.22; }
-}
