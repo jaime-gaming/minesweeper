@@ -1,4 +1,4 @@
-/* minesweeper — un solo fichero, sin módulos. generado por tools/build.mjs (2026-11-11 · v4).
+/* minesweeper — un solo fichero, sin módulos. generado por tools/build.mjs (2026-11-11 · v5).
    no lo edites a mano: cambia js/*.js y vuelve a ejecutar node tools/build.mjs */
 (function () {
 'use strict';
@@ -219,8 +219,10 @@ class Tablero {
   }
 
   // al perder, destapa el tablero entero: la partida ha terminado y el
-  // campo queda a la vista, como un mapa que ya no sirve a nadie
+  // campo queda a la vista, como un mapa que ya no sirve a nadie.
+  // de paso anota cuántas casillas seguras destapó el jugador.
   revelarTodo() {
+    this.despejadasPorJugador = this.celdas.filter((c) => c.revelada && !c.mina).length;
     for (const celda of this.celdas) {
       celda.revelada = true;
     }
@@ -1255,6 +1257,13 @@ const STRINGS = {
     levelCell: 'nivel {n}',
     descend: 'marchar',
     storyDossier: 'exp. nº 0042-a',
+    casualtyTag: 'baja',
+    statTime: 'tiempo',
+    statCleared: 'despejadas',
+    statBest: 'mejor',
+    statMines: 'minas',
+    campaignHere: 'tu posición en la operación',
+    campaignComplete: 'operación completada. descanse el que la cruzó.',
     descendAgain: 'volver a marchar',
     epilogueKicker: 'el final del campo',
     epilogueTitle: 'has vuelto.',
@@ -1416,6 +1425,13 @@ const STRINGS = {
     levelCell: 'level {n}',
     descend: 'march',
     storyDossier: 'file № 0042-a',
+    casualtyTag: 'casualty',
+    statTime: 'time',
+    statCleared: 'cleared',
+    statBest: 'best',
+    statMines: 'mines',
+    campaignHere: 'your position in the operation',
+    campaignComplete: 'operation complete. rest to those who crossed it.',
     descendAgain: 'march again',
     epilogueKicker: 'the end of the field',
     epilogueTitle: 'you made it home.',
@@ -2202,14 +2218,16 @@ function renderDemo() {
 }
 /* ------------------------------------------------------------ pantallas */
 
-function filaHTML({ accion = null, campo = null, idx, nombre, detalle = '', derecha = '', peligro = false, stat = false, dim = false }) {
+function filaHTML({ accion = null, campo = null, idx, nombre, detalle = '', derecha = '', peligro = false, stat = false, dim = false, acento = false, titulo = '' }) {
   const clases = ['row'];
   if (peligro) clases.push('peligro');
   if (stat) clases.push('stat');
   if (dim) clases.push('dim');
+  if (acento) clases.push('acento');
   const attrs = ['type="button"', `class="${clases.join(' ')}"`];
   if (accion) attrs.push(`data-accion="${accion}"`);
   if (campo) attrs.push(`data-campo="${campo}"`);
+  if (titulo) attrs.push(`title="${titulo}"`);
   return `<button ${attrs.join(' ')}>
     <span class="row-idx">${dosDigitos(idx + 1)}</span>
     <span class="row-name">${nombre}${detalle ? `<small>${detalle}</small>` : ''}</span>
@@ -2267,21 +2285,27 @@ function mostrarPortada() {
 function dibujarLogo(canvas) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
-  const W = canvas.width;
-  const H = canvas.height;
-  ctx.clearRect(0, 0, W, H);
+  const DPR = 2; // rótulo a doble densidad: nítido en pantallas con mucha luz de píxel
+  const texto = 'minesweeper';
+  const alto = 104;
+  ctx.font = '900 88px ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+  // medir antes de pintar: el lienzo se ajusta al rótulo, nunca lo recorta
+  const anchoTexto = Math.ceil(ctx.measureText(texto).width);
+  const radio = 13;
+  const ancho = anchoTexto + 5 + radio * 2;
+  canvas.width = ancho * DPR;
+  canvas.height = alto * DPR;
+  ctx.scale(DPR, DPR);
+  ctx.clearRect(0, 0, ancho, alto);
   ctx.fillStyle = '#f5f5f0';
-  ctx.font = '900 92px ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+  ctx.font = '900 88px ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
-  const texto = 'minesweeper';
-  const ancho = ctx.measureText(texto).width;
-  const y = H / 2 + 4;
+  const y = alto / 2 + 2;
   ctx.fillText(texto, 0, y);
   // el único color de la casa es este punto
   ctx.fillStyle = ACENTO_LOGO;
-  const radio = 13;
-  ctx.fillRect(Math.round(ancho + 5), Math.round(y - radio), radio * 2, radio * 2);
+  ctx.fillRect(Math.round(anchoTexto + 5), Math.round(y - radio), radio * 2, radio * 2);
 }
 
 function detalleCustom() {
@@ -2306,17 +2330,20 @@ function mostrarCampaña() {
       const mejor = guardado.campaign.best[i] || 0;
       const nombre = getLanguage() === 'en' ? nivel.nombreEn : nivel.nombreEs;
       const detalle = `${nivel.filas}×${nivel.columnas} · ${nivel.minas} ${unitMinas(nivel.minas)}`;
+      const esSiguiente = i === guardado.campaign.unlocked - 1;
       if (desbloqueado) {
-        const derecha = mejor > 0 ? formatoTiempo(mejor) : '↵';
+        const derecha = mejor > 0 ? formatoTiempo(mejor) : (esSiguiente ? '→' : '↵');
         rows.push(filaHTML({
           accion: `playCampaign:${i}`,
           idx: i,
           nombre,
           detalle,
           derecha,
+          acento: esSiguiente && mejor === 0,
+          titulo: esSiguiente && mejor === 0 ? t('campaignHere') : '',
         }));
       } else {
-        rows.push(filaHTML({ idx: i, nombre: '· · ·', detalle, derecha: '✕', stat: true, dim: true }));
+        rows.push(filaHTML({ idx: i, nombre: '· · ·', detalle, derecha: '—', stat: true, dim: true, titulo: t('campaignLocked') }));
       }
     }
     const nombreActoTxt = getLanguage() === 'en' ? acto.nombreEn : acto.nombreEs;
@@ -2335,7 +2362,7 @@ function mostrarCampaña() {
       </div>
       ${botonVolver()}
     </div>
-    <p class="prologo">${t('campaignPrologue')}</p>
+    <p class="prologo">${hechos >= NIVELES.length ? t('campaignComplete') : t('campaignPrologue')}</p>
     ${secciones}
   </div>`);
   pantalla('campaign');
@@ -2663,11 +2690,23 @@ function mostrarFinGanada() {
 function mostrarFinPerdida() {
   const j = app.juego;
   if (!j) return;
+  const totalSeguras = j.cfg.filas * j.cfg.columnas - j.cfg.minas;
+  const despejadas = typeof j.tablero.despejadasPorJugador === 'number' ? j.tablero.despejadasPorJugador : 0;
+  const enCampaña = app.modo === 'campaign';
+  const mejor = enCampaña ? (guardado.campaign.best[app.nivel] || 0) : 0;
+  const kicker = `${etiquetaPartida()} · ${t('casualtyTag')}`;
+  const tercera = enCampaña
+    ? `<div class="muerte-dato"><b>${mejor > 0 ? formatoTiempo(mejor) : '—'}</b><span>${t('statBest')}</span></div>`
+    : `<div class="muerte-dato"><b>${j.cfg.minas}</b><span>${t('statMines')}</span></div>`;
   ponerOverlay(`<div class="panel fin-muerte">
     <header class="fin-cabeza">
-      <p class="kicker">${etiquetaPartida()}</p>
+      <p class="kicker">${kicker}</p>
       <h2 class="cifra derrota">${t('youLost')}</h2>
-      <p class="nota">${formatoTiempo(j.tiempoMs)} · ${t('minesExploded', { count: j.cfg.minas })}</p>
+      <div class="muerte-stats">
+        <div class="muerte-dato"><b>${formatoTiempo(j.tiempoMs)}</b><span>${t('statTime')}</span></div>
+        <div class="muerte-dato"><b>${despejadas}/${totalSeguras}</b><span>${t('statCleared')}</span></div>
+        ${tercera}
+      </div>
     </header>
     <div class="acciones">
       ${accionesFin({ hayMas: false })}

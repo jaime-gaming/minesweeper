@@ -210,8 +210,10 @@ export class Tablero {
   }
 
   // al perder, destapa el tablero entero: la partida ha terminado y el
-  // campo queda a la vista, como un mapa que ya no sirve a nadie
+  // campo queda a la vista, como un mapa que ya no sirve a nadie.
+  // de paso anota cuántas casillas seguras destapó el jugador.
   revelarTodo() {
+    this.despejadasPorJugador = this.celdas.filter((c) => c.revelada && !c.mina).length;
     for (const celda of this.celdas) {
       celda.revelada = true;
     }

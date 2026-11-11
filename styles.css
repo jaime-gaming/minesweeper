@@ -1232,3 +1232,50 @@ button.foco {
     align-items: stretch;
   }
 }
+
+/* «→» en rojo: tu posición en la operación */
+.row.acento .row-right {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.muerte-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(10px, 2vw, 18px);
+  margin-top: 10px;
+}
+
+.muerte-dato {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line2);
+  min-width: 0;
+}
+
+.muerte-dato b {
+  font-family: var(--mono);
+  font-size: clamp(17px, 4vw, 24px);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.muerte-dato span {
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+/* el borde superior de la barra de muerte va en el rojo del estallido */
+.panel.fin-muerte {
+  border-top: 1px solid var(--accent);
+}

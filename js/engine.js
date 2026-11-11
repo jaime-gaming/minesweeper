@@ -1,7 +1,7 @@
 // motor del buscaminas: máquina de estados + dibujado en lienzo.
 // la lógica del tablero vive en board.js; aquí se anima y se pinta.
 
-import { Tablero } from './board.js?v=3';
+import { Tablero } from './board.js?v=4';
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const ACENTO = '#ff2b2b';
