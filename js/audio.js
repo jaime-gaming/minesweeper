@@ -1,6 +1,6 @@
 // Sonido sintetizado en tiempo real para los efectos; la victoria y la
 // derrota llevan su propia pieza (audio/Win.mp3 / audio/Death.mp3), y el
-// estallido usa audio/Boom.mp3 (recortado a menos de un segundo).
+// estallido usa audio/Boom.mp3 (recortado a seis décimas de segundo).
 
 let ctx = null;
 let master = null;

@@ -3,7 +3,7 @@
 const KEY = 'minesweeper.language';
 const STRINGS = {
   es: {
-    documentTitle: 'Minesweeper',
+    documentTitle: 'minesweeper.',
     description: 'Buscaminas de bloques en blanco y negro: la historia de un recluta en treinta campos minados. Tres dificultades, banderas y récords locales.',
     language: 'Idioma',
     brandTagline: 'treinta campos entre tú y tu casa.',
@@ -56,6 +56,8 @@ const STRINGS = {
     // final de partida
     youWon: 'despejado.',
     youLost: 'boom.',
+    deathWhisper: 'el campo no devuelve a nadie.',
+    parcelTag: 'parcela',
     clearedIn: 'despejado en {time}',
     newRecord: 'nuevo récord',
     yourRecord: 'tu récord: {time}',
@@ -171,7 +173,7 @@ const STRINGS = {
     routeCustom: 'personalizada',
   },
   en: {
-    documentTitle: 'Minesweeper',
+    documentTitle: 'minesweeper.',
     description: 'A black-and-white block minesweeper: the story of a conscript across thirty mined fields. Three difficulties, flags and local records.',
     language: 'Language',
     brandTagline: 'thirty fields between you and home.',
@@ -224,6 +226,8 @@ const STRINGS = {
     // end of game
     youWon: 'cleared.',
     youLost: 'boom.',
+    deathWhisper: 'the field gives no one back.',
+    parcelTag: 'parcel',
     clearedIn: 'cleared in {time}',
     newRecord: 'new record',
     yourRecord: 'your record: {time}',

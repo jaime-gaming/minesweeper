@@ -6,11 +6,11 @@ El buscaminas clásico, de bloques en blanco y negro y muy poco más: la rejilla
 
 La pantalla es una hoja de tinta: negro profundo, blancos duros y un rojo para la bandera, las minas y la casilla que estalla. Las celdas son bloques planos separados por la rejilla de un píxel, como en snake; las descubiertas se funden con el fondo y dejan su número plano, en la monoespaciada de la casa, con el color clásico del buscaminas (1 azul, 2 verde, 3 rojo, 4 violeta, 5 naranja, 6 cian, 7 amarillo, 8 blanco). Las banderas de paño rojo se izan con su pliegue y su muesca; las minas son bloques de ocho púas con su destello. Al estallar hay un **destello seco** y la hoja se va a negro; el campo queda al descubierto por completo y la pantalla de muerte se abre como una barra baja, con el tablero entero a la vista. Al ganar, las banderas se izan en oleada y una franja de luz cruza el tablero una sola vez.
 
-La portada juega sola: una partida automática del siguiente nivel de la Treinta se despeja en la vista previa mientras decides qué jugar. El logotipo «minesweeper.» es tipografía pura, como el resto de la casa.
+La portada juega sola: una partida automática del siguiente nivel de la Treinta se despeja en la vista previa mientras decides qué jugar. El logotipo «minesweeper.» es tipografía pura y su punto es una mini bomba encendida —cuerpo rojo, chispa blanca—, la misma que lleva la pestaña y la barra superior; como en snake el punto rojo era la manzana.
 
 ## Sonido
 
-Los efectos van sintetizados en tiempo real, salvo el estallido, que usa `audio/Boom.mp3` (recortado a un segundo). La victoria y la derrota llevan su propia pieza, `audio/Win.mp3` y `audio/Death.mp3`, que entran y salen con fundidos: suenan sobre el estallido o la oleada de banderas y se apagan solas al empezar otra partida o volver a la portada. El interruptor de sonido (y la tecla `M`) las silencia con lo demás.
+Los efectos van sintetizados en tiempo real, salvo el estallido, que usa `audio/Boom.mp3` (recortado a seis décimas de segundo). La victoria y la derrota llevan su propia pieza, `audio/Win.mp3` y `audio/Death.mp3`, que entran y salen con fundidos: suenan sobre el estallido o la oleada de banderas y se apagan solas al empezar otra partida o volver a la portada. El interruptor de sonido (y la tecla `M`) las silencia con lo demás.
 
 ## Controles
 
@@ -80,7 +80,7 @@ node serve.mjs 8123      # sirve el sitio en http://0.0.0.0:8123
 ```
 index.html        esqueleto: barra superior, lienzo, capas de menú y arranque roto
 styles.css        la casa: tinta negra, monoespaciada, un rojo y un verde
-audio/            Win.mp3 · Death.mp3 · Boom.mp3 (el estallido, por debajo de un segundo)
+audio/            Win.mp3 · Death.mp3 · Boom.mp3 (el estallido, seis décimas de segundo)
 js/board.js       reglas puras del buscaminas (sembrar, destapar, acorde); sin DOM
 js/presets.js     las tres dificultades fijas y los límites de la personalizada
 js/engine.js      máquina de estados y dibujado en lienzo (bloques, no suavizado)

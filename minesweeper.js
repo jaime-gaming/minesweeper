@@ -1,4 +1,4 @@
-/* minesweeper — un solo fichero, sin módulos. generado por tools/build.mjs (2026-11-11 · v8).
+/* minesweeper — un solo fichero, sin módulos. generado por tools/build.mjs (2026-11-11 · v9).
    no lo edites a mano: cambia js/*.js y vuelve a ejecutar node tools/build.mjs */
 (function () {
 'use strict';
@@ -336,7 +336,7 @@ function esDificultadFija(id) {
 'use strict';
 // Sonido sintetizado en tiempo real para los efectos; la victoria y la
 // derrota llevan su propia pieza (audio/Win.mp3 / audio/Death.mp3), y el
-// estallido usa audio/Boom.mp3 (recortado a menos de un segundo).
+// estallido usa audio/Boom.mp3 (recortado a seis décimas de segundo).
 
 let ctx = null;
 let master = null;
@@ -1263,7 +1263,7 @@ class Game {
 const KEY = 'minesweeper.language';
 const STRINGS = {
   es: {
-    documentTitle: 'Minesweeper',
+    documentTitle: 'minesweeper.',
     description: 'Buscaminas de bloques en blanco y negro: la historia de un recluta en treinta campos minados. Tres dificultades, banderas y récords locales.',
     language: 'Idioma',
     brandTagline: 'treinta campos entre tú y tu casa.',
@@ -1316,6 +1316,8 @@ const STRINGS = {
     // final de partida
     youWon: 'despejado.',
     youLost: 'boom.',
+    deathWhisper: 'el campo no devuelve a nadie.',
+    parcelTag: 'parcela',
     clearedIn: 'despejado en {time}',
     newRecord: 'nuevo récord',
     yourRecord: 'tu récord: {time}',
@@ -1431,7 +1433,7 @@ const STRINGS = {
     routeCustom: 'personalizada',
   },
   en: {
-    documentTitle: 'Minesweeper',
+    documentTitle: 'minesweeper.',
     description: 'A black-and-white block minesweeper: the story of a conscript across thirty mined fields. Three difficulties, flags and local records.',
     language: 'Language',
     brandTagline: 'thirty fields between you and home.',
@@ -1484,6 +1486,8 @@ const STRINGS = {
     // end of game
     youWon: 'cleared.',
     youLost: 'boom.',
+    deathWhisper: 'the field gives no one back.',
+    parcelTag: 'parcel',
     clearedIn: 'cleared in {time}',
     newRecord: 'new record',
     yourRecord: 'your record: {time}',
@@ -2435,8 +2439,10 @@ function dibujarLogo(canvas) {
   ctx.font = '900 88px ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
   // medir antes de pintar: el lienzo se ajusta al rótulo, nunca lo recorta
   const anchoTexto = Math.ceil(ctx.measureText(texto).width);
+  // la mini bomba: cuerpo rojo de 13 px, mecha escalonada y chispa en cruz
   const radio = 13;
-  const ancho = anchoTexto + 5 + radio * 2;
+  const centroX = anchoTexto + 6 + radio;
+  const ancho = Math.ceil(centroX + radio * 3.4); // el alabeo de la chispa nunca se recorta
   canvas.width = ancho * DPR;
   canvas.height = alto * DPR;
   ctx.scale(DPR, DPR);
@@ -2447,9 +2453,21 @@ function dibujarLogo(canvas) {
   ctx.textAlign = 'left';
   const y = alto / 2 + 2;
   ctx.fillText(texto, 0, y);
-  // el único color de la casa es este punto
+  // mismas formas que el icono de la pestaña, a escala
+  ctx.save();
+  ctx.translate(centroX, y);
+  ctx.scale(radio / 4.3, radio / 4.3);
+  ctx.translate(-7.3, -10.7);
   ctx.fillStyle = ACENTO_LOGO;
-  ctx.fillRect(Math.round(anchoTexto + 5), Math.round(y - radio), radio * 2, radio * 2);
+  ctx.beginPath();
+  ctx.arc(7.3, 10.7, 4.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillRect(9.6, 5.2, 2.6, 1.8);
+  ctx.fillRect(10.8, 3.9, 1.8, 1.7);
+  ctx.fillStyle = '#f5f5f0';
+  ctx.fillRect(11.7, 0.9, 1, 3.2);
+  ctx.fillRect(9.6, 1.85, 5.2, 1.3);
+  ctx.restore();
 }
 
 function detalleCustom() {
@@ -2843,6 +2861,9 @@ function mostrarFinPerdida() {
   const enCampaña = app.modo === 'campaign';
   const mejor = enCampaña ? (guardado.campaign.best[app.nivel] || 0) : 0;
   const kicker = `${etiquetaPartida()} · ${t('casualtyTag')}`;
+  const parcela = enCampaña
+    ? `${t('parcelTag')} · ${nombreNivel(app.nivel || 0)}`
+    : `${t('parcelTag')} · ${j.cfg.columnas} × ${j.cfg.filas} · ${j.cfg.minas} ${unitMinas(j.cfg.minas)}`;
   const tercera = enCampaña
     ? `<div class="muerte-dato"><b>${mejor > 0 ? formatoTiempo(mejor) : '—'}</b><span>${t('statBest')}</span></div>`
     : `<div class="muerte-dato"><b>${j.cfg.minas}</b><span>${t('statMines')}</span></div>`;
@@ -2850,11 +2871,13 @@ function mostrarFinPerdida() {
     <header class="fin-cabeza">
       <p class="kicker">${kicker}</p>
       <h2 class="cifra derrota">${t('youLost')}</h2>
+      <p class="muerte-susurro">${t('deathWhisper')}</p>
       <div class="muerte-stats">
         <div class="muerte-dato"><b>${formatoTiempo(j.tiempoMs)}</b><span>${t('statTime')}</span></div>
         <div class="muerte-dato"><b>${despejadas}/${totalSeguras}</b><span>${t('statCleared')}</span></div>
         ${tercera}
       </div>
+      <p class="muerte-parcela">${parcela}</p>
     </header>
     <div class="acciones">
       ${accionesFin({ hayMas: false })}

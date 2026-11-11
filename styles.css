@@ -133,8 +133,12 @@ button:disabled {
   letter-spacing: 0.18em;
 }
 
-.brand .dot {
-  color: var(--accent);
+.brand-bomb {
+  display: inline-block;
+  width: 0.95em;
+  height: 0.95em;
+  margin-left: 0.16em;
+  vertical-align: -0.14em;
 }
 
 
@@ -350,10 +354,6 @@ h1 {
   font-weight: 700;
   line-height: 0.78;
   letter-spacing: -0.06em;
-}
-
-h1 .dot {
-  color: var(--accent);
 }
 
 /* inicio */
@@ -1194,6 +1194,17 @@ button.foco {
   .panel.fin-muerte {
     animation: none;
   }
+
+  .panel.fin-muerte .kicker,
+  .panel.fin-muerte .cifra,
+  .panel.fin-muerte .muerte-susurro,
+  .panel.fin-muerte .muerte-stats > :nth-child(1),
+  .panel.fin-muerte .muerte-stats > :nth-child(2),
+  .panel.fin-muerte .muerte-stats > :nth-child(3),
+  .panel.fin-muerte .muerte-parcela,
+  .panel.fin-muerte .acciones {
+    animation: none;
+  }
 }
 
 /* la muerte no tapa el campo: el tablero completo queda a la vista y el
@@ -1269,6 +1280,22 @@ button.foco {
   font-weight: 700;
 }
 
+.muerte-susurro {
+  margin: 8px 0 0;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: #9a9a9a;
+}
+
+.muerte-parcela {
+  margin: 12px 0 0;
+  font-family: var(--mono);
+  font-size: 8.5px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
 .muerte-stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1308,6 +1335,50 @@ button.foco {
 /* el borde superior de la barra de muerte va en el rojo del estallido */
 .panel.fin-muerte {
   border-top: 1px solid var(--accent);
+}
+
+/* intriga en capas: kicker, golpe, susurro, parte y parcela, en orden */
+@keyframes aparecer {
+  from {
+    opacity: 0;
+    transform: translateY(9px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.panel.fin-muerte .kicker {
+  animation: aparecer 0.55s ease 0.30s backwards;
+}
+
+.panel.fin-muerte .cifra {
+  animation: aparecer 0.6s ease 0.48s backwards;
+}
+
+.panel.fin-muerte .muerte-susurro {
+  animation: aparecer 0.6s ease 0.76s backwards;
+}
+
+.panel.fin-muerte .muerte-stats > :nth-child(1) {
+  animation: aparecer 0.55s ease 1.00s backwards;
+}
+
+.panel.fin-muerte .muerte-stats > :nth-child(2) {
+  animation: aparecer 0.55s ease 1.12s backwards;
+}
+
+.panel.fin-muerte .muerte-stats > :nth-child(3) {
+  animation: aparecer 0.55s ease 1.24s backwards;
+}
+
+.panel.fin-muerte .muerte-parcela {
+  animation: aparecer 0.6s ease 1.40s backwards;
+}
+
+.panel.fin-muerte .acciones {
+  animation: aparecer 0.6s ease 1.55s backwards;
 }
 
 @keyframes subir-muerte {
