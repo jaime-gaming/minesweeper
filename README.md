@@ -60,7 +60,7 @@ La portada enlaza con el perfil: partidas, victorias, tasa de victorias, mejor r
 
 ## Idioma
 
-El selector **EN / ES** cambia todos los textos y recuerda la elección. La estética no cambia con el idioma: los mismos bloques, los mismos silencios y el mismo rojo.
+El selector **EN / ES** cambia todos los textos y recuerda la elección. La estética no cambia con el idioma: los mismos bloques, los mismos silencios y el mismo rojo. 
 
 ## Desarrollo
 
