@@ -89,7 +89,6 @@ js/i18n.js        textos en ES/EN y slugs de ruta (jugar, campaña, …)
 js/campaign.js    la Treinta: el relato, los actos, los treinta niveles y sus líneas de historia
 js/main.js        pantallas, HUD, récords en localStorage, demo de portada, rutas y arranque
 serve.mjs         servidor estático local (node serve.mjs 8123)
-AGENTS.md         la casa, sus reglas y cómo se comprueba todo antes de empujar
 tools/build.mjs   empaquetador sin dependencias
 tools/check.mjs   pruebas de lógica, sin navegador
 tools/smoke.mjs   humo de arranque: juega una partida con un DOM simulado
