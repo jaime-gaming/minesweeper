@@ -2213,10 +2213,7 @@ function hudMenu(meta) {
 
 function actualizarMarcador() {
   const j = app.juego;
-  if (!j) {
-    escribirHud('—', '—', '', '');
-    return;
-  }
+  if (!j) return;
   let meta;
   let bestTxt;
   if (app.modo === 'campaign') {
@@ -2434,7 +2431,6 @@ function mostrarPortada() {
       </header>
       <nav class="filas" aria-label="${t('menuAria')}">${filas}</nav>
       <p class="pie">
-        <span>minesweeper · v1</span>
         <button class="link" type="button" data-accion="settings">${t('settings')}</button>
       </p>
     </div>
@@ -2444,7 +2440,7 @@ function mostrarPortada() {
       <p class="nota" id="demo-nota"></p>
     </aside>
   </div>`);
-  hudMenu(t('brandTagline'));
+  hudMenu('minesweeper · v1');
   pantalla('home');
   pintarLienzoVacio();
   const logo = document.getElementById('logo-mine');
@@ -2721,7 +2717,7 @@ function mostrarCampaña() {
     <div class="mapa-cuerpo">
       <div class="mapa-marco">
         <div class="mapa">${mapaSVG()}${mapaNodosHTML()}</div>
-        <p class="mapa-leyenda"><span class="lg lg-hecha"></span>${t('clearedShort')}<span class="punto">·</span><span class="lg lg-actual"></span>${t('campaignHereShort')}<span class="punto">·</span><span class="lg lg-cerrada"></span>${t('lockedShort')}<span class="punto">·</span><span class="leyenda-scroll">${t('mapScroll')}</span></p>
+        <p class="mapa-leyenda"><span class="lg lg-hecha"></span>${t('clearedTag')}<span class="punto">·</span><span class="lg lg-actual"></span>${t('campaignHereShort')}<span class="punto">·</span><span class="lg lg-cerrada"></span>${t('lockedShort')}<span class="punto">·</span><span class="leyenda-scroll">${t('mapScroll')}</span></p>
       </div>
       <aside class="mapa-lateral" id="mapa-lateral">${lateralMapaHTML(frontera)}</aside>
     </div>

@@ -1,4 +1,5 @@
 
+import fs from 'node:fs';
 import { Tablero } from '../js/board.js';
 import {
   DIFICULTADES,
@@ -303,6 +304,22 @@ prueba('ningún texto está vacío y los placeholders coinciden', () => {
       `placeholders distintos en ${clave}`,
     );
   }
+});
+
+prueba('toda clave usada existe (js e index.html)', () => {
+  const archivos = ['js/main.js', 'js/board.js', 'js/presets.js', 'js/audio.js', 'js/input.js', 'js/engine.js', 'js/campaign.js', 'js/i18n.js', 'index.html'];
+  const definidas = new Set(__testClaves().es);
+  const faltan = [];
+  for (const archivo of archivos) {
+    const fuente = fs.readFileSync(new URL(`../${archivo}`, import.meta.url), 'utf8');
+    for (const m of fuente.matchAll(/\bt\('([A-Za-z0-9_]+)'/g)) {
+      if (!definidas.has(m[1])) faltan.push(`${archivo}: ${m[1]}`);
+    }
+    for (const m of fuente.matchAll(/data-i18n(?:-aria)?="([A-Za-z0-9_]+)"/g)) {
+      if (!definidas.has(m[1])) faltan.push(`${archivo}: ${m[1]}`);
+    }
+  }
+  afirma(faltan.length === 0, `claves usadas pero no definidas: ${faltan.join(', ')}`);
 });
 
 prueba('las unidades de mina concuerdan', () => {

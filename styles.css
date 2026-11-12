@@ -129,6 +129,14 @@ button:disabled {
   color: var(--accent);
 }
 
+.brand-bomb {
+  display: inline-block;
+  width: 0.95em;
+  height: 0.95em;
+  margin-left: 0.16em;
+  vertical-align: -0.14em;
+}
+
 .language-control {
   display: inline-flex;
   flex: none;
