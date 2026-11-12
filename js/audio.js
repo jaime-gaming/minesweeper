@@ -7,6 +7,7 @@ let master = null;
 let musicGain = null;
 let noiseBuf = null;
 let roto = false;
+let nivelMusica = 1; // 0..1; las piezas del final van del archivo, más bajas
 
 function build() {
   if (ctx) return ctx;
@@ -22,7 +23,7 @@ function build() {
     master = ctx.createGain();
     master.gain.value = audio.enabled ? 0.15 : 0;
     musicGain = ctx.createGain();
-    musicGain.gain.value = 1.5; // las piezas llegan bajas del archivo: aquí se equilibran
+    musicGain.gain.value = 1.5 * nivelMusica; // las piezas llegan bajas del archivo: aquí se equilibran
 
     musicGain.connect(master);
     if (typeof ctx.createDynamicsCompressor === 'function') {
@@ -260,6 +261,19 @@ export const audio = {
   toggle() {
     this.set(!this.enabled);
     return this.enabled;
+  },
+
+  // volumen de las piezas (0–100). los efectos no lo tocan: la bomba manda
+  setVolumen(porcentaje) {
+    const v = Math.max(0, Math.min(100, Math.round(Number(porcentaje) || 0)));
+    nivelMusica = v / 100;
+    if (!musicGain || !ctx) return;
+    try {
+      musicGain.gain.cancelScheduledValues(ctx.currentTime);
+      musicGain.gain.setTargetAtTime(1.5 * nivelMusica, ctx.currentTime, 0.05);
+    } catch (err) {
+      musicGain.gain.value = 1.5 * nivelMusica;
+    }
   },
 
   // fanfarria de victoria o derrota: entra con fade, sale al siguiente paso

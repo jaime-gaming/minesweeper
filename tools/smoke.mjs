@@ -375,6 +375,59 @@ try {
   frames(5);
   console.log('pantalla campaña:', api.app.pantalla);
   if (api.app.pantalla !== 'campaign') throw new Error('la pantalla de campaña no se abrió');
+  const mapaHTML = documentStub.querySelector('#overlay').innerHTML;
+  if (!mapaHTML.includes('mapa-nodo')) throw new Error('el mapa no pinta posiciones');
+  if ((mapaHTML.match(/mapa-nodo/g) || []).length < 30) throw new Error('el mapa pinta menos de treinta posiciones');
+  if (!mapaHTML.includes('mapa-lateral')) throw new Error('el mapa no lleva el acta del campo seleccionado');
+  console.log('mapa: treinta posiciones y acta lateral ok');
+
+  // ---- el mapa: la selección de una posición bloqueada no abre nada; la de una abierta sí
+  api.ejecutar('lockedNode');
+  frames(2);
+  if (api.app.pantalla !== 'campaign') throw new Error('lockedNode sacó de la campaña');
+  api.ejecutar('playCampaign:0'); // primera pasada: selecciona la casilla ya seleccionada? no: selecciona y no marches
+  frames(2);
+  console.log('primer toque sobre pos 1:', api.app.pantalla);
+  if (api.app.pantalla !== 'campaign') throw new Error('el primer toque sobre el mapa no seleccionó, marchó');
+  api.ejecutar('playCampaign:0'); // segundo toque sobre la misma: marcha
+  frames(2);
+  if (api.app.pantalla !== 'story') throw new Error('el segundo toque no abrió la historia');
+  console.log('mapa: primer toque inspecciona, segundo marcha ok');
+  api.accion('back'); // vuelta al mapa
+  frames(3);
+
+  // ---- ajustes: la pantalla por grupos, con el volumen
+  api.ejecutar('settings');
+  frames(3);
+  const ajustesHTML = documentStub.querySelector('#overlay').innerHTML;
+  if (api.app.pantalla !== 'settings') throw new Error('ajustes no se abrió');
+  if (!ajustesHTML.includes('volumen')) throw new Error('ajustes no lleva el paso de volumen');
+  if (!ajustesHTML.includes('doble clic para confirmar') && !ajustesHTML.includes('double-click')) throw new Error('ajustes perdió el doble clic');
+  if (!ajustesHTML.includes('grupo')) throw new Error('ajustes perdió los grupos');
+  console.log('ajustes: grupos audio/imagen/juego/datos y volumen ok');
+  api.ejecutar('toggleDobleClick');
+  frames(2);
+  if (!JSON.parse(localStorageStub.getItem('minesweeper.v1')).dobleClick) throw new Error('el doble clic no persistió');
+  api.ejecutar('toggleDobleClick'); // de vuelta al estado original
+  frames(2);
+
+  // ---- perfil: la carta de servicios
+  api.ejecutar('profile');
+  frames(3);
+  const perfilHTML = documentStub.querySelector('#overlay').innerHTML;
+  if (api.app.pantalla !== 'profile') throw new Error('perfil no se abrió');
+  if (!perfilHTML.includes('perfil-cifras')) throw new Error('perfil perdió las cifras grandes');
+  if (!perfilHTML.includes('perfil-ticks')) throw new Error('perfil perdió los ticks de la treinta');
+  if (!perfilHTML.includes('statsFieldTime') && !perfilHTML.includes('tiempo en el campo') && !perfilHTML.includes('time in the field')) throw new Error('perfil perdió el tiempo en el campo');
+  console.log('perfil: cifras, ticks y tiempo total ok');
+
+  // ---- la ayuda ya no existe: Esc desde la campaña vuelve a la portada
+  api.ejecutar('campaign');
+  frames(3);
+  api.accion('back');
+  frames(3);
+  if (api.app.pantalla !== 'home') throw new Error('Esc desde la campaña no devolvió a la portada');
+  console.log('campaña cierra a la portada ok');
 
   console.log('ops de lienzo validadas:', opsCanvas);
   console.log('OK humo completo');

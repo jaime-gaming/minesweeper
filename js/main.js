@@ -7,9 +7,9 @@ import {
   esDificultadFija,
   limitesMinas,
 } from './presets.js?v=1';
-import { audio } from './audio.js?v=7';
+import { audio } from './audio.js?v=8';
 import { attachInput, registrarConversorPunto } from './input.js?v=1';
-import { t, getLanguage, setLanguage, unitMinas, routeSlug, routeWords } from './i18n.js?v=13';
+import { t, getLanguage, setLanguage, unitMinas, routeSlug, routeWords } from './i18n.js?v=14';
 import { NIVELES, ACTOS, configNivel, nivelCampana, actoDe } from './campaign.js?v=7';
 
 const $ = (sel) => document.querySelector(sel);
@@ -38,10 +38,11 @@ const CLAVE = 'minesweeper.v1';
 function nuevoRegistro() {
   return {
     best: { beginner: 0, intermediate: 0, expert: 0 }, // ms; 0 = sin récord
-    stats: { games: 0, wins: 0, streak: 0, bestStreak: 0 },
+    stats: { games: 0, wins: 0, streak: 0, bestStreak: 0, timeMs: 0 },
     sound: true,
     trama: true,
     dobleClick: false,
+    volumen: 100,
     custom: { filas: 9, columnas: 16, minas: 40 },
     campaign: { unlocked: 1, best: {} }, // unlocked: niveles alcanzables; best: ms por nivel
   };
@@ -62,9 +63,11 @@ function leerGuardado() {
     datos.best[clave] = Number.isFinite(valor) && valor > 0 ? Math.floor(valor) : 0;
   }
   const st = bruto.stats || {};
-  for (const campo of ['games', 'wins', 'streak', 'bestStreak']) {
+  for (const campo of ['games', 'wins', 'streak', 'bestStreak', 'timeMs']) {
     datos.stats[campo] = Math.max(0, Math.floor(Number(st[campo])) || 0);
   }
+  const volumen = Math.floor(Number(bruto.volumen));
+  datos.volumen = Number.isFinite(volumen) ? Math.max(0, Math.min(100, volumen)) : 100;
   if (typeof bruto.sound === 'boolean') datos.sound = bruto.sound;
   if (typeof bruto.trama === 'boolean') datos.trama = bruto.trama;
   if (typeof bruto.dobleClick === 'boolean') datos.dobleClick = bruto.dobleClick;
@@ -111,6 +114,8 @@ const app = {
   flagMode: false,
   demo: null, // partida automática de fondo en la portada
   demoAcum: 0,
+  mapaSel: null, // casilla seleccionada en el mapa de la treinta
+  resetDesde: 'profile', // pantalla a la que vuelve el borrado de progreso
   hud: { meta: '', score: '', mult: '', best: '' },
 };
 
@@ -191,7 +196,7 @@ function esTactil() {
 
 /* --------------------------------------------------------- overlay/pantallas */
 
-const FOCO_SEL = '.row:not(.stat), .acciones button';
+const FOCO_SEL = '.row:not(.stat), .acciones button, .mapa-nodo';
 let focoIndice = -1;
 
 function ponerOverlay(html, variante) {
@@ -473,7 +478,6 @@ const PISTAS = {
   dead: 'hintDead',
   won: 'hintWon',
   profile: 'hintProfile',
-  help: 'hintHelp',
   settings: 'hintSettings',
   campaign: 'hintCampaign',
   story: 'hintStory',
@@ -741,7 +745,6 @@ function mostrarPortada() {
       <nav class="filas" aria-label="${t('menuAria')}">${filas}</nav>
       <p class="pie">
         <span>minesweeper · v1</span>
-        <button class="link" type="button" data-accion="help">${t('help')}</button>
         <button class="link" type="button" data-accion="settings">${t('settings')}</button>
       </p>
     </div>
@@ -819,57 +822,144 @@ function densidadCustom() {
   return Math.round((c.minas / (c.filas * c.columnas)) * 100);
 }
 
+// el mapa de la treinta: treinta posiciones dibujadas a mano, del alistamiento a la puerta
+const MAPA_RUTA = [
+  [60, 460], [105, 375], [155, 430], [185, 305], [235, 355], [225, 230],
+  [300, 455], [335, 350], [390, 400], [410, 285], [470, 340], [460, 205],
+  [530, 445], [565, 345], [620, 400], [640, 285], [700, 335], [700, 205],
+  [770, 460], [810, 380], [860, 435], [880, 340], [935, 395], [955, 300],
+  [1010, 350], [1030, 255], [1085, 300], [1095, 205], [1150, 250], [1165, 140],
+];
+const MAPA_DIVISORES = [262, 497, 730]; // las fronteras de los cuatro actos
+const MAPA_ACTOS_X = [150, 385, 615, 958]; // rótulos de acto al pie del mapa
+const MAPA_ROMANOS = ['I', 'II', 'III', 'IV'];
+
+function puntosRuta(desde, hasta) {
+  return MAPA_RUTA.slice(desde, hasta).map(([x, y]) => `${x},${y}`).join(' ');
+}
+
+function mapaSVG() {
+  const total = NIVELES.length;
+  const frontera = Math.min(Math.max(guardado.campaign.unlocked - 1, 0), total - 1);
+  const recorrido = puntosRuta(0, frontera + 1);
+  const pendiente = frontera + 1 < total ? puntosRuta(frontera, total) : '';
+  const divisores = MAPA_DIVISORES
+    .map((x) => `<line x1="${x}" y1="26" x2="${x}" y2="486" stroke="#222222" stroke-width="1" stroke-dasharray="6 8"/>`)
+    .join('');
+  const rotulos = ACTOS.map((acto, i) => {
+    const nombre = getLanguage() === 'en' ? acto.nombreEn : acto.nombreEs;
+    return `<text class="mapa-acto" x="${MAPA_ACTOS_X[i]}" y="530" text-anchor="middle">${MAPA_ROMANOS[i]} · ${nombre}</text>`;
+  }).join('');
+  return `<svg class="mapa-svg" viewBox="0 0 1200 560" role="img" aria-label="${t('campaign')}">
+    <defs>
+      <pattern id="mapa-puntos" width="36" height="36" patternUnits="userSpaceOnUse">
+        <circle cx="1.4" cy="1.4" r="1.4" fill="#161616"/>
+      </pattern>
+    </defs>
+    <rect x="0" y="0" width="1200" height="560" fill="#040404"/>
+    <rect x="0" y="0" width="1200" height="560" fill="url(#mapa-puntos)"/>
+    <path d="M -20 128 Q 260 74 480 132 T 1220 96" fill="none" stroke="#101010" stroke-width="1.4" stroke-dasharray="2 9"/>
+    <path d="M -20 318 Q 320 260 640 330 T 1220 284" fill="none" stroke="#101010" stroke-width="1.4" stroke-dasharray="2 9"/>
+    ${divisores}
+    ${pendiente ? `<polyline points="${pendiente}" fill="none" stroke="#3d3d3d" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="0.1 13"/>` : ''}
+    <polyline points="${recorrido}" fill="none" stroke="#f2f2f2" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+    <g class="mapa-escala">
+      <line x1="1035" y1="472" x2="1172" y2="472" stroke="#3a3a3a" stroke-width="2"/>
+      <line x1="1035" y1="465" x2="1035" y2="479" stroke="#3a3a3a" stroke-width="2"/>
+      <line x1="1172" y1="465" x2="1172" y2="479" stroke="#3a3a3a" stroke-width="2"/>
+      <text x="1103" y="458" text-anchor="middle">1 km</text>
+    </g>
+    <text class="mapa-sello" x="1158" y="66" text-anchor="end" transform="rotate(-8 1158 66)">${t('mapStamp')}</text>
+    ${rotulos}
+  </svg>`;
+}
+
+function mapaNodosHTML() {
+  return NIVELES.map((nivel, i) => {
+    const desbloqueado = i < guardado.campaign.unlocked;
+    const mejor = guardado.campaign.best[i] || 0;
+    const hecha = mejor > 0;
+    const frontera = i === guardado.campaign.unlocked - 1 && !hecha;
+    const clases = ['mapa-nodo'];
+    if (!desbloqueado) clases.push('cerrada');
+    else if (hecha) clases.push('hecha');
+    else clases.push('actual', 'acento');
+    const nombre = getLanguage() === 'en' ? nivel.nombreEn : nivel.nombreEs;
+    const etiqueta = desbloqueado
+      ? `${t('levelCell', { n: i + 1 })} · ${nombre}`
+      : `${t('levelCell', { n: i + 1 })} · ${t('lockedShort')}`;
+    const left = ((MAPA_RUTA[i][0] / 1200) * 100).toFixed(3);
+    const top = ((MAPA_RUTA[i][1] / 560) * 100).toFixed(3);
+    return `<button type="button" class="${clases.join(' ')}" data-mapa="${i}" data-accion="${desbloqueado ? `playCampaign:${i}` : 'lockedNode'}" style="left:${left}%;top:${top}%" aria-label="${etiqueta}"><span>${desbloqueado ? i + 1 : '··'}</span></button>`;
+  }).join('');
+}
+
+function lateralMapaHTML(i) {
+  const nivel = nivelCampana(i);
+  const desbloqueado = i < guardado.campaign.unlocked;
+  const mejor = guardado.campaign.best[i] || 0;
+  const acto = actoDe(i);
+  const nombreActoTxt = acto ? (getLanguage() === 'en' ? acto.nombreEn : acto.nombreEs) : '';
+  const nombre = desbloqueado
+    ? (getLanguage() === 'en' ? nivel.nombreEn : nivel.nombreEs)
+    : '· · ·';
+  const kicker = acto
+    ? `${t('actLabel', { n: acto.id, name: nombreActoTxt })} · ${t('levelCell', { n: i + 1 })}`
+    : t('levelCell', { n: i + 1 });
+  let estado;
+  if (!desbloqueado) estado = `<p class="mapa-estado cerrada">${t('campaignLocked')}</p>`;
+  else if (mejor > 0) estado = `<p class="mapa-estado hecho">✓ ${t('clearedTag')} · ${formatoTiempo(mejor)}</p>`;
+  else estado = `<p class="mapa-estado actual">→ ${t('campaignHere')}</p>`;
+  const accion = desbloqueado
+    ? `<button class="mapa-accion principal" id="mapa-accion" type="button" data-accion="mapDescend"><span>${mejor > 0 ? t('descendAgain') : t('descend')}</span><kbd>↵</kbd></button>`
+    : `<button class="mapa-accion principal" id="mapa-accion" type="button" disabled><span>${t('lockedShort')}</span></button>`;
+  return `<p class="kicker">${kicker}</p>
+    <h3 class="mapa-nombre">${nombre}</h3>
+    <p class="mapa-meta">${nivel.filas} × ${nivel.columnas} · ${nivel.minas} ${unitMinas(nivel.minas)}</p>
+    ${estado}
+    ${accion}
+    <p class="nota">${t('storyDossier')}</p>`;
+}
+
+function seleccionarNodoMapa(i, silencioso = false) {
+  const nivel = nivelCampana(i);
+  if (!nivel) return;
+  app.mapaSel = i;
+  el.overlay.querySelectorAll('.mapa-nodo').forEach((nodo) => {
+    nodo.classList.toggle('sel', Number(nodo.getAttribute('data-mapa')) === i);
+  });
+  const lateral = document.getElementById('mapa-lateral');
+  if (lateral) lateral.innerHTML = lateralMapaHTML(i);
+  const nodos = Array.from(el.overlay.querySelectorAll('.mapa-nodo'));
+  const pos = nodos.findIndex((n) => Number(n.getAttribute('data-mapa')) === i);
+  if (pos >= 0) focoIndice = pos;
+  if (!silencioso) audio.play('ui');
+}
+
 function mostrarCampaña() {
   app.juego = null;
   const hechos = campañaHechos();
-  const secciones = ACTOS.map((acto) => {
-    const rows = [];
-    for (let i = 0; i < NIVELES.length; i += 1) {
-      const nivel = NIVELES[i];
-      if (nivel.act !== acto.id) continue;
-      const desbloqueado = i < guardado.campaign.unlocked;
-      const mejor = guardado.campaign.best[i] || 0;
-      const nombre = getLanguage() === 'en' ? nivel.nombreEn : nivel.nombreEs;
-      const detalle = `${nivel.filas}×${nivel.columnas} · ${nivel.minas} ${unitMinas(nivel.minas)}`;
-      const esSiguiente = i === guardado.campaign.unlocked - 1;
-      if (desbloqueado) {
-        const derecha = mejor > 0 ? formatoTiempo(mejor) : (esSiguiente ? '→' : '↵');
-        rows.push(filaHTML({
-          accion: `playCampaign:${i}`,
-          idx: i,
-          nombre,
-          detalle,
-          derecha,
-          acento: esSiguiente && mejor === 0,
-          hecho: mejor > 0,
-          titulo: esSiguiente && mejor === 0 ? t('campaignHere') : '',
-        }));
-      } else {
-        rows.push(filaHTML({ idx: i, nombre: '· · ·', detalle, derecha: '—', stat: true, dim: true, titulo: t('campaignLocked') }));
-      }
-    }
-    const nombreActoTxt = getLanguage() === 'en' ? acto.nombreEn : acto.nombreEs;
-    const lore = getLanguage() === 'en' ? acto.subEn : acto.subEs;
-    return `<div class="acto">
-      <p class="grupo acto-grupo">${t('actLabel', { n: acto.id, name: nombreActoTxt })}</p>
-      <p class="acto-lore">${lore}</p>
-      <div class="filas">${rows.join('')}</div>
-    </div>`;
-  }).join('');
-  ponerOverlay(`<div class="panel campana">
+  const frontera = Math.min(Math.max(guardado.campaign.unlocked - 1, 0), NIVELES.length - 1);
+  ponerOverlay(`<div class="panel campana mapa-panel">
     <div class="niveles-cabeza">
       <div>
-        <p class="kicker">${t('campaign')} · <b id="campana-cifra">00</b>/30</p>
+        <p class="kicker">${t('campaign')} · <b id="campana-cifra">00</b>/${NIVELES.length}</p>
         <h2 class="campana-titulo">${t('campaignTagShort')}</h2>
       </div>
       ${botonVolver()}
     </div>
-    <p class="prologo">${hechos >= NIVELES.length ? t('campaignComplete') : t('campaignPrologue')}</p>
-    ${secciones}
+    <p class="mapa-nota">${hechos >= NIVELES.length ? t('campaignComplete') : t('campaignPrologue')}</p>
+    <div class="mapa-cuerpo">
+      <div class="mapa-marco">
+        <div class="mapa">${mapaSVG()}${mapaNodosHTML()}</div>
+        <p class="mapa-leyenda"><span class="lg lg-hecha"></span>${t('clearedShort')}<span class="punto">·</span><span class="lg lg-actual"></span>${t('campaignHereShort')}<span class="punto">·</span><span class="lg lg-cerrada"></span>${t('lockedShort')}</p>
+      </div>
+      <aside class="mapa-lateral" id="mapa-lateral">${lateralMapaHTML(frontera)}</aside>
+    </div>
   </div>`);
   pantalla('campaign');
   animarCifra(document.getElementById('campana-cifra'), hechos, (v) => dosDigitos(Math.round(v)));
-  enfocarPrimero();
+  seleccionarNodoMapa(frontera, true);
 }
 
 function mostrarHistoria(indice) {
@@ -978,6 +1068,16 @@ function pasoPersonalizado(campo, delta) {
   mostrarPersonalizada(focoIndice);
 }
 
+function pasoVolumen(delta) {
+  guardado.volumen = Math.max(0, Math.min(100, (Number(guardado.volumen) || 0) + (Number(delta) || 0)));
+  audio.setVolumen(guardado.volumen);
+  guardar();
+  audio.play('ui');
+  const marca = el.overlay.querySelector('[data-ajuste^="volumen"]');
+  const valor = marca && marca.closest('.paso') ? marca.closest('.paso').querySelector('b') : null;
+  if (valor) valor.textContent = `${guardado.volumen} %`;
+}
+
 function pintarLienzoVacio() {
   if (!el.lienzoCtx) el.lienzoCtx = el.canvas.getContext('2d');
   ajustarLienzo();
@@ -1054,6 +1154,7 @@ function contabilizarFin(gano) {
   app.contado = true;
   const s = guardado.stats;
   s.games += 1;
+  s.timeMs = (s.timeMs || 0) + Math.max(0, Math.floor((app.juego && app.juego.tiempoMs) || 0));
   if (gano) {
     s.wins += 1;
     s.streak += 1;
@@ -1266,41 +1367,78 @@ function filaStat(idx, nombre, valor) {
   return filaHTML({ idx, nombre, derecha: valor, stat: true });
 }
 
+function datoCifra(valor, etiqueta, cuenta, formato) {
+  const inner = cuenta === null
+    ? `<b>${valor}</b>`
+    : `<b data-cuenta="${cuenta}" data-formato="${formato}">0</b>`;
+  return `<div class="dato-cifra">${inner}<span>${etiqueta}</span></div>`;
+}
+
 function mostrarPerfil() {
   app.juego = null;
   const s = guardado.stats;
-  const tasa = s.games > 0 ? `${Math.round((s.wins / s.games) * 100)}%` : '—';
-  const tiempo = (id) => (guardado.best[id] > 0 ? formatoTiempo(guardado.best[id]) : '—');
   const hechos = campañaHechos();
-  const filas = [
-    filaStat(0, t('statsGames'), String(s.games)),
-    filaStat(1, t('statsWins'), String(s.wins)),
-    filaStat(2, t('statsWinRate'), tasa),
-    filaStat(3, t('statsBestStreak'), String(s.bestStreak)),
-    filaStat(4, t('statsCampaign'), `${dosDigitos(hechos)}/30 · ${t('statsCampaignTag')}`),
+  const tasaCruda = s.games > 0 ? Math.round((s.wins / s.games) * 100) : null;
+  const tiempo = (id) => (guardado.best[id] > 0 ? formatoTiempo(guardado.best[id]) : '—');
+  const sumaMejores = Object.values(guardado.campaign.best)
+    .reduce((acc, valor) => acc + (Number(valor) || 0), 0);
+  const cifras = [
+    datoCifra(String(s.games), t('statsGames'), s.games, 'int'),
+    datoCifra(String(s.wins), t('statsWins'), s.wins, 'int'),
+    tasaCruda === null
+      ? datoCifra('—', t('statsWinRate'), null, 'int')
+      : datoCifra('0%', t('statsWinRate'), tasaCruda, 'pct'),
+    datoCifra(String(s.bestStreak), t('statsBestStreak'), s.bestStreak, 'int'),
   ].join('');
+  const ticks = NIVELES.map((_, i) => {
+    const clases = ['tick'];
+    if ((guardado.campaign.best[i] || 0) > 0) clases.push('hecho');
+    else if (i === guardado.campaign.unlocked - 1) clases.push('actual');
+    return `<span class="${clases.join(' ')}"></span>`;
+  }).join('');
   const records = [
     filaStat(6, t('statsBeginner'), tiempo('beginner')),
     filaStat(7, t('statsIntermediate'), tiempo('intermediate')),
     filaStat(8, t('statsExpert'), tiempo('expert')),
   ].join('');
+  const campana = [
+    filaStat(9, t('statsCampaign'), `${dosDigitos(hechos)}/${NIVELES.length} · ${t('statsCampaignTag')}`),
+    filaStat(10, t('statsCampaignTotal'), sumaMejores > 0 ? formatoTiempo(sumaMejores) : '—'),
+    filaStat(11, t('statsFieldTime'), s.timeMs > 0 ? formatoTiempo(s.timeMs) : '—'),
+  ].join('');
   const peligro = filaHTML({
     accion: 'resetProgress',
-    idx: 9,
+    idx: 12,
     nombre: t('resetProgress'),
     detalle: t('resetProgressTag'),
     derecha: '⌫',
     peligro: true,
   });
-  ponerOverlay(`<div class="panel">
-    ${cabeceraPanel(t('profileTitle'), botonVolver())}
-    <div class="filas">${filas}</div>
+  ponerOverlay(`<div class="panel perfil">
+    <div class="niveles-cabeza">
+      <div>
+        <p class="kicker">${t('storyDossier')}</p>
+        <h2 class="panel-titulo">${t('profileTitle')}</h2>
+      </div>
+      ${botonVolver()}
+    </div>
+    <div class="perfil-cifras">${cifras}</div>
+    <p class="grupo">${t('campaign')} · ${dosDigitos(hechos)}/${NIVELES.length}</p>
+    <div class="perfil-ticks" role="img" aria-label="${t('statsCampaign')} ${hechos}/${NIVELES.length}">${ticks}</div>
+    <div class="filas">${campana}</div>
     <p class="grupo">${t('record')}</p>
     <div class="filas">${records}</div>
     <div class="filas">${peligro}</div>
   </div>`);
   pantalla('profile');
   enfocarPrimero();
+  el.overlay.querySelectorAll('[data-cuenta]').forEach((nodo) => {
+    const objetivo = Number(nodo.getAttribute('data-cuenta')) || 0;
+    const formato = nodo.getAttribute('data-formato') === 'pct'
+      ? (v) => `${Math.round(v)}%`
+      : (v) => String(Math.round(v));
+    animarCifra(nodo, objetivo, formato);
+  });
 }
 
 function mostrarConfirmacionBorrado() {
@@ -1332,10 +1470,13 @@ function borrarTodo() {
   guardado.trama = limpio.trama;
   guardado.dobleClick = limpio.dobleClick;
   guardado.custom = limpio.custom;
+  guardado.volumen = limpio.volumen;
   aplicarSonido();
+  audio.setVolumen(100);
   document.documentElement.classList.toggle('trama', guardado.trama);
   guardar();
-  mostrarPerfil();
+  if (app.resetDesde === 'settings') mostrarAjustes();
+  else mostrarPerfil();
   el.hint.textContent = t('resetDone');
 }
 
@@ -1343,56 +1484,41 @@ function mostrarAjustes() {
   const sonido = guardado.sound ? t('soundOn') : t('soundOff');
   const trama = guardado.trama ? t('on') : t('off');
   const doble = guardado.dobleClick ? t('on') : t('off');
-  const filas = [
-    filaHTML({ accion: 'toggleSound', idx: 0, nombre: t('settingSound'), detalle: 'M', derecha: sonido }),
-    filaHTML({ accion: 'toggleTrama', idx: 1, nombre: t('settingTrama'), detalle: t('settingTramaTag'), derecha: trama }),
-    filaHTML({ accion: 'toggleDobleClick', idx: 2, nombre: t('settingDouble'), detalle: t('settingDoubleTag'), derecha: doble }),
-  ].join('');
-  ponerOverlay(`<div class="panel">
-    ${cabeceraPanel(t('settingsTitle'), botonVolver())}
-    <nav class="filas">${filas}</nav>
+  ponerOverlay(`<div class="panel ajustes">
+    <div class="niveles-cabeza">
+      <div>
+        <p class="kicker">minesweeper · v1</p>
+        <h2 class="panel-titulo">${t('settingsTitle')}</h2>
+      </div>
+      ${botonVolver()}
+    </div>
+    <p class="grupo">${t('groupAudio')}</p>
+    <nav class="filas" aria-label="${t('groupAudio')}">
+      ${filaHTML({ accion: 'toggleSound', idx: 0, nombre: t('settingSound'), detalle: 'M', derecha: sonido })}
+      <div class="row paso-row" role="group" data-campo="volumen" aria-label="${t('settingVolume')}">
+        <span class="row-idx">02</span>
+        <span class="row-name">${t('settingVolume')}<small>${t('settingVolumeTag')}</small></span>
+        <span class="paso">
+          <button type="button" data-ajuste="volumen:-25" aria-label="− ${t('settingVolume')}">−</button>
+          <b>${guardado.volumen} %</b>
+          <button type="button" data-ajuste="volumen:25" aria-label="+ ${t('settingVolume')}">+</button>
+        </span>
+      </div>
+    </nav>
+    <p class="grupo">${t('groupImage')}</p>
+    <nav class="filas" aria-label="${t('groupImage')}">
+      ${filaHTML({ accion: 'toggleTrama', idx: 2, nombre: t('settingTrama'), detalle: t('settingTramaTag'), derecha: trama })}
+    </nav>
+    <p class="grupo">${t('groupGame')}</p>
+    <nav class="filas" aria-label="${t('groupGame')}">
+      ${filaHTML({ accion: 'toggleDobleClick', idx: 3, nombre: t('settingDouble'), detalle: t('settingDoubleTag'), derecha: doble })}
+    </nav>
+    <p class="grupo">${t('groupData')}</p>
+    <nav class="filas" aria-label="${t('groupData')}">
+      ${filaHTML({ accion: 'resetProgress', idx: 4, nombre: t('resetProgress'), detalle: t('resetProgressTag'), derecha: '⌫', peligro: true })}
+    </nav>
   </div>`);
   pantalla('settings');
-  enfocarPrimero();
-}
-
-function mostrarAyuda() {
-  app.juego = app.pantalla === 'playing' ? app.juego : null;
-  const reglas = ['rule1', 'rule2', 'rule3', 'rule4', 'rule5']
-    .map((clave) => `<li>${t(clave)}</li>`)
-    .join('');
-  const modos = ['modeRule1', 'modeRule2', 'modeRule3']
-    .map((clave) => `<li>${t(clave)}</li>`)
-    .join('');
-  const campana = ['campaignRule1', 'campaignRule2', 'campaignRule3']
-    .map((clave) => `<li>${t(clave)}</li>`)
-    .join('');
-  const controles = [
-    ['↑↓←→ / WASD', t('ctrlMove')],
-    ['↑↓ / W S', t('ctrlNavigate')],
-    ['Espacio / Enter', t('ctrlConfirm')],
-    ['F', t('ctrlFlag')],
-    ['X', t('ctrlChord')],
-    ['R', t('ctrlRestart')],
-    ['P / Esc', t('ctrlPause')],
-    ['M', t('ctrlMute')],
-    ['H', t('ctrlHelp')],
-    ['PgUp / PgDn', t('ctrlScroll')],
-  ].map(([tecla, desc]) => `<tr><th>${tecla}</th><td>${desc}</td></tr>`).join('');
-  ponerOverlay(`<div class="panel ayuda">
-    ${cabeceraPanel(t('helpTitle'), botonVolver())}
-    <h2>${t('rulesTitle')}</h2>
-    <ul class="reglas">${reglas}</ul>
-    <h2>${t('modesTitle')}</h2>
-    <ul class="reglas">${modos}</ul>
-    <h2>${t('campaignRulesTitle')}</h2>
-    <ul class="reglas">${campana}</ul>
-    <h2>${t('controlsTitle')}</h2>
-    <table class="tabla"><tbody>${controles}</tbody></table>
-    <p class="nota">${t('ctrlMouse')}</p>
-    <p class="nota">${t('ctrlTouch')}</p>
-  </div>`);
-  pantalla('help');
   enfocarPrimero();
 }
 
@@ -1407,14 +1533,33 @@ function ejecutar(nombre) {
   }
   if (nombre.startsWith('playCampaign:')) {
     const i = Number(nombre.slice(13));
-    if (Number.isInteger(i) && i >= 0 && i < guardado.campaign.unlocked && i < NIVELES.length) {
-      mostrarHistoria(i);
+    if (!Number.isInteger(i) || i < 0 || i >= NIVELES.length) return;
+    if (i >= guardado.campaign.unlocked) {
+      audio.play('locked');
+      return;
     }
+    if (app.pantalla === 'campaign') {
+      // primer toque: inspecciona; segundo toque sobre el mismo: marcha
+      if (app.mapaSel === i) mostrarHistoria(i);
+      else seleccionarNodoMapa(i);
+      return;
+    }
+    mostrarHistoria(i);
     return;
   }
   switch (nombre) {
     case 'play': mostrarDificultades(); return;
     case 'campaign': mostrarCampaña(); return;
+    case 'lockedNode': audio.play('locked'); return;
+    case 'mapDescend': {
+      const i = app.mapaSel;
+      if (Number.isInteger(i) && i >= 0 && i < guardado.campaign.unlocked && i < NIVELES.length) {
+        mostrarHistoria(i);
+      } else {
+        audio.play('locked');
+      }
+      return;
+    }
     case 'descend':
       if (app.historia !== null && app.historia !== undefined) empezarPartida('campaign', app.historia);
       return;
@@ -1422,7 +1567,6 @@ function ejecutar(nombre) {
       if (haySiguienteNivel()) mostrarHistoria(app.nivel + 1);
       return;
     case 'profile': mostrarPerfil(); return;
-    case 'help': mostrarAyuda(); return;
     case 'settings': mostrarAjustes(); return;
     case 'playCustom': mostrarPersonalizada(); return;
     case 'customStart': empezarPartida('custom'); return;
@@ -1458,9 +1602,15 @@ function ejecutar(nombre) {
       audio.play('ui');
       return;
     case 'back': volverAtras(); return;
-    case 'resetProgress': mostrarConfirmacionBorrado(); return;
+    case 'resetProgress':
+      app.resetDesde = app.pantalla === 'settings' ? 'settings' : 'profile';
+      mostrarConfirmacionBorrado();
+      return;
     case 'confirmResetWipe': borrarTodo(); return;
-    case 'cancelReset': mostrarPerfil(); return;
+    case 'cancelReset':
+      if (app.resetDesde === 'settings') mostrarAjustes();
+      else mostrarPerfil();
+      return;
     default: return;
   }
 }
@@ -1470,12 +1620,13 @@ function fijarScroll(paso) {
 }
 
 function ajustarPasoFocused(delta) {
-  if (app.pantalla !== 'custom') return;
+  if (app.pantalla !== 'custom' && app.pantalla !== 'settings') return;
   const filas = filasDelOverlay();
   const nodo = filas[focoIndice];
   if (!nodo) return;
   const campo = nodo.getAttribute('data-campo');
-  if (campo) pasoPersonalizado(campo, delta);
+  if (campo === 'volumen') pasoVolumen(delta * 25);
+  else if (campo) pasoPersonalizado(campo, delta);
 }
 
 function volverAtras() {
@@ -1486,7 +1637,6 @@ function volverAtras() {
     case 'campaign': mostrarPortada(); return;
     case 'story': mostrarCampaña(); return;
     case 'profile':
-    case 'help':
     case 'settings':
       mostrarPortada();
       return;
@@ -1573,12 +1723,22 @@ function accion(nombre, repetido = false, datos) {
       case 'restart': reiniciarPartida(); return;
       case 'pause':
       case 'back': pausarJuego(); return;
-      case 'help': return;
       default: return;
     }
   }
 
   // menús y paneles
+  if (app.pantalla === 'campaign'
+    && (nombre === 'up' || nombre === 'down' || nombre === 'left' || nombre === 'right')) {
+    const delta = (nombre === 'up' || nombre === 'left') ? -1 : 1;
+    const actual = Number.isInteger(app.mapaSel) ? app.mapaSel : 0;
+    seleccionarNodoMapa((actual + delta + NIVELES.length) % NIVELES.length, false);
+    const nodos = filasDelOverlay();
+    if (nodos[focoIndice] && typeof nodos[focoIndice].scrollIntoView === 'function') {
+      nodos[focoIndice].scrollIntoView({ block: 'nearest' });
+    }
+    return;
+  }
   switch (nombre) {
     case 'up': moverFoco(-1); return;
     case 'down': moverFoco(1); return;
@@ -1601,10 +1761,6 @@ function accion(nombre, repetido = false, datos) {
       if (app.pantalla === 'paused') reanudar();
       return;
     case 'back': volverAtras(); return;
-    case 'help':
-      if (app.pantalla === 'help') volverAtras();
-      else if (app.pantalla === 'home') mostrarAyuda();
-      return;
     default: return;
   }
 }
@@ -1659,7 +1815,6 @@ function pantallaDeRuta() {
       ? { tipo: 'campaign-level', nivel: Number(nivel[1]) - 1 }
       : { tipo: 'campaign' };
   }
-  if (coincideRuta(primera, 'help')) return { tipo: 'help' };
   if (coincideRuta(primera, 'settings')) return { tipo: 'settings' };
   if (coincideRuta(primera, 'profile')) return { tipo: 'profile' };
   for (const modo of ['beginner', 'intermediate', 'expert']) {
@@ -1677,7 +1832,6 @@ function rutaDeEstado() {
   if (app.pantalla === 'story' && app.historia !== null) {
     return `${slug('campaign')}/nivel-${dosDigitos(app.historia + 1)}`;
   }
-  if (app.pantalla === 'help') return slug('help');
   if (app.pantalla === 'settings') return slug('settings');
   if (app.pantalla === 'profile') return slug('profile');
   if (app.modo === 'campaign' && app.nivel !== null) {
@@ -1701,7 +1855,6 @@ function mostrarRuta(ruta) {
   if (ruta.tipo === 'play') { mostrarDificultades(); return; }
   if (ruta.tipo === 'custom') { mostrarPersonalizada(); return; }
   if (ruta.tipo === 'campaign') { mostrarCampaña(); return; }
-  if (ruta.tipo === 'help') { mostrarAyuda(); return; }
   if (ruta.tipo === 'settings') { mostrarAjustes(); return; }
   if (ruta.tipo === 'profile') { mostrarPerfil(); return; }
   if (ruta.tipo === 'game') { empezarPartida(ruta.modo); return; }
@@ -1801,7 +1954,6 @@ const REPINTAR = {
   modes: mostrarDificultades,
   custom: () => mostrarPersonalizada(),
   profile: mostrarPerfil,
-  help: mostrarAyuda,
   settings: mostrarAjustes,
   reset: mostrarConfirmacionBorrado,
   paused: pausarJuego,
@@ -1823,6 +1975,7 @@ function arrancar() {
 
   document.documentElement.classList.toggle('trama', guardado.trama);
   aplicarSonido();
+  audio.setVolumen(guardado.volumen);
   aplicarIdiomaBase();
 
   el.langSwitch.value = getLanguage();
@@ -1832,6 +1985,12 @@ function arrancar() {
   attachInput({ stage: el.stage, actions: (nombre, repetido, datos) => accion(nombre, repetido, datos) });
 
   el.overlay.addEventListener('click', (evento) => {
+    const ajuste = evento.target && evento.target.closest ? evento.target.closest('[data-ajuste]') : null;
+    if (ajuste) {
+      const [campo, delta] = ajuste.getAttribute('data-ajuste').split(':');
+      if (campo === 'volumen') pasoVolumen(Number(delta));
+      return;
+    }
     const paso = evento.target && evento.target.closest ? evento.target.closest('[data-paso]') : null;
     if (paso) {
       const [campo, delta] = paso.getAttribute('data-paso').split(':');

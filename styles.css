@@ -559,58 +559,6 @@ button.foco {
   color: #4a4a4a;
 }
 
-/* ayuda */
-
-.ayuda {
-  display: flex;
-  flex-direction: column;
-  gap: clamp(12px, 2vh, 18px);
-  max-width: 560px;
-}
-
-.tabla {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 10px;
-}
-
-.tabla th {
-  width: 34%;
-  padding: 6px 8px 6px 0;
-  text-align: left;
-  font-weight: 400;
-  letter-spacing: 0.1em;
-  color: var(--muted);
-  border-top: 1px solid var(--line);
-  vertical-align: top;
-}
-
-.tabla td {
-  padding: 6px 0;
-  letter-spacing: 0.03em;
-  color: #dcdcdc;
-  border-top: 1px solid var(--line);
-}
-
-.reglas {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  font-size: 10px;
-  letter-spacing: 0.03em;
-  line-height: 1.6;
-  color: #cfcfcf;
-}
-
-.reglas li::before {
-  content: "—";
-  color: var(--dim);
-  margin-right: 8px;
-}
-
 /* fin de partida */
 
 .fin {
@@ -1085,9 +1033,9 @@ button.foco {
   letter-spacing: 0.18em;
 }
 
-/* la treinta: portada con el relato y actos como secciones */
+/* la treinta: el mapa de la operación */
 .campana {
-  max-width: 780px;
+  max-width: 1120px;
 }
 
 .campana-titulo {
@@ -1109,35 +1057,6 @@ button.foco {
 .niveles-cabeza b {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-}
-
-/* el prólogo del relato, en voz baja */
-.prologo {
-  margin: 2px 0 14px;
-  padding-left: 10px;
-  border-left: 1px solid var(--line2);
-  font-size: 12px;
-  line-height: 1.65;
-  color: var(--muted);
-}
-
-.acto-grupo {
-  margin-top: 14px;
-  color: var(--fg);
-}
-
-.acto-lore {
-  margin: -6px 0 6px;
-  font-size: 10px;
-  letter-spacing: 0;
-  text-transform: none;
-  color: var(--dim);
-}
-
-/* filas cerradas: índices y textos atenuados */
-.row.dim {
-  cursor: default;
-  opacity: 0.32;
 }
 
 /* la historia de un nivel, antes de picar */
@@ -1171,11 +1090,6 @@ button.foco {
   line-height: 1.7;
   color: var(--fg);
   max-width: 34ch;
-}
-
-/* ayuda: tabla de teclas */
-.tabla th {
-  white-space: nowrap;
 }
 
 @media (max-width: 760px) {
@@ -1283,34 +1197,6 @@ button.foco {
     grid-template-columns: minmax(0, 1fr);
     align-items: stretch;
   }
-}
-
-/* mapas ya completados: la fila entera en verde fósforo */
-.row.hecho .row-name,
-.row.hecho .row-right {
-  color: var(--ok);
-}
-
-.row.hecho .row-idx,
-.row.hecho .row-name small {
-  color: color-mix(in srgb, var(--ok) 62%, #404040);
-}
-
-.row.hecho:hover .row-name,
-.row.hecho:hover .row-right,
-.row.hecho.sel .row-name,
-.row.hecho.sel .row-right,
-.row.hecho:hover .row-idx,
-.row.hecho:hover .row-name small,
-.row.hecho.sel .row-idx,
-.row.hecho.sel .row-name small {
-  color: #000;
-}
-
-/* «→» en rojo: tu posición en la operación */
-.row.acento .row-right {
-  color: var(--accent);
-  font-weight: 700;
 }
 
 .fin-susurro {
@@ -1430,5 +1316,385 @@ button.foco {
   to {
     opacity: 1;
     transform: none;
+  }
+}
+
+/* título grande de panel (perfil, ajustes) */
+
+.panel-titulo {
+  margin: 4px 0 0;
+  font-size: clamp(26px, 6vw, 40px);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 0.95;
+}
+
+/* ---------- la treinta: el mapa de la operación ---------- */
+
+.mapa-nota {
+  margin: 0 0 10px;
+  max-width: 96ch;
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  line-height: 1.6;
+  color: var(--dim);
+}
+
+.mapa-cuerpo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 212px;
+  gap: clamp(14px, 2.4vw, 22px);
+  align-items: start;
+}
+
+.mapa-marco {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.mapa {
+  position: relative;
+  width: 100%;
+  min-width: 720px;
+  aspect-ratio: 1200 / 560;
+  border: 1px solid var(--line);
+  background: #040404;
+  overflow: hidden;
+}
+
+.mapa-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.mapa-acto {
+  fill: #555555;
+  font-family: var(--mono);
+  font-size: 13px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+}
+
+.mapa-sello {
+  fill: #a03434;
+  font-family: var(--mono);
+  font-size: 24px;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.mapa-escala text {
+  fill: #3d3d3d;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+}
+
+/* las treinta posiciones: bloques sobre el mapa */
+.mapa-nodo {
+  position: absolute;
+  width: 38px;
+  height: 38px;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #2a2a2a;
+  background: #0a0a0a;
+  color: #3a3a3a;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  z-index: 1;
+}
+
+.mapa-nodo span {
+  pointer-events: none;
+}
+
+.mapa-nodo.hecha {
+  background: #f2f2f2;
+  border-color: #f2f2f2;
+  color: #000;
+}
+
+.mapa-nodo.actual {
+  border: 2px solid var(--accent);
+  color: #ff5b5b;
+  background: rgba(255, 43, 43, 0.08);
+  animation: mapa-latido 1.7s ease-in-out infinite;
+  z-index: 2;
+}
+
+.mapa-nodo.cerrada {
+  cursor: not-allowed;
+}
+
+.mapa-nodo:hover:not(.cerrada):not(.hecha) {
+  background: #141414;
+  border-color: #5a5a5a;
+  color: #cfcfcf;
+}
+
+.mapa-nodo.hecha:hover {
+  background: #ffffff;
+}
+
+.mapa-nodo.sel {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+  z-index: 3;
+}
+
+.mapa-nodo:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+}
+
+@keyframes mapa-latido {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(255, 43, 43, 0.55);
+  }
+  55% {
+    box-shadow: 0 0 0 9px rgba(255, 43, 43, 0);
+  }
+}
+
+.mapa-leyenda {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--dim);
+  white-space: nowrap;
+}
+
+.mapa-leyenda .punto {
+  color: var(--line2);
+}
+
+.lg {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border: 1px solid #2a2a2a;
+  vertical-align: -1px;
+}
+
+.lg-hecha {
+  background: #f2f2f2;
+  border-color: #f2f2f2;
+}
+
+.lg-actual {
+  border-color: var(--accent);
+  background: rgba(255, 43, 43, 0.16);
+}
+
+.lg-cerrada {
+  background: #0a0a0a;
+}
+
+/* la casilla del detalle, a la derecha del mapa */
+.mapa-lateral {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  min-width: 0;
+}
+
+.mapa-nombre {
+  margin: 0;
+  font-size: clamp(19px, 3vw, 25px);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  min-height: 2.1em;
+}
+
+.mapa-meta {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.mapa-estado {
+  margin: 0;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  min-height: 1.4em;
+}
+
+.mapa-estado.hecho {
+  color: #e8e8e8;
+}
+
+.mapa-estado.actual {
+  color: var(--accent);
+}
+
+.mapa-estado.cerrada {
+  color: var(--dim);
+}
+
+.mapa-accion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 12px;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  text-align: left;
+  border: 1px solid var(--fg);
+  background: var(--fg);
+  color: #000;
+  transition: background 0.1s, color 0.1s;
+}
+
+.mapa-accion:hover:not(:disabled) {
+  background: #d8d8d8;
+  border-color: #d8d8d8;
+}
+
+.mapa-accion:disabled {
+  background: #0a0a0a;
+  border-color: var(--line);
+  color: #3a3a3a;
+  cursor: not-allowed;
+}
+
+.mapa-accion:disabled kbd {
+  border-color: var(--line);
+  color: #2e2e2e;
+}
+
+.mapa-accion kbd {
+  font-family: inherit;
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  color: #4a4a4a;
+  border: 1px solid #b9b9b9;
+  padding: 2px 4px;
+}
+
+/* ---------- perfil: la carta de servicios ---------- */
+
+.perfil-cifras {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  margin-bottom: 4px;
+}
+
+.dato-cifra {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 12px 10px;
+  background: #000;
+}
+
+.dato-cifra b {
+  font-size: clamp(20px, 4.6vw, 30px);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.dato-cifra span {
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* la treinta en treinta trazos: blanco, rojo es tu frontera */
+.perfil-ticks {
+  display: flex;
+  gap: 2px;
+  margin: 2px 0 10px;
+}
+
+.perfil-ticks .tick {
+  flex: 1 1 0;
+  height: 12px;
+  background: #161616;
+  border: 1px solid #1f1f1f;
+}
+
+.perfil-ticks .tick.hecho {
+  background: #f2f2f2;
+  border-color: #f2f2f2;
+}
+
+.perfil-ticks .tick.actual {
+  background: var(--accent);
+  border-color: var(--accent);
+  animation: tick-latido 1.7s ease-in-out infinite;
+}
+
+@keyframes tick-latido {
+  0%, 100% {
+    opacity: 1;
+  }
+  55% {
+    opacity: 0.35;
+  }
+}
+
+/* ---------- responsive: el mapa se explora desplazándolo en pequeño ---------- */
+
+@media (max-width: 860px) {
+  .mapa-cuerpo {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mapa-lateral {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px 14px;
+  }
+
+  .mapa-nombre {
+    min-height: 0;
+    flex-basis: 100%;
+  }
+
+  .mapa-accion {
+    flex: 1 1 auto;
+  }
+
+  .perfil-cifras {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mapa-nodo.actual,
+  .perfil-ticks .tick.actual {
+    animation: none;
   }
 }

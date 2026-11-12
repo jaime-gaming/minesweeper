@@ -23,7 +23,6 @@ Los efectos van sintetizados en tiempo real, salvo el estallido, que usa `audio/
 | Reiniciar | R | — / Y |
 | Pausa | P o Esc | Start |
 | Sonido | M | — |
-| Ayuda | H | — |
 | Menús | Flechas + Enter | Elegir una opción |
 
 El **acorde** destapa los vecinos de un número cuando ya tienes a su alrededor tantas banderas como indica el número; si una bandera estaba mal puesta, la mina que queda destapada estalla. Tocar sobre un número descubierto hace el acorde automáticamente. En pantallas táctiles aparece una bandera grande abajo a la derecha para jugar en modo marcar.
@@ -43,7 +42,7 @@ Las tres dificultades fijas tienen **récord de tiempo** independiente y estadí
 
 ## La Treinta — el modo historia
 
-Treinta campos minados dibujados a mano en cuatro actos, con un único relato lineal: **la guerra te ha reclutado.** Nadie pregunta por qué. Nadie se ofrece. Cada nivel cuenta una línea del avance, en pantalla, antes de picar:
+Treinta campos minados dibujados a mano en cuatro actos, con un único relato lineal: **la guerra te ha reclutado.** Nadie pregunta por qué. Nadie se ofrece. El modo campaña es un **mapa militar**: la ruta de la operación trazada a mano sobre la rejilla, con sello de «no pisar», divisorias de acto y tu posición marcada en rojo. Cada nivel cuenta una línea del avance, antes de marchar:
 
 | Acto | Nivel | Tableros |
 | --- | --- | --- |
@@ -52,11 +51,11 @@ Treinta campos minados dibujados a mano en cuatro actos, con un único relato li
 | III · la operación | 13 – 18 | de 14×14/44 a 16×16/66 — operación puente, el asalto |
 | IV · el final del campo | 19 – 30 | de 16×16/69 a 24×30/132 — la traición, el expediente, la vuelta |
 
-El relato es lineal y acompaña hasta el final: al cerrar el último campo, un epílogo cierra el viaje. Completar un nivel abre el siguiente y guarda tu **mejor tiempo** en su casilla; no hay estrellas, sólo tu marca. El perfil cuenta la campaña como victorias, rachas y tiempo total, y la portada lleva directo a tu siguiente paso. Cada nivel tiene su ruta profunda (`/campaña/nivel-07`) y el botón atrás navega como en cualquier web.
+El relato es lineal y acompaña hasta el final: al cerrar el último campo, un epílogo cierra el viaje. Completar un nivel abre el siguiente y guarda tu **mejor tiempo** en su casilla; no hay estrellas, sólo tu marca. La campaña se juega desde **el mapa de la operación**: treinta posiciones unidas por la ruta, del alistamiento a la puerta, con el recorrido hecho en blanco, el que queda por delante como línea de puntos y tu frontera latiendo en rojo. Eliges con las flechas o el ratón, ves el acta de cada campo a la derecha (acto, tamaño, minas, tu mejor marca o su estado) y marchas con ↵ o con el botón; el mapa también es desplazable en pantallas pequeñas. Cada nivel tiene su ruta profunda (`/campaña/nivel-07`) y el botón atrás navega como en cualquier web.
 
 ## Perfil
 
-La portada enlaza con el perfil: partidas, victorias, tasa de victorias, mejor racha, progreso en la Treinta (niveles despejados), los tres mejores tiempos y un botón para **borrar todo el progreso** —récords, estadísticas y ajustes— con confirmación. La ayuda y los ajustes viven en el pie de la portada, no como botones principales; la ayuda cubre el juego entero: reglas, modos, campaña, controles de teclado, ratón y táctil.
+La portada enlaza con el perfil, la **carta de servicios** del expediente 0042-a: cuatro cifras grandes (partidas, victorias, tasa de victorias y mejor racha), la Treinta en **treinta trazos** —blanco para los campos despejados y rojo para tu frontera—, la suma de tus mejores tiempos en campaña, el total del tiempo en el campo, los tres mejores tiempos fijos y un botón para **borrar todo el progreso** —récords, estadísticas y ajustes— con confirmación. Los ajustes viven en el pie de la portada, no como botón principal: **sonido** y su volumen (solo las piezas de final; el estallido y los efectos no se tocan), **trama de fósforo**, **doble clic para confirmar** —un primer clic arma la casilla, el segundo la destapa— y el borrado de progreso, todo agrupado por secciones.
 
 ## Idioma
 

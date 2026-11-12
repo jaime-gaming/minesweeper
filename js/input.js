@@ -17,7 +17,6 @@ const TECLAS = {
   KeyP: 'pause',
   KeyR: 'restart',
   KeyM: 'mute',
-  KeyH: 'help',
   Escape: 'back',
   PageUp: 'scrollUp',
   PageDown: 'scrollDown',
