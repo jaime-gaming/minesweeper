@@ -2207,6 +2207,10 @@ function escribirHud(meta, score, timer, best) {
   if (hud.best !== best) { el.best.textContent = best; hud.best = best; }
 }
 
+function hudMenu(meta) {
+  escribirHud(meta, '—', '', '');
+}
+
 function actualizarMarcador() {
   const j = app.juego;
   if (!j) {
@@ -2440,7 +2444,7 @@ function mostrarPortada() {
       <p class="nota" id="demo-nota"></p>
     </aside>
   </div>`);
-  escribirHud('—', '—', '', '');
+  hudMenu(t('brandTagline'));
   pantalla('home');
   pintarLienzoVacio();
   const logo = document.getElementById('logo-mine');
@@ -2723,6 +2727,7 @@ function mostrarCampaña() {
     </div>
   </div>`);
   pantalla('campaign');
+  hudMenu(`${t('campaign')} · ${dosDigitos(hechos)}/${NIVELES.length}`);
   animarCifra(document.getElementById('campana-cifra'), hechos, (v) => dosDigitos(Math.round(v)));
   seleccionarNodoMapa(frontera, true);
 
@@ -2756,6 +2761,7 @@ function mostrarHistoria(indice) {
     </div>
   </div>`);
   pantalla('story');
+  hudMenu(t('campaignHud', { n: dosDigitos(indice + 1), name: nombre }));
   enfocarPrimero();
 }
 
@@ -2784,6 +2790,7 @@ function mostrarDificultades() {
     <nav class="filas" aria-label="${t('difficulty')}">${filas.join('')}</nav>
   </div>`);
   pantalla('modes');
+  hudMenu(t('difficulty'));
   enfocarPrimero();
 }
 
@@ -2820,6 +2827,7 @@ function mostrarPersonalizada(foco = 0) {
     <p class="nota">${t('customMines')}: ${min}–${max} · ${c.filas} × ${c.columnas}</p>
   </div>`);
   pantalla('custom');
+  hudMenu(t('diffCustom'));
   const filasUi = filasDelOverlay();
   focoIndice = Math.min(foco, Math.max(0, filasUi.length - 1));
   pintarFoco();
@@ -3196,6 +3204,7 @@ function mostrarPerfil() {
     <div class="filas">${peligro}</div>
   </div>`);
   pantalla('profile');
+  hudMenu(t('profile'));
   enfocarPrimero();
   el.overlay.querySelectorAll('[data-cuenta]').forEach((nodo) => {
     const objetivo = Number(nodo.getAttribute('data-cuenta')) || 0;
@@ -3219,6 +3228,7 @@ function mostrarConfirmacionBorrado() {
     </div>
   </div>`);
   pantalla('reset');
+  hudMenu(t('resetProgress'));
   enfocarPrimero();
 }
 
@@ -3284,6 +3294,7 @@ function mostrarAjustes() {
     </nav>
   </div>`);
   pantalla('settings');
+  hudMenu(t('settings'));
   enfocarPrimero();
 }
 

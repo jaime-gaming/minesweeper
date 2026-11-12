@@ -125,12 +125,8 @@ button:disabled {
   letter-spacing: 0.18em;
 }
 
-.brand-bomb {
-  display: inline-block;
-  width: 0.95em;
-  height: 0.95em;
-  margin-left: 0.16em;
-  vertical-align: -0.14em;
+.brand .dot {
+  color: var(--accent);
 }
 
 .language-control {
@@ -219,10 +215,6 @@ button:disabled {
   display: flex;
   gap: 0;
   flex: none;
-}
-
-body:not([data-screen="playing"]):not([data-screen="paused"]):not([data-screen="dead"]):not([data-screen="won"]) .stats {
-  visibility: hidden;
 }
 
 @media (max-width: 560px) {
