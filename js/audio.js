@@ -5,6 +5,7 @@ let musicGain = null;
 let noiseBuf = null;
 let roto = false;
 let nivelMusica = 1;
+const GANANCIA_MUSICA = 1.3;
 
 function build() {
   if (ctx) return ctx;
@@ -20,7 +21,7 @@ function build() {
     master = ctx.createGain();
     master.gain.value = audio.enabled ? 0.15 : 0;
     musicGain = ctx.createGain();
-    musicGain.gain.value = 1.5 * nivelMusica;
+    musicGain.gain.value = GANANCIA_MUSICA * nivelMusica;
 
     musicGain.connect(master);
     if (typeof ctx.createDynamicsCompressor === 'function') {
@@ -115,8 +116,9 @@ function boomSintetico() {
 }
 
 const MUSICA = {
-  win: 'audio/Win.mp3',
-  death: 'audio/Death.mp3',
+  ambience: { url: 'audio/Ambience.mp3', bucle: true, vol: 0.32 },
+  win: { url: 'audio/Win.mp3', bucle: false, vol: 1 },
+  death: { url: 'audio/Death.mp3', bucle: false, vol: 1 },
 };
 
 const EFECTOS = {
@@ -127,7 +129,7 @@ const buffersFx = new Map();
 const fxListos = new Map();
 
 function precargarEfectos() {
-  if (!ctx) return;
+  if (!ctx || typeof fetch !== 'function') return;
   for (const nombre of Object.keys(EFECTOS)) {
     if (buffersFx.has(nombre)) continue;
     const peticion = fetch(EFECTOS[nombre])
@@ -147,12 +149,14 @@ function precargarEfectos() {
 
 const buffersMusica = new Map();
 let actual = null;
+let solicitada = null;
 let generacion = 0;
 
 function cargarMusica(nombre) {
   if (buffersMusica.has(nombre)) return buffersMusica.get(nombre);
   const c = build();
-  const promesa = fetch(MUSICA[nombre])
+  if (!c || typeof fetch !== 'function') return Promise.reject(new Error('audio listo'));
+  const promesa = fetch(MUSICA[nombre].url)
     .then((r) => {
       if (!r.ok) throw new Error(`audio ${r.status}`);
       return r.arrayBuffer();
@@ -165,6 +169,7 @@ function cargarMusica(nombre) {
 
 function detenerMusicaActual(fade = 0.35) {
   generacion += 1;
+  solicitada = null;
   const c = ctx;
   const corriente = actual;
   actual = null;
@@ -173,6 +178,11 @@ function detenerMusicaActual(fade = 0.35) {
   try {
     const t = c.currentTime;
     gan.gain.cancelScheduledValues(t);
+    if (!(fade > 0)) {
+      gan.gain.setValueAtTime(0.0001, t);
+      src.stop(t + 0.03);
+      return;
+    }
     gan.gain.setValueAtTime(Math.max(0.0001, gan.gain.value), t);
     gan.gain.setTargetAtTime(0.0001, t, fade / 4);
     src.stop(t + fade + 0.25);
@@ -181,28 +191,38 @@ function detenerMusicaActual(fade = 0.35) {
   }
 }
 
+let precargaHecha = false;
+function precargarTodo() {
+  if (precargaHecha) return;
+  const c = build();
+  if (!c || typeof fetch !== 'function') return;
+  precargaHecha = true;
+  for (const nombre of Object.keys(MUSICA)) cargarMusica(nombre);
+  precargarEfectos();
+}
+
 const SONIDOS = {
   start() {
-    tono(260, 0.085, { tipo: 'triangle', vol: 0.16, fin: 430 });
-    tono(620, 0.08, { tipo: 'sine', vol: 0.08, delay: 0.045, fin: 760 });
+    tono(260, 0.085, { tipo: 'triangle', vol: 0.2, fin: 430 });
+    tono(620, 0.08, { tipo: 'sine', vol: 0.1, delay: 0.045, fin: 760 });
   },
 
   reveal({ size = 1 } = {}) {
     const n = Math.min(8, Math.max(1, size | 0));
     const base = 340 + n * 28;
-    tono(base, 0.035, { tipo: 'square', vol: 0.055 });
-    if (n >= 4) tono(base * 1.5, 0.03, { tipo: 'sine', vol: 0.04, delay: 0.03 });
+    tono(base, 0.035, { tipo: 'square', vol: 0.085 });
+    if (n >= 4) tono(base * 1.5, 0.03, { tipo: 'sine', vol: 0.06, delay: 0.03 });
   },
   chord() {
-    tono(430, 0.03, { tipo: 'square', vol: 0.05 });
-    tono(560, 0.035, { tipo: 'square', vol: 0.055, delay: 0.035 });
+    tono(430, 0.03, { tipo: 'square', vol: 0.075 });
+    tono(560, 0.035, { tipo: 'square', vol: 0.08, delay: 0.035 });
   },
   flag() {
-    tono(720, 0.04, { tipo: 'square', vol: 0.085 });
-    tono(1080, 0.03, { tipo: 'sine', vol: 0.05, delay: 0.025 });
+    tono(720, 0.04, { tipo: 'square', vol: 0.12 });
+    tono(1080, 0.03, { tipo: 'sine', vol: 0.07, delay: 0.025 });
   },
   unflag() {
-    tono(540, 0.035, { tipo: 'square', vol: 0.06, fin: 430 });
+    tono(540, 0.035, { tipo: 'square', vol: 0.09, fin: 430 });
   },
   boom() {
     const c = ctx;
@@ -211,7 +231,7 @@ const SONIDOS = {
       try {
         const src = c.createBufferSource();
         const gan = c.createGain();
-        gan.gain.value = 1.8;
+        gan.gain.value = 1.55;
         src.buffer = buf;
         src.connect(gan).connect(master);
         src.start(c.currentTime + 0.001);
@@ -223,10 +243,10 @@ const SONIDOS = {
     boomSintetico();
   },
   ui() {
-    tono(460, 0.028, { tipo: 'square', vol: 0.045 });
+    tono(460, 0.028, { tipo: 'square', vol: 0.07 });
   },
   locked() {
-    tono(120, 0.075, { tipo: 'triangle', vol: 0.09, fin: 95 });
+    tono(120, 0.075, { tipo: 'triangle', vol: 0.12, fin: 95 });
   },
 };
 
@@ -240,6 +260,7 @@ export const audio = {
     } catch (err) {
       
     }
+    precargarTodo();
   },
 
   set(on) {
@@ -265,38 +286,56 @@ export const audio = {
     if (!musicGain || !ctx) return;
     try {
       musicGain.gain.cancelScheduledValues(ctx.currentTime);
-      musicGain.gain.setTargetAtTime(1.5 * nivelMusica, ctx.currentTime, 0.05);
+      musicGain.gain.setTargetAtTime(GANANCIA_MUSICA * nivelMusica, ctx.currentTime, 0.05);
     } catch (err) {
-      musicGain.gain.value = 1.5 * nivelMusica;
+      musicGain.gain.value = GANANCIA_MUSICA * nivelMusica;
     }
   },
 
+  precargar: precargarTodo,
+
   musica(nombre, retardoMs = 0, fundido = 1.2) {
     if (!this.enabled || !MUSICA[nombre]) return;
+    if (actual && actual.nombre === nombre) return;
+    if (solicitada === nombre) return;
     const c = build();
     if (!c) return;
     detenerMusicaActual(0.85);
     const gen = generacion;
+    solicitada = nombre;
+    const cfg = MUSICA[nombre];
     cargarMusica(nombre).then((buf) => {
-      if (gen !== generacion || !this.enabled) return;
+      if (gen !== generacion) return;
+      if (!this.enabled) {
+        if (solicitada === nombre) solicitada = null;
+        return;
+      }
       const gan = c.createGain();
       gan.gain.setValueAtTime(0.0001, c.currentTime);
-      gan.gain.exponentialRampToValueAtTime(1, c.currentTime + Math.max(0.05, fundido));
+      gan.gain.exponentialRampToValueAtTime(Math.max(0.02, cfg.vol ?? 1), c.currentTime + Math.max(0.05, fundido));
       const src = c.createBufferSource();
       src.buffer = buf;
+      src.loop = !!cfg.bucle;
       src.connect(gan).connect(musicGain);
       src.addEventListener('ended', () => {
         if (actual && actual.src === src) actual = null;
       });
       src.start(c.currentTime + Math.max(0, retardoMs) / 1000);
+      solicitada = null;
       actual = { src, gan, nombre };
     }).catch(() => {
-      
+      if (solicitada === nombre) solicitada = null;
     });
   },
 
   pararMusica(fade = 0.9) {
     detenerMusicaActual(fade);
+  },
+
+  pararAmbiente(fade = 0.8) {
+    const enMarcha = Boolean(actual && actual.nombre === 'ambience');
+    const arrancando = solicitada === 'ambience';
+    if (enMarcha || arrancando) detenerMusicaActual(fade);
   },
 
   play(nombre, datos) {
@@ -310,3 +349,5 @@ export const audio = {
     }
   },
 };
+
+precargarTodo();

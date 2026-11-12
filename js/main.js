@@ -7,9 +7,9 @@ import {
   esDificultadFija,
   limitesMinas,
 } from './presets.js?v=1';
-import { audio } from './audio.js?v=8';
+import { audio } from './audio.js?v=9';
 import { attachInput, registrarConversorPunto } from './input.js?v=1';
-import { t, getLanguage, setLanguage, unitMinas, routeSlug, routeWords } from './i18n.js?v=18';
+import { t, getLanguage, setLanguage, unitMinas, routeSlug, routeWords } from './i18n.js?v=19';
 import { NIVELES, ACTOS, configNivel, nivelCampana, actoDe } from './campaign.js?v=7';
 
 const $ = (sel) => document.querySelector(sel);
@@ -136,6 +136,8 @@ const el = {
   langSwitch: $('#lang-switch'),
   avisoFoco: $('#aviso-foco'),
   flagToggle: $('#flag-toggle'),
+  app: $('#app'),
+  luto: $('#luto'),
   barrido: $('#barrido'),
   ruido: $('#ruido'),
   lupa: $('#lupa'),
@@ -318,10 +320,9 @@ function pasoBarrido(dt) {
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
 const DURACION_RUIDO = 800;
-const ruidoFx = { t: 0, activo: false, lienzoBase: null, img: null };
+const ruidoFx = { t: 0, pintado: 0, activo: false, persistente: false, lienzoBase: null, img: null, ctxBase: null, ctxLienzo: null };
 
-function efectoTubos() {
-  if (sinMovimiento()) return;
+function ajustarRuido() {
   const lienzo = el.ruido;
   if (!lienzo) return;
   const dpr = Math.min(1.5, window.devicePixelRatio || 1);
@@ -336,39 +337,92 @@ function efectoTubos() {
   }
   ruidoFx.lienzoBase.width = ladoX;
   ruidoFx.lienzoBase.height = ladoY;
-  ruidoFx.img = ruidoFx.lienzoBase.getContext('2d').createImageData(ladoX, ladoY);
-  if (el.stage) {
-    el.stage.classList.remove('tubo');
-    void el.stage.offsetWidth;
-    el.stage.classList.add('tubo');
-  }
-  if (lienzo.hidden) lienzo.hidden = false;
+  ruidoFx.ctxBase = ruidoFx.lienzoBase.getContext('2d');
+  ruidoFx.ctxLienzo = lienzo.getContext('2d');
+  ruidoFx.img = ruidoFx.ctxBase.createImageData(ladoX, ladoY);
+}
+
+function activarEfectoTv() {
+  if (sinMovimiento()) return;
+  if (ruidoFx.persistente) return;
+  ajustarRuido();
+  const lienzo = el.ruido;
+  if (lienzo && lienzo.hidden) lienzo.hidden = false;
   ruidoFx.t = 0;
   ruidoFx.activo = true;
+  ruidoFx.persistente = true;
+  if (el.app) {
+    el.app.classList.add('tv-muerte');
+    el.app.classList.add('tv-entrada');
+    setTimeout(() => el.app && el.app.classList.remove('tv-entrada'), 950);
+  }
+}
+
+function desactivarEfectoTv() {
+  if (!ruidoFx.activo && !ruidoFx.persistente) return;
+  ruidoFx.activo = false;
+  ruidoFx.persistente = false;
+  const lienzo = el.ruido;
+  if (lienzo) {
+    const c = lienzo.getContext('2d');
+    if (c) c.clearRect(0, 0, lienzo.width, lienzo.height);
+    lienzo.hidden = true;
+  }
+  if (el.app) el.app.classList.remove('tv-muerte', 'tv-entrada');
+}
+
+const RETARDO_REVELADO = 1000;
+let lutoTemporizador = 0;
+
+function activarLuto() {
+  const l = el.luto;
+  if (!l) return;
+  if (l.classList.contains('revelado')) return;
+  l.classList.add('activo');
+}
+
+function revelarTableroFin() {
+  const l = el.luto;
+  if (!l || !l.classList.contains('activo')) return;
+  l.classList.add('revelado');
+}
+
+function ocultarLuto() {
+  const l = el.luto;
+  if (l) l.classList.remove('activo', 'revelado');
+  if (lutoTemporizador) {
+    clearTimeout(lutoTemporizador);
+    lutoTemporizador = 0;
+  }
 }
 
 function pasoRuido(dt) {
   if (!ruidoFx.activo) return;
   ruidoFx.t += dt;
+  ruidoFx.pintado += dt;
+  const cadencia = ruidoFx.persistente ? 33 : 16;
+  if (ruidoFx.pintado < cadencia) return;
+  ruidoFx.pintado = 0;
   const progreso = clamp01(ruidoFx.t / DURACION_RUIDO);
   const lienzo = el.ruido;
-  const ctx = lienzo ? lienzo.getContext('2d') : null;
+  const ctx = ruidoFx.ctxLienzo || (lienzo ? lienzo.getContext('2d') : null);
   const { img, lienzoBase } = ruidoFx;
-  if (ctx && img && lienzoBase) {
+  const ctxBase = ruidoFx.ctxBase || (lienzoBase ? lienzoBase.getContext('2d') : null);
+  if (ctx && img && lienzoBase && ctxBase) {
     const datos = img.data;
-    const intensidad = 1 - progreso * 0.72;
+    const intensidad = ruidoFx.persistente ? 0.3 + (1 - progreso) * 0.28 : 1 - progreso * 0.72;
     for (let i = 0; i < datos.length; i += 4) {
-      const v = Math.random() < 0.52 ? Math.random() * 255 : 0;
+      const v = Math.random() < 0.42 ? Math.random() * 255 : 0;
       datos[i] = v;
       datos[i + 1] = v;
       datos[i + 2] = v;
-      datos[i + 3] = 255 * intensidad * (Math.random() < 0.86 ? 1 : 0.25);
+      datos[i + 3] = 255 * intensidad * (Math.random() < 0.8 ? 1 : 0.25);
     }
-    lienzoBase.getContext('2d').putImageData(img, 0, 0);
+    ctxBase.putImageData(img, 0, 0);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, lienzo.width, lienzo.height);
     ctx.imageSmoothingEnabled = false;
-    ctx.globalAlpha = 0.92;
+    ctx.globalAlpha = 0.7;
     ctx.drawImage(lienzoBase, 0, 0, lienzo.width, lienzo.height);
 
     for (const banda of [0.31, 0.68]) {
@@ -381,14 +435,14 @@ function pasoRuido(dt) {
     }
     ctx.globalAlpha = 1;
   }
-  if (progreso >= 1) {
+  if (progreso >= 1 && !ruidoFx.persistente) {
     ruidoFx.activo = false;
     if (el.ruido) {
       const c = el.ruido.getContext('2d');
       if (c) c.clearRect(0, 0, el.ruido.width, el.ruido.height);
       el.ruido.hidden = true;
     }
-    if (el.stage) el.stage.classList.remove('tubo');
+    if (el.app) el.app.classList.remove('tv-muerte', 'tv-entrada');
   }
 }
 
@@ -479,6 +533,14 @@ function actualizarPista() {
   el.hint.textContent = clave ? t(clave) : '';
 }
 
+function gestionarMusicaPantalla(nombre) {
+  if (nombre === 'playing' || nombre === 'paused') {
+    if (app.juego && !app.juego.terminada) audio.musica('ambience', 200, 1.4);
+    return;
+  }
+  audio.pararAmbiente();
+}
+
 function pantalla(nombre) {
   const antes = app.pantalla;
   app.pantalla = nombre;
@@ -486,6 +548,12 @@ function pantalla(nombre) {
   el.flagToggle.hidden = !(nombre === 'playing' && esTactil());
   if (nombre !== 'playing') el.senal.classList.remove('visible');
   if (antes !== nombre) taparPantalla();
+  gestionarMusicaPantalla(nombre);
+  if (nombre === 'dead') activarEfectoTv();
+  else {
+    desactivarEfectoTv();
+    ocultarLuto();
+  }
   actualizarPista();
   if (RUTAS.listas && !RUTAS.restaurando) sincronizarRuta(false);
 }
@@ -524,16 +592,19 @@ function actualizarMarcador() {
 let huecoFin = 0;
 let casillaArmada = null;
 const RETARDO_DOBLE = 400;
+const RETARDO_INFORME = 1500;
 
 function ajustarLienzo() {
   const j = app.juego;
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   const banda = el.stage.getBoundingClientRect();
+  const bandaAncho = el.stage.clientWidth || banda.width;
+  const bandaAlto = el.stage.clientHeight || banda.height;
   const columnas = j ? j.columnas : 9;
   const filas = j ? j.filas : 9;
   const margen = 4;
-  const availW = Math.max(80, banda.width - margen);
-  const availH = Math.max(80, banda.height - margen - huecoFin);
+  const availW = Math.max(80, bandaAncho - margen);
+  const availH = Math.max(80, bandaAlto - margen - huecoFin);
   const cell = Math.max(8, Math.floor(Math.min(availW / columnas, availH / filas)));
   vista.cell = cell;
   vista.width = cell * columnas;
@@ -731,7 +802,7 @@ function mostrarPortada() {
       <p class="nota" id="demo-nota"></p>
     </aside>
   </div>`);
-  hudMenu('minesweeper · v1');
+  hudMenu('v1');
   pantalla('home');
   pintarLienzoVacio();
   const logo = document.getElementById('logo-mine');
@@ -811,8 +882,8 @@ const MAPA_DIVISORES = [520, 1040, 1660];
 const MAPA_ACTOS_X = [245, 780, 1340, 2005];
 const MAPA_ROMANOS = ['I', 'II', 'III', 'IV'];
 
-const TINTA = '#3f3f3f';
-const TINTA_LEVE = '#242424';
+const TINTA = '#4a4a4a';
+const TINTA_LEVE = '#2c2c2c';
 
 const DIBUJOS = [
 
@@ -888,15 +959,29 @@ const DIBUJOS = [
    <text class="mapa-marca" x="2005" y="442" text-anchor="middle">IV</text>`,
 ];
 
-function puntosRuta(desde, hasta) {
-  return MAPA_RUTA.slice(desde, hasta).map(([x, y]) => `${x},${y}`).join(' ');
+function curvaRuta(puntos) {
+  if (!puntos.length) return '';
+  if (puntos.length === 1) return `M ${puntos[0][0]} ${puntos[0][1]}`;
+  let d = `M ${puntos[0][0]} ${puntos[0][1]}`;
+  for (let i = 0; i < puntos.length - 1; i += 1) {
+    const p0 = puntos[Math.max(0, i - 1)];
+    const p1 = puntos[i];
+    const p2 = puntos[i + 1];
+    const p3 = puntos[Math.min(puntos.length - 1, i + 2)];
+    const c1x = p1[0] + (p2[0] - p0[0]) / 6;
+    const c1y = p1[1] + (p2[1] - p0[1]) / 6;
+    const c2x = p2[0] - (p3[0] - p1[0]) / 6;
+    const c2y = p2[1] - (p3[1] - p1[1]) / 6;
+    d += ` C ${c1x.toFixed(1)} ${c1y.toFixed(1)} ${c2x.toFixed(1)} ${c2y.toFixed(1)} ${p2[0]} ${p2[1]}`;
+  }
+  return d;
 }
 
 function mapaSVG() {
   const total = NIVELES.length;
   const frontera = Math.min(Math.max(guardado.campaign.unlocked - 1, 0), total - 1);
-  const recorrido = puntosRuta(0, frontera + 1);
-  const pendiente = frontera + 1 < total ? puntosRuta(frontera, total) : '';
+  const recorrido = curvaRuta(MAPA_RUTA.slice(0, frontera + 1));
+  const pendiente = frontera + 1 < total ? curvaRuta(MAPA_RUTA.slice(frontera)) : '';
   const divisores = MAPA_DIVISORES
     .map((x) => `<line x1="${x}" y1="30" x2="${x}" y2="596" stroke="#232323" stroke-width="1" stroke-dasharray="6 9"/>`)
     .join('');
@@ -917,8 +1002,8 @@ function mapaSVG() {
     <path d="M -20 372 Q 340 312 700 384 T 1330 356 T 1960 382 T 2460 330" fill="none" stroke="${TINTA_LEVE}" stroke-width="1.5" stroke-dasharray="2 10"/>
     ${dibujos}
     ${divisores}
-    ${pendiente ? `<polyline points="${pendiente}" fill="none" stroke="#3d3d3d" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="0.1 14"/>` : ''}
-    <polyline points="${recorrido}" fill="none" stroke="#f2f2f2" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+    ${pendiente ? `<path d="${pendiente}" fill="none" stroke="#3d3d3d" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="0.1 14"/>` : ''}
+    <path d="${recorrido}" fill="none" stroke="#f2f2f2" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
     <g class="mapa-escala">
       <line x1="2200" y1="560" x2="2372" y2="560" stroke="#3a3a3a" stroke-width="2"/>
       <line x1="2200" y1="553" x2="2200" y2="567" stroke="#3a3a3a" stroke-width="2"/>
@@ -1162,7 +1247,6 @@ function empezarPartida(modo, nivel = null) {
     mostrarCampaña();
     return;
   }
-  audio.pararMusica(0.9);
   app.juego = new Game(cfg, eventosJuego);
   casillaArmada = null;
   app.record = false;
@@ -1263,6 +1347,8 @@ function eventosJuego(tipo, datos) {
       break;
     case 'boom': {
       contabilizarFin(false);
+      audio.pararAmbiente(0);
+      activarLuto();
       if (typeof navigator.vibrate === 'function') navigator.vibrate([50, 40, 90]);
       audio.play('boom');
       const destello = document.getElementById('flash');
@@ -1273,7 +1359,7 @@ function eventosJuego(tipo, datos) {
       }
       setTimeout(() => {
         if (app.juego === j && j.estado === 'perdido') mostrarFinPerdida();
-      }, 900);
+      }, RETARDO_INFORME);
       break;
     }
     case 'win':
@@ -1391,10 +1477,12 @@ function ponerBarraFin({ variante, kicker, titulo, susurro, stats, parcela, acci
   enfocarPrimero();
 
   const panel = el.overlay.querySelector('.fin-barra');
-  const alto = panel ? Math.ceil(panel.getBoundingClientRect().height) : 0;
+  const alto = panel ? Math.ceil(panel.offsetHeight || panel.getBoundingClientRect().height) : 0;
   if (alto > 0) {
-    huecoFin = alto;
-    el.stage.style.paddingBottom = `${alto}px`;
+    const banda = el.stage.getBoundingClientRect();
+    const solape = Math.max(0, Math.round(banda.bottom - (window.innerHeight - alto)));
+    huecoFin = solape;
+    el.stage.style.paddingBottom = `${solape}px`;
     ajustarLienzo();
   }
 }
@@ -1403,7 +1491,15 @@ function mostrarFinPerdida() {
   const j = app.juego;
   if (!j) return;
   audio.musica('death', 0, 1.2);
-  efectoTubos();
+  const l = el.luto;
+  if (!l || !l.classList.contains('revelado')) {
+    activarLuto();
+    if (lutoTemporizador) clearTimeout(lutoTemporizador);
+    lutoTemporizador = setTimeout(() => {
+      lutoTemporizador = 0;
+      revelarTableroFin();
+    }, RETARDO_REVELADO);
+  }
   const totalSeguras = j.cfg.filas * j.cfg.columnas - j.cfg.minas;
   const despejadas = typeof j.tablero.despejadasPorJugador === 'number' ? j.tablero.despejadasPorJugador : 0;
   const enCampaña = app.modo === 'campaign';
@@ -1528,6 +1624,7 @@ function borrarTodo() {
   const limpio = nuevoRegistro();
   guardado.best = limpio.best;
   guardado.stats = limpio.stats;
+  guardado.campaign = limpio.campaign;
   guardado.sound = limpio.sound;
   guardado.trama = limpio.trama;
   guardado.dobleClick = limpio.dobleClick;
@@ -1549,7 +1646,7 @@ function mostrarAjustes() {
   ponerOverlay(`<div class="panel ajustes">
     <div class="niveles-cabeza">
       <div>
-        <p class="kicker">minesweeper · v1</p>
+        <p class="kicker">v1</p>
         <h2 class="panel-titulo">${t('settingsTitle')}</h2>
       </div>
       ${botonVolver()}
@@ -1983,6 +2080,7 @@ function bucle(t) {
 function aplicarSonido() {
   audio.enabled = guardado.sound;
   audio.set(guardado.sound);
+  gestionarMusicaPantalla(app.pantalla);
 }
 
 function aplicarIdiomaBase() {
@@ -2081,23 +2179,19 @@ function arrancar() {
     }, { once: true });
   }
 
+  const alRedimensionar = () => {
+    ajustarLienzo();
+    ajustarBarrido();
+    if (ruidoFx.activo) ajustarRuido();
+  };
   if (window.ResizeObserver) {
     try {
-      new ResizeObserver(() => {
-        ajustarLienzo();
-        ajustarBarrido();
-      }).observe(el.stage);
+      new ResizeObserver(alRedimensionar).observe(el.stage);
     } catch (err) {
-      window.addEventListener('resize', () => {
-        ajustarLienzo();
-        ajustarBarrido();
-      });
+      window.addEventListener('resize', alRedimensionar);
     }
   } else {
-    window.addEventListener('resize', () => {
-      ajustarLienzo();
-      ajustarBarrido();
-    });
+    window.addEventListener('resize', alRedimensionar);
   }
   window.addEventListener('orientationchange', () => setTimeout(ajustarLienzo, 140));
 

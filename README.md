@@ -4,13 +4,13 @@ El buscaminas clásico, de bloques en blanco y negro y muy poco más: la rejilla
 
 ## Idea visual
 
-La pantalla es una hoja de tinta: negro profundo, blancos duros y un rojo para la bandera, las minas y la casilla que estalla. Las celdas son bloques planos separados por la rejilla de un píxel, como en snake; las descubiertas se funden con el fondo y dejan su número plano, en la monoespaciada de la casa, con el color clásico del buscaminas (1 azul, 2 verde, 3 rojo, 4 violeta, 5 naranja, 6 cian, 7 amarillo, 8 blanco). Las banderas de paño rojo se izan con su pliegue y su muesca; las minas son bloques de ocho púas con su destello. Al estallar hay un **destello seco** y la hoja se va a negro; el campo queda al descubierto por completo y la pantalla de muerte se abre como una barra baja, con el tablero entero a la vista —kicker, golpe, estadísticas y parcela, en capas—. Al ganar, las banderas se izan en oleada y la misma barra se abre diciendo «despejado.»: reparto idéntico, el borde superior en blanco y solo la pieza de victoria sonando.
+La pantalla es una hoja de tinta: negro profundo, blancos duros y un rojo para la bandera, las minas y la casilla que estalla. Las celdas son bloques planos separados por la rejilla de un píxel, como en snake; las descubiertas se funden con el fondo y dejan su número plano, en la monoespaciada de la casa, con el color clásico del buscaminas (1 azul, 2 verde, 3 rojo, 4 violeta, 5 naranja, 6 cian, 7 amarillo, 8 blanco). Las banderas de paño rojo se izan con su pliegue y su muesca; las minas son bloques de ocho púas con su destello. Al estallar hay un **destello seco** y la hoja se va a negro: la pantalla se queda en negro hasta que sube la barra de la muerte con el golpe —«boom.»— y, **justo cuando las letras se han posado, el campo completo aparece detrás**, bien ajustado sobre la barra. Mientras dura el informe de baja, el cristal se queda como un **televisor estropeado**: la imagen ensanchada, un temblor de señal y una **nieve** tenue sobre la pantalla, solo ahí. Al ganar, las banderas se izan en oleada y la misma barra se abre diciendo «despejado.»: reparto idéntico, el borde superior en blanco y solo la pieza de victoria sonando.
 
 La portada juega sola: una partida automática del siguiente nivel de la Treinta se despeja en la vista previa mientras decides qué jugar. El logotipo «minesweeper.» es tipografía pura y su punto es la mina del juego, el bloque blanco de ocho púas, la misma que pinta el lienzo, la pestaña y la barra superior; como en snake el punto rojo era la manzana.
 
 ## Sonido
 
-Los efectos van sintetizados en tiempo real, salvo el estallido, que usa `audio/Boom.mp3` (recortado a cuatro décimas de segundo). La victoria y la derrota llevan su propia pieza, `audio/Win.mp3` y `audio/Death.mp3`, que entran y salen con fundidos: suenan sobre el estallido o la oleada de banderas y se apagan solas al empezar otra partida o volver a la portada. El interruptor de sonido (y la tecla `M`) las silencia con lo demás.
+Siempre que hay una partida en marcha suena el **ambiente del campo**, `audio/Ambience.mp3`, en bucle; al estallar se corta de golpe y al ganar cede el sitio, con fundido, a la pieza de victoria. Los efectos van sintetizados en tiempo real, salvo el estallido, que usa `audio/Boom.mp3` (recortado a cuatro décimas de segundo). La victoria y la derrota llevan su propia pieza, `audio/Win.mp3` y `audio/Death.mp3`, que entran y salen con fundidos: suenan sobre el estallido o la oleada de banderas y se apagan solas al empezar otra partida o volver a la portada. **Todo el audio se descarga y decodifica al abrir la página**, así que no hay esperas ni retardos al empezar a tocar. El interruptor de sonido (y la tecla `M`) lo silencia todo; el **volumen** de los ajustes manda sobre la música —ambiente y piezas de final— y los efectos van a su aire.
 
 ## Controles
 
@@ -55,7 +55,7 @@ El relato es lineal y acompaña hasta el final: al cerrar el último campo, un e
 
 ## Perfil
 
-La portada enlaza con el perfil, la **carta de servicios** del expediente 0042-a: cuatro cifras grandes (partidas, victorias, tasa de victorias y mejor racha), la Treinta en **treinta trazos** —blanco para los campos despejados y rojo para tu frontera—, la suma de tus mejores tiempos en campaña, el total del tiempo en el campo, los tres mejores tiempos fijos y un botón para **borrar todo el progreso** —récords, estadísticas y ajustes— con confirmación. Los ajustes viven en el pie de la portada, no como botón principal: **sonido** y su volumen (solo las piezas de final; el estallido y los efectos no se tocan), **trama de fósforo**, **doble clic para confirmar** —un primer clic arma la casilla, el segundo la destapa— y el borrado de progreso, todo agrupado por secciones.
+La portada enlaza con el perfil, la **carta de servicios** del expediente 0042-a: cuatro cifras grandes (partidas, victorias, tasa de victorias y mejor racha), la Treinta en **treinta trazos** —blanco para los campos despejados y rojo para tu frontera—, la suma de tus mejores tiempos en campaña, el total del tiempo en el campo, los tres mejores tiempos fijos y un botón para **borrar todo el progreso** —récords, estadísticas y ajustes— con confirmación. Los ajustes viven en el pie de la portada, no como botón principal: **sonido** y su volumen (la música: ambiente del campo y piezas de final; los efectos no se tocan), **trama de fósforo**, **doble clic para confirmar** —un primer clic arma la casilla, el segundo la destapa— y el borrado de progreso, todo agrupado por secciones.
 
 ## Idioma
 
@@ -79,12 +79,12 @@ node serve.mjs 8123      # sirve el sitio en http://0.0.0.0:8123
 ```
 index.html        esqueleto: barra superior, lienzo, capas de menú y arranque roto
 styles.css        la casa: tinta negra, monoespaciada, un rojo y un verde
-audio/            Win.mp3 · Death.mp3 · Boom.mp3 (el estallido, cuatro décimas de segundo)
+audio/            Ambience.mp3 (bucle de partida) · Win.mp3 · Death.mp3 · Boom.mp3 (el estallido, cuatro décimas)
 js/board.js       reglas puras del buscaminas (sembrar, destapar, acorde); sin DOM
 js/presets.js     las tres dificultades fijas y los límites de la personalizada
 js/engine.js      máquina de estados y dibujado en lienzo (bloques, no suavizado)
 js/input.js       teclado, gestos táctiles y mando; habla en acciones
-js/audio.js       efectos por Web Audio; música y estallido desde audio/, con fundidos
+js/audio.js       efectos por Web Audio; música y estallido desde audio/, precargados y con fundidos
 js/i18n.js        textos en ES/EN y slugs de ruta (jugar, campaña, …)
 js/campaign.js    la Treinta: el relato, los actos, los treinta niveles y sus líneas de historia
 js/main.js        pantallas, HUD, récords en localStorage, demo de portada, rutas y arranque
@@ -99,7 +99,7 @@ _headers          HTML sin caché y nosniff (lo aplica el router de assets)
 
 ## Despliegue
 
-Es un **Worker estático**: `npx wrangler deploy` publica únicamente el juego (seis ficheros; `.assetsignore` deja el código de desarrollo y `.git` fuera del alcance público), con `not_found_handling = "single-page-application"` para que las rutas profundas del juego devuelvan `index.html` y `_headers` para que el HTML no se cachee nunca. El dominio `minesweeper.jaime-gaming.com` se asocia en *Workers & Pages → minesweeper → Settings → Domains & routes*. La publicación, la autenticación, la caché y la resolución de problemas están en [DESPLIEGUE.md](DESPLIEGUE.md).
+Es un **Worker estático**: `npx wrangler deploy` publica únicamente el juego (siete ficheros; `.assetsignore` deja el código de desarrollo y `.git` fuera del alcance público), con `not_found_handling = "single-page-application"` para que las rutas profundas del juego devuelvan `index.html` y `_headers` para que el HTML no se cachee nunca. El dominio `minesweeper.jaime-gaming.com` se asocia en *Workers & Pages → minesweeper → Settings → Domains & routes*. La publicación, la autenticación, la caché y la resolución de problemas están en [DESPLIEGUE.md](DESPLIEGUE.md).
 
 ## Creditos de assets
 Musica: LSplash
