@@ -33,6 +33,7 @@ class Tablero {
     this.sembradas = false;
     this.estado = 'jugando';
     this.reveladas = 0;
+    this.banderas = 0;
     this.explosionIndice = -1;
   }
 
@@ -130,6 +131,7 @@ class Tablero {
       for (const celda of this.celdas) {
         if (celda.mina) celda.bandera = true;
       }
+      this.banderas = this.minas;
       return true;
     }
     return false;
@@ -216,19 +218,16 @@ class Tablero {
     const celda = this.celdas[indice];
     if (celda.revelada) return null;
     celda.bandera = !celda.bandera;
+    this.banderas += celda.bandera ? 1 : -1;
     return celda.bandera ? 'bandera' : 'sin-bandera';
   }
 
   contarBanderas() {
-    let n = 0;
-    for (const celda of this.celdas) {
-      if (celda.bandera) n += 1;
-    }
-    return n;
+    return this.banderas;
   }
 
   restantesMinas() {
-    return this.minas - this.contarBanderas();
+    return this.minas - this.banderas;
   }
 
   minasOcultas() {
@@ -315,6 +314,7 @@ let musicGain = null;
 let noiseBuf = null;
 let roto = false;
 let nivelMusica = 1;
+const GANANCIA_MUSICA = 1.3;
 
 function build() {
   if (ctx) return ctx;
@@ -330,7 +330,7 @@ function build() {
     master = ctx.createGain();
     master.gain.value = audio.enabled ? 0.15 : 0;
     musicGain = ctx.createGain();
-    musicGain.gain.value = 1.5 * nivelMusica;
+    musicGain.gain.value = GANANCIA_MUSICA * nivelMusica;
 
     musicGain.connect(master);
     if (typeof ctx.createDynamicsCompressor === 'function') {
@@ -512,26 +512,26 @@ function precargarTodo() {
 
 const SONIDOS = {
   start() {
-    tono(260, 0.085, { tipo: 'triangle', vol: 0.16, fin: 430 });
-    tono(620, 0.08, { tipo: 'sine', vol: 0.08, delay: 0.045, fin: 760 });
+    tono(260, 0.085, { tipo: 'triangle', vol: 0.2, fin: 430 });
+    tono(620, 0.08, { tipo: 'sine', vol: 0.1, delay: 0.045, fin: 760 });
   },
 
   reveal({ size = 1 } = {}) {
     const n = Math.min(8, Math.max(1, size | 0));
     const base = 340 + n * 28;
-    tono(base, 0.035, { tipo: 'square', vol: 0.055 });
-    if (n >= 4) tono(base * 1.5, 0.03, { tipo: 'sine', vol: 0.04, delay: 0.03 });
+    tono(base, 0.035, { tipo: 'square', vol: 0.085 });
+    if (n >= 4) tono(base * 1.5, 0.03, { tipo: 'sine', vol: 0.06, delay: 0.03 });
   },
   chord() {
-    tono(430, 0.03, { tipo: 'square', vol: 0.05 });
-    tono(560, 0.035, { tipo: 'square', vol: 0.055, delay: 0.035 });
+    tono(430, 0.03, { tipo: 'square', vol: 0.075 });
+    tono(560, 0.035, { tipo: 'square', vol: 0.08, delay: 0.035 });
   },
   flag() {
-    tono(720, 0.04, { tipo: 'square', vol: 0.085 });
-    tono(1080, 0.03, { tipo: 'sine', vol: 0.05, delay: 0.025 });
+    tono(720, 0.04, { tipo: 'square', vol: 0.12 });
+    tono(1080, 0.03, { tipo: 'sine', vol: 0.07, delay: 0.025 });
   },
   unflag() {
-    tono(540, 0.035, { tipo: 'square', vol: 0.06, fin: 430 });
+    tono(540, 0.035, { tipo: 'square', vol: 0.09, fin: 430 });
   },
   boom() {
     const c = ctx;
@@ -540,7 +540,7 @@ const SONIDOS = {
       try {
         const src = c.createBufferSource();
         const gan = c.createGain();
-        gan.gain.value = 1.8;
+        gan.gain.value = 1.55;
         src.buffer = buf;
         src.connect(gan).connect(master);
         src.start(c.currentTime + 0.001);
@@ -552,10 +552,10 @@ const SONIDOS = {
     boomSintetico();
   },
   ui() {
-    tono(460, 0.028, { tipo: 'square', vol: 0.045 });
+    tono(460, 0.028, { tipo: 'square', vol: 0.07 });
   },
   locked() {
-    tono(120, 0.075, { tipo: 'triangle', vol: 0.09, fin: 95 });
+    tono(120, 0.075, { tipo: 'triangle', vol: 0.12, fin: 95 });
   },
 };
 
@@ -595,9 +595,9 @@ const audio = {
     if (!musicGain || !ctx) return;
     try {
       musicGain.gain.cancelScheduledValues(ctx.currentTime);
-      musicGain.gain.setTargetAtTime(1.5 * nivelMusica, ctx.currentTime, 0.05);
+      musicGain.gain.setTargetAtTime(GANANCIA_MUSICA * nivelMusica, ctx.currentTime, 0.05);
     } catch (err) {
-      musicGain.gain.value = 1.5 * nivelMusica;
+      musicGain.gain.value = GANANCIA_MUSICA * nivelMusica;
     }
   },
 
@@ -2069,7 +2069,7 @@ function pasoBarrido(dt) {
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
 const DURACION_RUIDO = 800;
-const ruidoFx = { t: 0, activo: false, persistente: false, lienzoBase: null, img: null };
+const ruidoFx = { t: 0, pintado: 0, activo: false, persistente: false, lienzoBase: null, img: null, ctxBase: null, ctxLienzo: null };
 
 function ajustarRuido() {
   const lienzo = el.ruido;
@@ -2086,7 +2086,9 @@ function ajustarRuido() {
   }
   ruidoFx.lienzoBase.width = ladoX;
   ruidoFx.lienzoBase.height = ladoY;
-  ruidoFx.img = ruidoFx.lienzoBase.getContext('2d').createImageData(ladoX, ladoY);
+  ruidoFx.ctxBase = ruidoFx.lienzoBase.getContext('2d');
+  ruidoFx.ctxLienzo = lienzo.getContext('2d');
+  ruidoFx.img = ruidoFx.ctxBase.createImageData(ladoX, ladoY);
 }
 
 function activarEfectoTv() {
@@ -2146,11 +2148,16 @@ function ocultarLuto() {
 function pasoRuido(dt) {
   if (!ruidoFx.activo) return;
   ruidoFx.t += dt;
+  ruidoFx.pintado += dt;
+  const cadencia = ruidoFx.persistente ? 33 : 16;
+  if (ruidoFx.pintado < cadencia) return;
+  ruidoFx.pintado = 0;
   const progreso = clamp01(ruidoFx.t / DURACION_RUIDO);
   const lienzo = el.ruido;
-  const ctx = lienzo ? lienzo.getContext('2d') : null;
+  const ctx = ruidoFx.ctxLienzo || (lienzo ? lienzo.getContext('2d') : null);
   const { img, lienzoBase } = ruidoFx;
-  if (ctx && img && lienzoBase) {
+  const ctxBase = ruidoFx.ctxBase || (lienzoBase ? lienzoBase.getContext('2d') : null);
+  if (ctx && img && lienzoBase && ctxBase) {
     const datos = img.data;
     const intensidad = ruidoFx.persistente ? 0.3 + (1 - progreso) * 0.28 : 1 - progreso * 0.72;
     for (let i = 0; i < datos.length; i += 4) {
@@ -2160,7 +2167,7 @@ function pasoRuido(dt) {
       datos[i + 2] = v;
       datos[i + 3] = 255 * intensidad * (Math.random() < 0.8 ? 1 : 0.25);
     }
-    lienzoBase.getContext('2d').putImageData(img, 0, 0);
+    ctxBase.putImageData(img, 0, 0);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, lienzo.width, lienzo.height);
     ctx.imageSmoothingEnabled = false;

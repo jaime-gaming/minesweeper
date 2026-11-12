@@ -5,6 +5,7 @@ let musicGain = null;
 let noiseBuf = null;
 let roto = false;
 let nivelMusica = 1;
+const GANANCIA_MUSICA = 1.3;
 
 function build() {
   if (ctx) return ctx;
@@ -20,7 +21,7 @@ function build() {
     master = ctx.createGain();
     master.gain.value = audio.enabled ? 0.15 : 0;
     musicGain = ctx.createGain();
-    musicGain.gain.value = 1.5 * nivelMusica;
+    musicGain.gain.value = GANANCIA_MUSICA * nivelMusica;
 
     musicGain.connect(master);
     if (typeof ctx.createDynamicsCompressor === 'function') {
@@ -202,26 +203,26 @@ function precargarTodo() {
 
 const SONIDOS = {
   start() {
-    tono(260, 0.085, { tipo: 'triangle', vol: 0.16, fin: 430 });
-    tono(620, 0.08, { tipo: 'sine', vol: 0.08, delay: 0.045, fin: 760 });
+    tono(260, 0.085, { tipo: 'triangle', vol: 0.2, fin: 430 });
+    tono(620, 0.08, { tipo: 'sine', vol: 0.1, delay: 0.045, fin: 760 });
   },
 
   reveal({ size = 1 } = {}) {
     const n = Math.min(8, Math.max(1, size | 0));
     const base = 340 + n * 28;
-    tono(base, 0.035, { tipo: 'square', vol: 0.055 });
-    if (n >= 4) tono(base * 1.5, 0.03, { tipo: 'sine', vol: 0.04, delay: 0.03 });
+    tono(base, 0.035, { tipo: 'square', vol: 0.085 });
+    if (n >= 4) tono(base * 1.5, 0.03, { tipo: 'sine', vol: 0.06, delay: 0.03 });
   },
   chord() {
-    tono(430, 0.03, { tipo: 'square', vol: 0.05 });
-    tono(560, 0.035, { tipo: 'square', vol: 0.055, delay: 0.035 });
+    tono(430, 0.03, { tipo: 'square', vol: 0.075 });
+    tono(560, 0.035, { tipo: 'square', vol: 0.08, delay: 0.035 });
   },
   flag() {
-    tono(720, 0.04, { tipo: 'square', vol: 0.085 });
-    tono(1080, 0.03, { tipo: 'sine', vol: 0.05, delay: 0.025 });
+    tono(720, 0.04, { tipo: 'square', vol: 0.12 });
+    tono(1080, 0.03, { tipo: 'sine', vol: 0.07, delay: 0.025 });
   },
   unflag() {
-    tono(540, 0.035, { tipo: 'square', vol: 0.06, fin: 430 });
+    tono(540, 0.035, { tipo: 'square', vol: 0.09, fin: 430 });
   },
   boom() {
     const c = ctx;
@@ -230,7 +231,7 @@ const SONIDOS = {
       try {
         const src = c.createBufferSource();
         const gan = c.createGain();
-        gan.gain.value = 1.8;
+        gan.gain.value = 1.55;
         src.buffer = buf;
         src.connect(gan).connect(master);
         src.start(c.currentTime + 0.001);
@@ -242,10 +243,10 @@ const SONIDOS = {
     boomSintetico();
   },
   ui() {
-    tono(460, 0.028, { tipo: 'square', vol: 0.045 });
+    tono(460, 0.028, { tipo: 'square', vol: 0.07 });
   },
   locked() {
-    tono(120, 0.075, { tipo: 'triangle', vol: 0.09, fin: 95 });
+    tono(120, 0.075, { tipo: 'triangle', vol: 0.12, fin: 95 });
   },
 };
 
@@ -285,9 +286,9 @@ export const audio = {
     if (!musicGain || !ctx) return;
     try {
       musicGain.gain.cancelScheduledValues(ctx.currentTime);
-      musicGain.gain.setTargetAtTime(1.5 * nivelMusica, ctx.currentTime, 0.05);
+      musicGain.gain.setTargetAtTime(GANANCIA_MUSICA * nivelMusica, ctx.currentTime, 0.05);
     } catch (err) {
-      musicGain.gain.value = 1.5 * nivelMusica;
+      musicGain.gain.value = GANANCIA_MUSICA * nivelMusica;
     }
   },
 

@@ -27,6 +27,7 @@ export class Tablero {
     this.sembradas = false;
     this.estado = 'jugando';
     this.reveladas = 0;
+    this.banderas = 0;
     this.explosionIndice = -1;
   }
 
@@ -124,6 +125,7 @@ export class Tablero {
       for (const celda of this.celdas) {
         if (celda.mina) celda.bandera = true;
       }
+      this.banderas = this.minas;
       return true;
     }
     return false;
@@ -210,19 +212,16 @@ export class Tablero {
     const celda = this.celdas[indice];
     if (celda.revelada) return null;
     celda.bandera = !celda.bandera;
+    this.banderas += celda.bandera ? 1 : -1;
     return celda.bandera ? 'bandera' : 'sin-bandera';
   }
 
   contarBanderas() {
-    let n = 0;
-    for (const celda of this.celdas) {
-      if (celda.bandera) n += 1;
-    }
-    return n;
+    return this.banderas;
   }
 
   restantesMinas() {
-    return this.minas - this.contarBanderas();
+    return this.minas - this.banderas;
   }
 
   minasOcultas() {

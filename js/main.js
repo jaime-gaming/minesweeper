@@ -320,7 +320,7 @@ function pasoBarrido(dt) {
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
 const DURACION_RUIDO = 800;
-const ruidoFx = { t: 0, activo: false, persistente: false, lienzoBase: null, img: null };
+const ruidoFx = { t: 0, pintado: 0, activo: false, persistente: false, lienzoBase: null, img: null, ctxBase: null, ctxLienzo: null };
 
 function ajustarRuido() {
   const lienzo = el.ruido;
@@ -337,7 +337,9 @@ function ajustarRuido() {
   }
   ruidoFx.lienzoBase.width = ladoX;
   ruidoFx.lienzoBase.height = ladoY;
-  ruidoFx.img = ruidoFx.lienzoBase.getContext('2d').createImageData(ladoX, ladoY);
+  ruidoFx.ctxBase = ruidoFx.lienzoBase.getContext('2d');
+  ruidoFx.ctxLienzo = lienzo.getContext('2d');
+  ruidoFx.img = ruidoFx.ctxBase.createImageData(ladoX, ladoY);
 }
 
 function activarEfectoTv() {
@@ -397,11 +399,16 @@ function ocultarLuto() {
 function pasoRuido(dt) {
   if (!ruidoFx.activo) return;
   ruidoFx.t += dt;
+  ruidoFx.pintado += dt;
+  const cadencia = ruidoFx.persistente ? 33 : 16;
+  if (ruidoFx.pintado < cadencia) return;
+  ruidoFx.pintado = 0;
   const progreso = clamp01(ruidoFx.t / DURACION_RUIDO);
   const lienzo = el.ruido;
-  const ctx = lienzo ? lienzo.getContext('2d') : null;
+  const ctx = ruidoFx.ctxLienzo || (lienzo ? lienzo.getContext('2d') : null);
   const { img, lienzoBase } = ruidoFx;
-  if (ctx && img && lienzoBase) {
+  const ctxBase = ruidoFx.ctxBase || (lienzoBase ? lienzoBase.getContext('2d') : null);
+  if (ctx && img && lienzoBase && ctxBase) {
     const datos = img.data;
     const intensidad = ruidoFx.persistente ? 0.3 + (1 - progreso) * 0.28 : 1 - progreso * 0.72;
     for (let i = 0; i < datos.length; i += 4) {
@@ -411,7 +418,7 @@ function pasoRuido(dt) {
       datos[i + 2] = v;
       datos[i + 3] = 255 * intensidad * (Math.random() < 0.8 ? 1 : 0.25);
     }
-    lienzoBase.getContext('2d').putImageData(img, 0, 0);
+    ctxBase.putImageData(img, 0, 0);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, lienzo.width, lienzo.height);
     ctx.imageSmoothingEnabled = false;
