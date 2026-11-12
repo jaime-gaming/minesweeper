@@ -245,9 +245,17 @@ try {
   if (!panel.includes('fin-stats')) throw new Error('faltan las estadísticas de la pantalla de muerte');
   const appEl = documentStub.querySelector('#app');
   const ruidoEl = documentStub.querySelector('#ruido');
+  const lutoEl = documentStub.querySelector('#luto');
   if (!appEl.classList.contains('tv-muerte')) throw new Error('el efecto de televisor no acompaña a la pantalla de muerte');
   if (ruidoEl.hidden) throw new Error('la nieve no cubre la pantalla de muerte');
+  if (!lutoEl.classList.contains('activo')) throw new Error('el luto no cubrió el tablero al morir');
+  if (lutoEl.classList.contains('revelado')) throw new Error('el tablero se reveló antes de las letras boom');
   console.log('pantalla de muerte: informe y efecto de televisor ok');
+
+  await dormir(800);
+  frames(5);
+  if (!lutoEl.classList.contains('revelado')) throw new Error('el tablero no apareció con las letras boom');
+  console.log('el tablero aparece con las letras boom ok');
 
   api.accion('restart');
   frames(5);
@@ -255,6 +263,7 @@ try {
     throw new Error('el efecto de televisor se quedó tras reiniciar');
   }
   if (!documentStub.querySelector('#ruido').hidden) throw new Error('la nieve no se apagó al reiniciar');
+  if (lutoEl.classList.contains('activo')) throw new Error('el luto no se levantó al reiniciar');
   console.log('efecto de televisor solo en la muerte ok');
   const j2 = api.app.juego;
 
@@ -286,6 +295,9 @@ try {
   if (api.app.pantalla !== 'won') throw new Error('el panel de victoria no se abrió');
   if (documentStub.querySelector('#app').classList.contains('tv-muerte')) {
     throw new Error('el efecto de televisor se coló en la victoria');
+  }
+  if (documentStub.querySelector('#luto').classList.contains('activo')) {
+    throw new Error('el luto se coló en la victoria');
   }
   console.log('victoria sin efecto de televisor ok');
 

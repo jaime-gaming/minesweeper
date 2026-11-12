@@ -115,7 +115,7 @@ function boomSintetico() {
 }
 
 const MUSICA = {
-  ambience: { url: 'audio/Ambience.mp3', bucle: true, vol: 0.55 },
+  ambience: { url: 'audio/Ambience.mp3', bucle: true, vol: 0.32 },
   win: { url: 'audio/Win.mp3', bucle: false, vol: 1 },
   death: { url: 'audio/Death.mp3', bucle: false, vol: 1 },
 };
@@ -177,6 +177,11 @@ function detenerMusicaActual(fade = 0.35) {
   try {
     const t = c.currentTime;
     gan.gain.cancelScheduledValues(t);
+    if (!(fade > 0)) {
+      gan.gain.setValueAtTime(0.0001, t);
+      src.stop(t + 0.03);
+      return;
+    }
     gan.gain.setValueAtTime(Math.max(0.0001, gan.gain.value), t);
     gan.gain.setTargetAtTime(0.0001, t, fade / 4);
     src.stop(t + fade + 0.25);
