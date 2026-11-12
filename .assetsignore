@@ -1,0 +1,11 @@
+/.git/
+/.github/
+/js/
+/tools/
+/serve.mjs
+/wrangler.toml
+/README.md
+/DESPLIEGUE.md
+/.gitignore
+/.assetsignore
+.DS_Store

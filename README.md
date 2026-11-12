@@ -92,11 +92,14 @@ serve.mjs         servidor estático local (node serve.mjs 8123)
 tools/build.mjs   empaquetador sin dependencias
 tools/check.mjs   pruebas de lógica, sin navegador
 tools/smoke.mjs   humo de arranque: juega una partida con un DOM simulado
+wrangler.toml     el Worker estático que sirve el juego en minesweeper.jaime-gaming.com
+_headers          HTML sin caché y nosniff (lo aplica el router de assets)
+.assetsignore     lo que jamás se sube (.git, js/, tools/, docs…)
 ```
 
 ## Despliegue
 
-Preparado para **Cloudflare Pages**: el repositorio es estático, sin paso de build (el bundle viaja siempre al día y la CI lo comprueba), con `_redirects` para las rutas profundas del juego y `_headers` para que el HTML no se cachee nunca. Conecta el repo en *Workers & Pages → Create → Pages*, deja el comando de build vacío, la salida en la raíz y asocia `minesweeper.jaime-gaming.com`. La publicación, la caché y la comprobación posterior —incluida la alternativa con Worker— están en [DESPLIEGUE.md](DESPLIEGUE.md).
+Es un **Worker estático**: `npx wrangler deploy` publica únicamente el juego (seis ficheros; `.assetsignore` deja el código de desarrollo y `.git` fuera del alcance público), con `not_found_handling = "single-page-application"` para que las rutas profundas del juego devuelvan `index.html` y `_headers` para que el HTML no se cachee nunca. El dominio `minesweeper.jaime-gaming.com` se asocia en *Workers & Pages → minesweeper → Settings → Domains & routes*. La publicación, la autenticación, la caché y la resolución de problemas están en [DESPLIEGUE.md](DESPLIEGUE.md).
 
 ## Creditos de assets
 Musica: LSplash

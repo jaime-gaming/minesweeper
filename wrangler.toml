@@ -1,10 +1,17 @@
-# Despliegue en Cloudflare Workers (dominio propio: minesweeper.jaime-gaming.com).
+# Despliegue en Cloudflare Workers con assets estáticos
+# (dominio propio: minesweeper.jaime-gaming.com).
 #
 #   npx wrangler deploy
 #
-# Sirve el repositorio completo como estáticos en la raíz del dominio. Sin
-# build previo: el worker empaqueta tal cual los ficheros del repo
-# (index.html, styles.css, minesweeper.js…).
+# Es estático: sin paso de build. El juego entero cabe en tres ficheros
+# (index.html, styles.css, minesweeper.js) más /audio. .assetsignore deja
+# fuera del alcance público el código fuente de desarrollo, las pruebas, la
+# documentación y .git; no se sube nada que no sea el juego.
+#
+# Las rutas profundas del juego (/campaña/nivel-07, /ajustes…) las resuelve
+# el propio router de assets: not_found_handling = "single-page-application"
+# devuelve el index.html con 200. _headers fija el HTML sin caché y nosniff;
+# los assets llevan sello ?v=N.
 
 name = "minesweeper"
 compatibility_date = "2026-11-11"
