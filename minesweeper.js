@@ -1,4 +1,4 @@
-/* minesweeper — un solo fichero, sin módulos. generado por tools/build.mjs (2026-11-11 · v10).
+/* minesweeper — un solo fichero, sin módulos. generado por tools/build.mjs (2026-11-12 · v11).
    no lo edites a mano: cambia js/*.js y vuelve a ejecutar node tools/build.mjs */
 (function () {
 'use strict';
@@ -1940,6 +1940,7 @@ const el = {
   avisoFoco: $('#aviso-foco'),
   flagToggle: $('#flag-toggle'),
   barrido: $('#barrido'),
+  ruido: $('#ruido'),
   demoCtx: null,
 };
 
@@ -2121,6 +2122,83 @@ function pasoBarrido(dt) {
 }
 
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
+
+/* -------------------------------------------- la muerte grita por el tubo */
+
+const DURACION_RUIDO = 800; // ms de estática, del tamaño justo del flash
+const ruidoFx = { t: 0, activo: false, lienzoBase: null, img: null };
+
+function efectoTubos() {
+  if (sinMovimiento()) return;
+  const lienzo = el.ruido;
+  if (!lienzo) return;
+  const dpr = Math.min(1.5, window.devicePixelRatio || 1);
+  lienzo.width = Math.round(window.innerWidth * dpr);
+  lienzo.height = Math.round(window.innerHeight * dpr);
+  lienzo.style.width = `${window.innerWidth}px`;
+  lienzo.style.height = `${window.innerHeight}px`;
+  // buffer de nieve en baja resolución: cubos gordos, como la casa y como la tele
+  const ladoX = 180, ladoY = 100;
+  if (!ruidoFx.lienzoBase) {
+    ruidoFx.lienzoBase = document.createElement('canvas');
+  }
+  ruidoFx.lienzoBase.width = ladoX;
+  ruidoFx.lienzoBase.height = ladoY;
+  ruidoFx.img = ruidoFx.lienzoBase.getContext('2d').createImageData(ladoX, ladoY);
+  if (el.stage) {
+    el.stage.classList.remove('tubo');
+    void el.stage.offsetWidth; // reinicia la animación si quedaba a medias
+    el.stage.classList.add('tubo');
+  }
+  if (lienzo.hidden) lienzo.hidden = false;
+  ruidoFx.t = 0;
+  ruidoFx.activo = true;
+}
+
+function pasoRuido(dt) {
+  if (!ruidoFx.activo) return;
+  ruidoFx.t += dt;
+  const progreso = clamp01(ruidoFx.t / DURACION_RUIDO);
+  const lienzo = el.ruido;
+  const ctx = lienzo ? lienzo.getContext('2d') : null;
+  const { img, lienzoBase } = ruidoFx;
+  if (ctx && img && lienzoBase) {
+    const datos = img.data;
+    const intensidad = 1 - progreso * 0.72; // la señal se rinde poco a poco
+    for (let i = 0; i < datos.length; i += 4) {
+      const v = Math.random() < 0.52 ? Math.random() * 255 : 0;
+      datos[i] = v;
+      datos[i + 1] = v;
+      datos[i + 2] = v;
+      datos[i + 3] = 255 * intensidad * (Math.random() < 0.86 ? 1 : 0.25);
+    }
+    lienzoBase.getContext('2d').putImageData(img, 0, 0);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, lienzo.width, lienzo.height);
+    ctx.imageSmoothingEnabled = false;
+    ctx.globalAlpha = 0.92;
+    ctx.drawImage(lienzoBase, 0, 0, lienzo.width, lienzo.height);
+    // dos bandas de rasgado: la imagen salta unos píxeles, la vieja tele lo hacía
+    for (const banda of [0.31, 0.68]) {
+      if (Math.random() < 0.55) {
+        const sy = Math.floor(lienzo.height * banda * Math.random());
+        const alto = Math.max(4, Math.floor(lienzo.height * (0.015 + Math.random() * 0.05)));
+        const desplaz = (Math.random() - 0.5) * lienzo.width * 0.09;
+        ctx.drawImage(lienzo, 0, sy, lienzo.width, alto, desplaz, sy, lienzo.width, alto);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+  if (progreso >= 1) {
+    ruidoFx.activo = false;
+    if (el.ruido) {
+      const c = el.ruido.getContext('2d');
+      if (c) c.clearRect(0, 0, el.ruido.width, el.ruido.height);
+      el.ruido.hidden = true;
+    }
+    if (el.stage) el.stage.classList.remove('tubo');
+  }
+}
 
 /* --------------------------------------------------------------- pistas */
 
@@ -2755,7 +2833,7 @@ function eventosJuego(tipo, datos) {
     case 'boom': {
       contabilizarFin(false);
       if (typeof navigator.vibrate === 'function') navigator.vibrate([50, 40, 90]);
-      audio.musica('death', 200, 1.2); // la pieza de derrota entra con el estallido
+      efectoTubos(); // la vieja tele pierde la señal justo cuando el campo abre fuego
       const destello = document.getElementById('flash');
       if (destello) {
         destello.classList.remove('activo');
@@ -2765,7 +2843,7 @@ function eventosJuego(tipo, datos) {
       // el golpe del estallido llega un instante después, como manda el usuario
       setTimeout(() => {
         if (app.juego === j && j.estado === 'perdido') audio.play('boom');
-      }, 200);
+      }, 350);
       setTimeout(() => {
         if (app.juego === j && j.estado === 'perdido') mostrarFinPerdida();
       }, 900);
@@ -2773,7 +2851,6 @@ function eventosJuego(tipo, datos) {
     }
     case 'win':
       contabilizarFin(true);
-      audio.musica('win', 150, 1.1); // solo la pieza de victoria
       setTimeout(() => {
         if (app.juego === j && j.estado === 'ganado') mostrarFinGanada();
       }, 850);
@@ -2811,6 +2888,7 @@ function accionesFin({ hayMas }) {
 function mostrarFinGanada() {
   const j = app.juego;
   if (!j) return;
+  audio.musica('win', 0, 1.1); // la pieza de victoria suena con su pantalla
   const fija = esDificultadFija(app.modo);
   const enCampaña = app.modo === 'campaign';
   const bestMs = enCampaña ? (guardado.campaign.best[app.nivel] || 0) : (fija ? guardado.best[app.modo] : 0);
@@ -2899,6 +2977,7 @@ function ponerBarraFin({ variante, kicker, titulo, susurro, stats, parcela, acci
 function mostrarFinPerdida() {
   const j = app.juego;
   if (!j) return;
+  audio.musica('death', 0, 1.2); // la pieza de derrota suena con la barra
   const totalSeguras = j.cfg.filas * j.cfg.columnas - j.cfg.minas;
   const despejadas = typeof j.tablero.despejadasPorJugador === 'number' ? j.tablero.despejadasPorJugador : 0;
   const enCampaña = app.modo === 'campaign';
@@ -3372,6 +3451,7 @@ function bucle(t) {
   const dt = Math.min(100, Math.max(0, t - ultimoT));
   ultimoT = t;
   pasoBarrido(dt);
+  pasoRuido(dt);
   const j = app.juego;
   if (j) {
     j.update(dt);

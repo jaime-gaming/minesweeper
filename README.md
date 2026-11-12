@@ -10,7 +10,7 @@ La portada juega sola: una partida automática del siguiente nivel de la Treinta
 
 ## Sonido
 
-Los efectos van sintetizados en tiempo real, salvo el estallido, que usa `audio/Boom.mp3` (recortado a seis décimas de segundo). La victoria y la derrota llevan su propia pieza, `audio/Win.mp3` y `audio/Death.mp3`, que entran y salen con fundidos: suenan sobre el estallido o la oleada de banderas y se apagan solas al empezar otra partida o volver a la portada. El interruptor de sonido (y la tecla `M`) las silencia con lo demás.
+Los efectos van sintetizados en tiempo real, salvo el estallido, que usa `audio/Boom.mp3` (recortado a cuatro décimas de segundo). La victoria y la derrota llevan su propia pieza, `audio/Win.mp3` y `audio/Death.mp3`, que entran y salen con fundidos: suenan sobre el estallido o la oleada de banderas y se apagan solas al empezar otra partida o volver a la portada. El interruptor de sonido (y la tecla `M`) las silencia con lo demás.
 
 ## Controles
 
@@ -80,7 +80,7 @@ node serve.mjs 8123      # sirve el sitio en http://0.0.0.0:8123
 ```
 index.html        esqueleto: barra superior, lienzo, capas de menú y arranque roto
 styles.css        la casa: tinta negra, monoespaciada, un rojo y un verde
-audio/            Win.mp3 · Death.mp3 · Boom.mp3 (el estallido, seis décimas de segundo)
+audio/            Win.mp3 · Death.mp3 · Boom.mp3 (el estallido, cuatro décimas de segundo)
 js/board.js       reglas puras del buscaminas (sembrar, destapar, acorde); sin DOM
 js/presets.js     las tres dificultades fijas y los límites de la personalizada
 js/engine.js      máquina de estados y dibujado en lienzo (bloques, no suavizado)
