@@ -1,4 +1,4 @@
-import { Game } from './engine.js?v=8';
+import { Game } from './engine.js?v=9';
 import {
   DIFICULTADES,
   DIFICULTAD_POR_DEFECTO,
@@ -7,9 +7,9 @@ import {
   esDificultadFija,
   limitesMinas,
 } from './presets.js?v=1';
-import { audio } from './audio.js?v=6';
+import { audio } from './audio.js?v=7';
 import { attachInput, registrarConversorPunto } from './input.js?v=1';
-import { t, getLanguage, setLanguage, unitMinas, routeSlug, routeWords } from './i18n.js?v=11';
+import { t, getLanguage, setLanguage, unitMinas, routeSlug, routeWords } from './i18n.js?v=12';
 import { NIVELES, ACTOS, configNivel, nivelCampana, actoDe } from './campaign.js?v=7';
 
 const $ = (sel) => document.querySelector(sel);
@@ -41,6 +41,7 @@ function nuevoRegistro() {
     stats: { games: 0, wins: 0, streak: 0, bestStreak: 0 },
     sound: true,
     trama: true,
+    dobleClick: false,
     custom: { filas: 9, columnas: 16, minas: 40 },
     campaign: { unlocked: 1, best: {} }, // unlocked: niveles alcanzables; best: ms por nivel
   };
@@ -66,6 +67,7 @@ function leerGuardado() {
   }
   if (typeof bruto.sound === 'boolean') datos.sound = bruto.sound;
   if (typeof bruto.trama === 'boolean') datos.trama = bruto.trama;
+  if (typeof bruto.dobleClick === 'boolean') datos.dobleClick = bruto.dobleClick;
   if (bruto.custom && typeof bruto.custom === 'object') {
     datos.custom = normalizarPersonalizada(bruto.custom);
   }
@@ -135,7 +137,6 @@ const el = {
   avisoFoco: $('#aviso-foco'),
   flagToggle: $('#flag-toggle'),
   barrido: $('#barrido'),
-  ruido: $('#ruido'),
   demoCtx: null,
 };
 
@@ -318,83 +319,6 @@ function pasoBarrido(dt) {
 
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
-/* -------------------------------------------- la muerte grita por el tubo */
-
-const DURACION_RUIDO = 800; // ms de estática, del tamaño justo del flash
-const ruidoFx = { t: 0, activo: false, lienzoBase: null, img: null };
-
-function efectoTubos() {
-  if (sinMovimiento()) return;
-  const lienzo = el.ruido;
-  if (!lienzo) return;
-  const dpr = Math.min(1.5, window.devicePixelRatio || 1);
-  lienzo.width = Math.round(window.innerWidth * dpr);
-  lienzo.height = Math.round(window.innerHeight * dpr);
-  lienzo.style.width = `${window.innerWidth}px`;
-  lienzo.style.height = `${window.innerHeight}px`;
-  // buffer de nieve en baja resolución: cubos gordos, como la casa y como la tele
-  const ladoX = 180, ladoY = 100;
-  if (!ruidoFx.lienzoBase) {
-    ruidoFx.lienzoBase = document.createElement('canvas');
-  }
-  ruidoFx.lienzoBase.width = ladoX;
-  ruidoFx.lienzoBase.height = ladoY;
-  ruidoFx.img = ruidoFx.lienzoBase.getContext('2d').createImageData(ladoX, ladoY);
-  if (el.stage) {
-    el.stage.classList.remove('tubo');
-    void el.stage.offsetWidth; // reinicia la animación si quedaba a medias
-    el.stage.classList.add('tubo');
-  }
-  if (lienzo.hidden) lienzo.hidden = false;
-  ruidoFx.t = 0;
-  ruidoFx.activo = true;
-}
-
-function pasoRuido(dt) {
-  if (!ruidoFx.activo) return;
-  ruidoFx.t += dt;
-  const progreso = clamp01(ruidoFx.t / DURACION_RUIDO);
-  const lienzo = el.ruido;
-  const ctx = lienzo ? lienzo.getContext('2d') : null;
-  const { img, lienzoBase } = ruidoFx;
-  if (ctx && img && lienzoBase) {
-    const datos = img.data;
-    const intensidad = 1 - progreso * 0.72; // la señal se rinde poco a poco
-    for (let i = 0; i < datos.length; i += 4) {
-      const v = Math.random() < 0.52 ? Math.random() * 255 : 0;
-      datos[i] = v;
-      datos[i + 1] = v;
-      datos[i + 2] = v;
-      datos[i + 3] = 255 * intensidad * (Math.random() < 0.86 ? 1 : 0.25);
-    }
-    lienzoBase.getContext('2d').putImageData(img, 0, 0);
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, lienzo.width, lienzo.height);
-    ctx.imageSmoothingEnabled = false;
-    ctx.globalAlpha = 0.92;
-    ctx.drawImage(lienzoBase, 0, 0, lienzo.width, lienzo.height);
-    // dos bandas de rasgado: la imagen salta unos píxeles, la vieja tele lo hacía
-    for (const banda of [0.31, 0.68]) {
-      if (Math.random() < 0.55) {
-        const sy = Math.floor(lienzo.height * banda * Math.random());
-        const alto = Math.max(4, Math.floor(lienzo.height * (0.015 + Math.random() * 0.05)));
-        const desplaz = (Math.random() - 0.5) * lienzo.width * 0.09;
-        ctx.drawImage(lienzo, 0, sy, lienzo.width, alto, desplaz, sy, lienzo.width, alto);
-      }
-    }
-    ctx.globalAlpha = 1;
-  }
-  if (progreso >= 1) {
-    ruidoFx.activo = false;
-    if (el.ruido) {
-      const c = el.ruido.getContext('2d');
-      if (c) c.clearRect(0, 0, el.ruido.width, el.ruido.height);
-      el.ruido.hidden = true;
-    }
-    if (el.stage) el.stage.classList.remove('tubo');
-  }
-}
-
 /* --------------------------------------------------------------- pistas */
 
 const PISTAS = {
@@ -467,6 +391,8 @@ function actualizarMarcador() {
 /* -------------------------------------------------------- ajustar lienzo */
 
 let huecoFin = 0; // alto reservado bajo el tablero en la barra de final de partida
+let casillaArmada = null; // { x, y, t } armada por el doble clic de confirmación
+const RETARDO_DOBLE = 400; // ms para el segundo clic sobre la misma casilla
 
 function ajustarLienzo() {
   const j = app.juego;
@@ -931,6 +857,7 @@ function empezarPartida(modo, nivel = null) {
   }
   audio.pararMusica(0.9); // transición: la fanfarria anterior se apaga sola
   app.juego = new Game(cfg, eventosJuego);
+  casillaArmada = null;
   app.record = false;
   app.contado = false;
   app.flagMode = false;
@@ -1028,17 +955,13 @@ function eventosJuego(tipo, datos) {
     case 'boom': {
       contabilizarFin(false);
       if (typeof navigator.vibrate === 'function') navigator.vibrate([50, 40, 90]);
-      efectoTubos(); // la vieja tele pierde la señal justo cuando el campo abre fuego
+      audio.play('boom'); // la bomba suena con el flash, sin un milisegundo de más
       const destello = document.getElementById('flash');
       if (destello) {
         destello.classList.remove('activo');
         void destello.offsetWidth; // reinicia la animación si quedaba a medias
         destello.classList.add('activo');
       }
-      // el golpe del estallido llega un instante después, como manda el usuario
-      setTimeout(() => {
-        if (app.juego === j && j.estado === 'perdido') audio.play('boom');
-      }, 350);
       setTimeout(() => {
         if (app.juego === j && j.estado === 'perdido') mostrarFinPerdida();
       }, 900);
@@ -1262,6 +1185,7 @@ function borrarTodo() {
   guardado.stats = limpio.stats;
   guardado.sound = limpio.sound;
   guardado.trama = limpio.trama;
+  guardado.dobleClick = limpio.dobleClick;
   guardado.custom = limpio.custom;
   aplicarSonido();
   document.documentElement.classList.toggle('trama', guardado.trama);
@@ -1273,9 +1197,11 @@ function borrarTodo() {
 function mostrarAjustes() {
   const sonido = guardado.sound ? t('soundOn') : t('soundOff');
   const trama = guardado.trama ? t('on') : t('off');
+  const doble = guardado.dobleClick ? t('on') : t('off');
   const filas = [
     filaHTML({ accion: 'toggleSound', idx: 0, nombre: t('settingSound'), detalle: 'M', derecha: sonido }),
     filaHTML({ accion: 'toggleTrama', idx: 1, nombre: t('settingTrama'), detalle: t('settingTramaTag'), derecha: trama }),
+    filaHTML({ accion: 'toggleDobleClick', idx: 2, nombre: t('settingDouble'), detalle: t('settingDoubleTag'), derecha: doble }),
   ].join('');
   ponerOverlay(`<div class="panel">
     ${cabeceraPanel(t('settingsTitle'), botonVolver())}
@@ -1378,6 +1304,14 @@ function ejecutar(nombre) {
       mostrarAjustes();
       audio.play('ui');
       return;
+    case 'toggleDobleClick':
+      guardado.dobleClick = !guardado.dobleClick;
+      casillaArmada = null;
+      if (app.juego) app.juego.casillaArmada = null;
+      guardar();
+      mostrarAjustes();
+      audio.play('ui');
+      return;
     case 'back': volverAtras(); return;
     case 'resetProgress': mostrarConfirmacionBorrado(); return;
     case 'confirmResetWipe': borrarTodo(); return;
@@ -1451,16 +1385,39 @@ function accion(nombre, repetido = false, datos) {
       case 'right': j.moverCursor(1, 0); return;
       case 'confirm':
         if (datos && datos.puntero) {
-          if (app.flagMode) j.alternarBanderaEn(datos.x, datos.y);
-          else j.pulsar(datos.x, datos.y);
+          if (app.flagMode) {
+            casillaArmada = null;
+            j.casillaArmada = null;
+            j.alternarBanderaEn(datos.x, datos.y);
+          } else if (guardado.dobleClick) {
+            // el primer clic arma la casilla (rojo); el segundo sobre la misma destapa
+            const ahora = Date.now();
+            if (casillaArmada && casillaArmada.x === datos.x && casillaArmada.y === datos.y && ahora - casillaArmada.t <= RETARDO_DOBLE) {
+              casillaArmada = null;
+              j.casillaArmada = null;
+              j.pulsar(datos.x, datos.y);
+            } else {
+              casillaArmada = { x: datos.x, y: datos.y, t: ahora };
+              j.casillaArmada = { x: datos.x, y: datos.y };
+            }
+          } else {
+            casillaArmada = null;
+            j.casillaArmada = null;
+            j.pulsar(datos.x, datos.y);
+          }
         } else {
           j.confirmarCursor();
         }
         actualizarMarcador();
         return;
       case 'flag':
-        if (datos && datos.puntero) j.alternarBanderaEn(datos.x, datos.y);
-        else j.alternarBanderaCursor();
+        if (datos && datos.puntero) {
+          casillaArmada = null;
+          j.casillaArmada = null;
+          j.alternarBanderaEn(datos.x, datos.y);
+        } else {
+          j.alternarBanderaCursor();
+        }
         actualizarMarcador();
         return;
       case 'chord':
@@ -1646,9 +1603,12 @@ function bucle(t) {
   const dt = Math.min(100, Math.max(0, t - ultimoT));
   ultimoT = t;
   pasoBarrido(dt);
-  pasoRuido(dt);
   const j = app.juego;
   if (j) {
+    if (casillaArmada && Date.now() - casillaArmada.t > RETARDO_DOBLE) {
+      casillaArmada = null;
+      j.casillaArmada = null;
+    }
     j.update(dt);
     renderJuego();
     actualizarMarcador();

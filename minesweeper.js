@@ -1,4 +1,4 @@
-/* minesweeper — un solo fichero, sin módulos. generado por tools/build.mjs (2026-11-12 · v11).
+/* minesweeper — un solo fichero, sin módulos. generado por tools/build.mjs (2026-11-12 · v12).
    no lo edites a mano: cambia js/*.js y vuelve a ejecutar node tools/build.mjs */
 (function () {
 'use strict';
@@ -550,7 +550,7 @@ const SONIDOS = {
       try {
         const src = c.createBufferSource();
         const gan = c.createGain();
-        gan.gain.value = 0.9;
+        gan.gain.value = 1.8; // la bomba es el suceso del juego: que se oiga desde la calle
         src.buffer = buf;
         src.connect(gan).connect(master);
         src.start(c.currentTime + 0.001);
@@ -845,6 +845,7 @@ class Game {
       y: Math.floor(this.cfg.filas / 2),
     };
     this.cursorVisible = false; // se enciende con el teclado, se apaga con el ratón
+    this.casillaArmada = null; // { x, y } marcada por el doble clic de confirmación
     this.hover = null;
 
     this.flashes = []; // { indice, t0 } — destello al destapar, en oleada
@@ -1090,22 +1091,27 @@ class Game {
 
     // cursor del teclado: cuatro marcas de esquina sobre cualquier casilla,
     // abierta o cerrada, para no perderlo de vista al destapar
+    if (this.casillaArmada && !this.terminada) { // el rojo de la casa: armada, aún sin destapar
+      this._marcas(ctx, px(this.casillaArmada.x), py(this.casillaArmada.y), cell, '#ff2b2b');
+    }
     if (this.cursorVisible && !this.terminada) {
-      const X = px(this.cursor.x);
-      const Y = py(this.cursor.y);
-      const c = Math.max(5, Math.round(cell * 0.34));
-      const i = 2;
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(X + i, Y + i + c); ctx.lineTo(X + i, Y + i); ctx.lineTo(X + i + c, Y + i);
-      ctx.moveTo(X + cell - i - c, Y + i); ctx.lineTo(X + cell - i, Y + i); ctx.lineTo(X + cell - i, Y + i + c);
-      ctx.moveTo(X + i, Y + cell - i - c); ctx.lineTo(X + i, Y + cell - i); ctx.lineTo(X + i + c, Y + cell - i);
-      ctx.moveTo(X + cell - i - c, Y + cell - i); ctx.lineTo(X + cell - i, Y + cell - i); ctx.lineTo(X + cell - i, Y + cell - i - c);
-      ctx.stroke();
+      this._marcas(ctx, px(this.cursor.x), py(this.cursor.y), cell, '#fff');
     }
 
     ctx.restore();
+  }
+
+  _marcas(ctx, X, Y, cell, estilo) {
+    const c = Math.max(5, Math.round(cell * 0.34));
+    const i = 2;
+    ctx.strokeStyle = estilo;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(X + i, Y + i + c); ctx.lineTo(X + i, Y + i); ctx.lineTo(X + i + c, Y + i);
+    ctx.moveTo(X + cell - i - c, Y + i); ctx.lineTo(X + cell - i, Y + i); ctx.lineTo(X + cell - i, Y + i + c);
+    ctx.moveTo(X + i, Y + cell - i - c); ctx.lineTo(X + i, Y + cell - i); ctx.lineTo(X + i + c, Y + cell - i);
+    ctx.moveTo(X + cell - i - c, Y + cell - i); ctx.lineTo(X + cell - i, Y + cell - i); ctx.lineTo(X + cell - i, Y + cell - i - c);
+    ctx.stroke();
   }
 
   _celdaCerrada(ctx, X, Y, lado, gap, hover) {
@@ -1332,6 +1338,8 @@ const STRINGS = {
     settingSound: 'sonido',
     settingTrama: 'trama de fósforo',
     settingTramaTag: 'las líneas horizontales de la pantalla',
+    settingDouble: 'doble clic para confirmar',
+    settingDoubleTag: 'el primer clic arma la casilla; el segundo la destapa',
     on: 'sí',
     off: 'no',
     back: 'volver',
@@ -1504,6 +1512,8 @@ const STRINGS = {
     settingSound: 'sound',
     settingTrama: 'phosphor scanlines',
     settingTramaTag: 'the horizontal lines on screen',
+    settingDouble: 'double-click to confirm',
+    settingDoubleTag: 'first click arms the cell; second one reveals it',
     on: 'on',
     off: 'off',
     back: 'back',
@@ -1846,6 +1856,7 @@ function nuevoRegistro() {
     stats: { games: 0, wins: 0, streak: 0, bestStreak: 0 },
     sound: true,
     trama: true,
+    dobleClick: false,
     custom: { filas: 9, columnas: 16, minas: 40 },
     campaign: { unlocked: 1, best: {} }, // unlocked: niveles alcanzables; best: ms por nivel
   };
@@ -1871,6 +1882,7 @@ function leerGuardado() {
   }
   if (typeof bruto.sound === 'boolean') datos.sound = bruto.sound;
   if (typeof bruto.trama === 'boolean') datos.trama = bruto.trama;
+  if (typeof bruto.dobleClick === 'boolean') datos.dobleClick = bruto.dobleClick;
   if (bruto.custom && typeof bruto.custom === 'object') {
     datos.custom = normalizarPersonalizada(bruto.custom);
   }
@@ -1940,7 +1952,6 @@ const el = {
   avisoFoco: $('#aviso-foco'),
   flagToggle: $('#flag-toggle'),
   barrido: $('#barrido'),
-  ruido: $('#ruido'),
   demoCtx: null,
 };
 
@@ -2123,83 +2134,6 @@ function pasoBarrido(dt) {
 
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
-/* -------------------------------------------- la muerte grita por el tubo */
-
-const DURACION_RUIDO = 800; // ms de estática, del tamaño justo del flash
-const ruidoFx = { t: 0, activo: false, lienzoBase: null, img: null };
-
-function efectoTubos() {
-  if (sinMovimiento()) return;
-  const lienzo = el.ruido;
-  if (!lienzo) return;
-  const dpr = Math.min(1.5, window.devicePixelRatio || 1);
-  lienzo.width = Math.round(window.innerWidth * dpr);
-  lienzo.height = Math.round(window.innerHeight * dpr);
-  lienzo.style.width = `${window.innerWidth}px`;
-  lienzo.style.height = `${window.innerHeight}px`;
-  // buffer de nieve en baja resolución: cubos gordos, como la casa y como la tele
-  const ladoX = 180, ladoY = 100;
-  if (!ruidoFx.lienzoBase) {
-    ruidoFx.lienzoBase = document.createElement('canvas');
-  }
-  ruidoFx.lienzoBase.width = ladoX;
-  ruidoFx.lienzoBase.height = ladoY;
-  ruidoFx.img = ruidoFx.lienzoBase.getContext('2d').createImageData(ladoX, ladoY);
-  if (el.stage) {
-    el.stage.classList.remove('tubo');
-    void el.stage.offsetWidth; // reinicia la animación si quedaba a medias
-    el.stage.classList.add('tubo');
-  }
-  if (lienzo.hidden) lienzo.hidden = false;
-  ruidoFx.t = 0;
-  ruidoFx.activo = true;
-}
-
-function pasoRuido(dt) {
-  if (!ruidoFx.activo) return;
-  ruidoFx.t += dt;
-  const progreso = clamp01(ruidoFx.t / DURACION_RUIDO);
-  const lienzo = el.ruido;
-  const ctx = lienzo ? lienzo.getContext('2d') : null;
-  const { img, lienzoBase } = ruidoFx;
-  if (ctx && img && lienzoBase) {
-    const datos = img.data;
-    const intensidad = 1 - progreso * 0.72; // la señal se rinde poco a poco
-    for (let i = 0; i < datos.length; i += 4) {
-      const v = Math.random() < 0.52 ? Math.random() * 255 : 0;
-      datos[i] = v;
-      datos[i + 1] = v;
-      datos[i + 2] = v;
-      datos[i + 3] = 255 * intensidad * (Math.random() < 0.86 ? 1 : 0.25);
-    }
-    lienzoBase.getContext('2d').putImageData(img, 0, 0);
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, lienzo.width, lienzo.height);
-    ctx.imageSmoothingEnabled = false;
-    ctx.globalAlpha = 0.92;
-    ctx.drawImage(lienzoBase, 0, 0, lienzo.width, lienzo.height);
-    // dos bandas de rasgado: la imagen salta unos píxeles, la vieja tele lo hacía
-    for (const banda of [0.31, 0.68]) {
-      if (Math.random() < 0.55) {
-        const sy = Math.floor(lienzo.height * banda * Math.random());
-        const alto = Math.max(4, Math.floor(lienzo.height * (0.015 + Math.random() * 0.05)));
-        const desplaz = (Math.random() - 0.5) * lienzo.width * 0.09;
-        ctx.drawImage(lienzo, 0, sy, lienzo.width, alto, desplaz, sy, lienzo.width, alto);
-      }
-    }
-    ctx.globalAlpha = 1;
-  }
-  if (progreso >= 1) {
-    ruidoFx.activo = false;
-    if (el.ruido) {
-      const c = el.ruido.getContext('2d');
-      if (c) c.clearRect(0, 0, el.ruido.width, el.ruido.height);
-      el.ruido.hidden = true;
-    }
-    if (el.stage) el.stage.classList.remove('tubo');
-  }
-}
-
 /* --------------------------------------------------------------- pistas */
 
 const PISTAS = {
@@ -2272,6 +2206,8 @@ function actualizarMarcador() {
 /* -------------------------------------------------------- ajustar lienzo */
 
 let huecoFin = 0; // alto reservado bajo el tablero en la barra de final de partida
+let casillaArmada = null; // { x, y, t } armada por el doble clic de confirmación
+const RETARDO_DOBLE = 400; // ms para el segundo clic sobre la misma casilla
 
 function ajustarLienzo() {
   const j = app.juego;
@@ -2736,6 +2672,7 @@ function empezarPartida(modo, nivel = null) {
   }
   audio.pararMusica(0.9); // transición: la fanfarria anterior se apaga sola
   app.juego = new Game(cfg, eventosJuego);
+  casillaArmada = null;
   app.record = false;
   app.contado = false;
   app.flagMode = false;
@@ -2833,17 +2770,13 @@ function eventosJuego(tipo, datos) {
     case 'boom': {
       contabilizarFin(false);
       if (typeof navigator.vibrate === 'function') navigator.vibrate([50, 40, 90]);
-      efectoTubos(); // la vieja tele pierde la señal justo cuando el campo abre fuego
+      audio.play('boom'); // la bomba suena con el flash, sin un milisegundo de más
       const destello = document.getElementById('flash');
       if (destello) {
         destello.classList.remove('activo');
         void destello.offsetWidth; // reinicia la animación si quedaba a medias
         destello.classList.add('activo');
       }
-      // el golpe del estallido llega un instante después, como manda el usuario
-      setTimeout(() => {
-        if (app.juego === j && j.estado === 'perdido') audio.play('boom');
-      }, 350);
       setTimeout(() => {
         if (app.juego === j && j.estado === 'perdido') mostrarFinPerdida();
       }, 900);
@@ -3067,6 +3000,7 @@ function borrarTodo() {
   guardado.stats = limpio.stats;
   guardado.sound = limpio.sound;
   guardado.trama = limpio.trama;
+  guardado.dobleClick = limpio.dobleClick;
   guardado.custom = limpio.custom;
   aplicarSonido();
   document.documentElement.classList.toggle('trama', guardado.trama);
@@ -3078,9 +3012,11 @@ function borrarTodo() {
 function mostrarAjustes() {
   const sonido = guardado.sound ? t('soundOn') : t('soundOff');
   const trama = guardado.trama ? t('on') : t('off');
+  const doble = guardado.dobleClick ? t('on') : t('off');
   const filas = [
     filaHTML({ accion: 'toggleSound', idx: 0, nombre: t('settingSound'), detalle: 'M', derecha: sonido }),
     filaHTML({ accion: 'toggleTrama', idx: 1, nombre: t('settingTrama'), detalle: t('settingTramaTag'), derecha: trama }),
+    filaHTML({ accion: 'toggleDobleClick', idx: 2, nombre: t('settingDouble'), detalle: t('settingDoubleTag'), derecha: doble }),
   ].join('');
   ponerOverlay(`<div class="panel">
     ${cabeceraPanel(t('settingsTitle'), botonVolver())}
@@ -3183,6 +3119,14 @@ function ejecutar(nombre) {
       mostrarAjustes();
       audio.play('ui');
       return;
+    case 'toggleDobleClick':
+      guardado.dobleClick = !guardado.dobleClick;
+      casillaArmada = null;
+      if (app.juego) app.juego.casillaArmada = null;
+      guardar();
+      mostrarAjustes();
+      audio.play('ui');
+      return;
     case 'back': volverAtras(); return;
     case 'resetProgress': mostrarConfirmacionBorrado(); return;
     case 'confirmResetWipe': borrarTodo(); return;
@@ -3256,16 +3200,39 @@ function accion(nombre, repetido = false, datos) {
       case 'right': j.moverCursor(1, 0); return;
       case 'confirm':
         if (datos && datos.puntero) {
-          if (app.flagMode) j.alternarBanderaEn(datos.x, datos.y);
-          else j.pulsar(datos.x, datos.y);
+          if (app.flagMode) {
+            casillaArmada = null;
+            j.casillaArmada = null;
+            j.alternarBanderaEn(datos.x, datos.y);
+          } else if (guardado.dobleClick) {
+            // el primer clic arma la casilla (rojo); el segundo sobre la misma destapa
+            const ahora = Date.now();
+            if (casillaArmada && casillaArmada.x === datos.x && casillaArmada.y === datos.y && ahora - casillaArmada.t <= RETARDO_DOBLE) {
+              casillaArmada = null;
+              j.casillaArmada = null;
+              j.pulsar(datos.x, datos.y);
+            } else {
+              casillaArmada = { x: datos.x, y: datos.y, t: ahora };
+              j.casillaArmada = { x: datos.x, y: datos.y };
+            }
+          } else {
+            casillaArmada = null;
+            j.casillaArmada = null;
+            j.pulsar(datos.x, datos.y);
+          }
         } else {
           j.confirmarCursor();
         }
         actualizarMarcador();
         return;
       case 'flag':
-        if (datos && datos.puntero) j.alternarBanderaEn(datos.x, datos.y);
-        else j.alternarBanderaCursor();
+        if (datos && datos.puntero) {
+          casillaArmada = null;
+          j.casillaArmada = null;
+          j.alternarBanderaEn(datos.x, datos.y);
+        } else {
+          j.alternarBanderaCursor();
+        }
         actualizarMarcador();
         return;
       case 'chord':
@@ -3451,9 +3418,12 @@ function bucle(t) {
   const dt = Math.min(100, Math.max(0, t - ultimoT));
   ultimoT = t;
   pasoBarrido(dt);
-  pasoRuido(dt);
   const j = app.juego;
   if (j) {
+    if (casillaArmada && Date.now() - casillaArmada.t > RETARDO_DOBLE) {
+      casillaArmada = null;
+      j.casillaArmada = null;
+    }
     j.update(dt);
     renderJuego();
     actualizarMarcador();

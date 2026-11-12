@@ -1,7 +1,7 @@
 // motor del buscaminas: máquina de estados + dibujado en lienzo.
 // la lógica del tablero vive en board.js; aquí se anima y se pinta.
 
-import { Tablero } from './board.js?v=7';
+import { Tablero } from './board.js?v=8';
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const ACENTO = '#ff2b2b';
@@ -30,6 +30,7 @@ export class Game {
       y: Math.floor(this.cfg.filas / 2),
     };
     this.cursorVisible = false; // se enciende con el teclado, se apaga con el ratón
+    this.casillaArmada = null; // { x, y } marcada por el doble clic de confirmación
     this.hover = null;
 
     this.flashes = []; // { indice, t0 } — destello al destapar, en oleada
@@ -275,22 +276,27 @@ export class Game {
 
     // cursor del teclado: cuatro marcas de esquina sobre cualquier casilla,
     // abierta o cerrada, para no perderlo de vista al destapar
+    if (this.casillaArmada && !this.terminada) { // el rojo de la casa: armada, aún sin destapar
+      this._marcas(ctx, px(this.casillaArmada.x), py(this.casillaArmada.y), cell, '#ff2b2b');
+    }
     if (this.cursorVisible && !this.terminada) {
-      const X = px(this.cursor.x);
-      const Y = py(this.cursor.y);
-      const c = Math.max(5, Math.round(cell * 0.34));
-      const i = 2;
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(X + i, Y + i + c); ctx.lineTo(X + i, Y + i); ctx.lineTo(X + i + c, Y + i);
-      ctx.moveTo(X + cell - i - c, Y + i); ctx.lineTo(X + cell - i, Y + i); ctx.lineTo(X + cell - i, Y + i + c);
-      ctx.moveTo(X + i, Y + cell - i - c); ctx.lineTo(X + i, Y + cell - i); ctx.lineTo(X + i + c, Y + cell - i);
-      ctx.moveTo(X + cell - i - c, Y + cell - i); ctx.lineTo(X + cell - i, Y + cell - i); ctx.lineTo(X + cell - i, Y + cell - i - c);
-      ctx.stroke();
+      this._marcas(ctx, px(this.cursor.x), py(this.cursor.y), cell, '#fff');
     }
 
     ctx.restore();
+  }
+
+  _marcas(ctx, X, Y, cell, estilo) {
+    const c = Math.max(5, Math.round(cell * 0.34));
+    const i = 2;
+    ctx.strokeStyle = estilo;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(X + i, Y + i + c); ctx.lineTo(X + i, Y + i); ctx.lineTo(X + i + c, Y + i);
+    ctx.moveTo(X + cell - i - c, Y + i); ctx.lineTo(X + cell - i, Y + i); ctx.lineTo(X + cell - i, Y + i + c);
+    ctx.moveTo(X + i, Y + cell - i - c); ctx.lineTo(X + i, Y + cell - i); ctx.lineTo(X + i + c, Y + cell - i);
+    ctx.moveTo(X + cell - i - c, Y + cell - i); ctx.lineTo(X + cell - i, Y + cell - i); ctx.lineTo(X + cell - i, Y + cell - i - c);
+    ctx.stroke();
   }
 
   _celdaCerrada(ctx, X, Y, lado, gap, hover) {

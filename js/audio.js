@@ -214,7 +214,7 @@ const SONIDOS = {
       try {
         const src = c.createBufferSource();
         const gan = c.createGain();
-        gan.gain.value = 0.9;
+        gan.gain.value = 1.8; // la bomba es el suceso del juego: que se oiga desde la calle
         src.buffer = buf;
         src.connect(gan).connect(master);
         src.start(c.currentTime + 0.001);
