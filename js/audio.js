@@ -1,13 +1,10 @@
-// Sonido sintetizado en tiempo real para los efectos; la victoria y la
-// derrota llevan su propia pieza (audio/Win.mp3 / audio/Death.mp3), y el
-// estallido usa audio/Boom.mp3 (recortado a seis décimas de segundo).
 
 let ctx = null;
 let master = null;
 let musicGain = null;
 let noiseBuf = null;
 let roto = false;
-let nivelMusica = 1; // 0..1; las piezas del final van del archivo, más bajas
+let nivelMusica = 1;
 
 function build() {
   if (ctx) return ctx;
@@ -23,7 +20,7 @@ function build() {
     master = ctx.createGain();
     master.gain.value = audio.enabled ? 0.15 : 0;
     musicGain = ctx.createGain();
-    musicGain.gain.value = 1.5 * nivelMusica; // las piezas llegan bajas del archivo: aquí se equilibran
+    musicGain.gain.value = 1.5 * nivelMusica;
 
     musicGain.connect(master);
     if (typeof ctx.createDynamicsCompressor === 'function') {
@@ -38,14 +35,14 @@ function build() {
       master.connect(ctx.destination);
     }
 
-    const len = Math.floor(ctx.sampleRate * 2); // 2 s: la explosión respira
+    const len = Math.floor(ctx.sampleRate * 2);
     noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate);
     const data = noiseBuf.getChannelData(0);
     for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
     precargarEfectos();
     return ctx;
   } catch (err) {
-    // Sin audio se puede jugar con normalidad.
+
     roto = true;
     ctx = null;
     master = null;
@@ -103,16 +100,16 @@ function ruido(dur, opts = {}) {
 }
 
 function boomSintetico() {
-    // capa 1 — el estruendo: ruido ancho que cae en barrido largo
+
     ruido(1.7, { desde: 1050, hasta: 52, vol: 0.5, ataque: 0.002 });
-    // capa 2 — el cuerpo: un sub que muere muy abajo, como la onda de presión
+
     tono(57, 1.25, { tipo: 'sine', vol: 0.42, fin: 29, release: 0.6 });
-    // capa 3 — el crack metálico: el chasquido que rompe el aire
+
     tono(150, 0.2, { tipo: 'sawtooth', vol: 0.28, fin: 58 });
     tono(320, 0.09, { tipo: 'square', vol: 0.12, fin: 180, delay: 0.012 });
-    // capa 4 — los escombros: metralla breve justo por encima, con retardo
+
     ruido(0.42, { desde: 3400, hasta: 640, vol: 0.17, delay: 0.085, ataque: 0.004 });
-    // capa 5 — el eco en el valle: casi nada, pero sigue vivo un segundo
+
     ruido(1.15, { desde: 320, hasta: 58, vol: 0.2, delay: 0.27 });
     tono(41, 0.9, { tipo: 'triangle', vol: 0.15, fin: 26, delay: 0.22, release: 0.5 });
 }
@@ -122,13 +119,12 @@ const MUSICA = {
   death: 'audio/Death.mp3',
 };
 
-// el estallido real del jugador; si no carga, la explosión sintética lo sustituye
 const EFECTOS = {
   boom: 'audio/Boom.mp3',
 };
 
-const buffersFx = new Map(); // nombre -> Promise<AudioBuffer>
-const fxListos = new Map();  // nombre -> AudioBuffer ya decodificado
+const buffersFx = new Map();
+const fxListos = new Map();
 
 function precargarEfectos() {
   if (!ctx) return;
@@ -150,7 +146,7 @@ function precargarEfectos() {
 }
 
 const buffersMusica = new Map();
-let actual = null; // { src, gan, nombre }
+let actual = null;
 let generacion = 0;
 
 function cargarMusica(nombre) {
@@ -168,7 +164,7 @@ function cargarMusica(nombre) {
 }
 
 function detenerMusicaActual(fade = 0.35) {
-  generacion += 1; // invalida cualquier carga en vuelo
+  generacion += 1;
   const c = ctx;
   const corriente = actual;
   actual = null;
@@ -181,7 +177,7 @@ function detenerMusicaActual(fade = 0.35) {
     gan.gain.setTargetAtTime(0.0001, t, fade / 4);
     src.stop(t + fade + 0.25);
   } catch (err) {
-    try { src.stop(); } catch (err2) { /* silencio */ }
+    try { src.stop(); } catch (err2) {  }
   }
 }
 
@@ -190,7 +186,7 @@ const SONIDOS = {
     tono(260, 0.085, { tipo: 'triangle', vol: 0.16, fin: 430 });
     tono(620, 0.08, { tipo: 'sine', vol: 0.08, delay: 0.045, fin: 760 });
   },
-  // el tic de destapar: sube un poco el tono cuantas más casillas caen de golpe
+
   reveal({ size = 1 } = {}) {
     const n = Math.min(8, Math.max(1, size | 0));
     const base = 340 + n * 28;
@@ -215,13 +211,13 @@ const SONIDOS = {
       try {
         const src = c.createBufferSource();
         const gan = c.createGain();
-        gan.gain.value = 1.8; // la bomba es el suceso del juego: que se oiga desde la calle
+        gan.gain.value = 1.8;
         src.buffer = buf;
         src.connect(gan).connect(master);
         src.start(c.currentTime + 0.001);
         return;
       } catch (err) {
-        /* si el estallido del archivo falla, suena la síntesis */
+        
       }
     }
     boomSintetico();
@@ -242,7 +238,7 @@ export const audio = {
       const c = build();
       if (c && c.state === 'suspended') c.resume().catch(() => {});
     } catch (err) {
-      /* El juego continúa en silencio. */
+      
     }
   },
 
@@ -263,7 +259,6 @@ export const audio = {
     return this.enabled;
   },
 
-  // volumen de las piezas (0–100). los efectos no lo tocan: la bomba manda
   setVolumen(porcentaje) {
     const v = Math.max(0, Math.min(100, Math.round(Number(porcentaje) || 0)));
     nivelMusica = v / 100;
@@ -276,7 +271,6 @@ export const audio = {
     }
   },
 
-  // fanfarria de victoria o derrota: entra con fade, sale al siguiente paso
   musica(nombre, retardoMs = 0, fundido = 1.2) {
     if (!this.enabled || !MUSICA[nombre]) return;
     const c = build();
@@ -284,7 +278,7 @@ export const audio = {
     detenerMusicaActual(0.85);
     const gen = generacion;
     cargarMusica(nombre).then((buf) => {
-      if (gen !== generacion || !this.enabled) return; // se pidió otra cosa entretanto
+      if (gen !== generacion || !this.enabled) return;
       const gan = c.createGain();
       gan.gain.setValueAtTime(0.0001, c.currentTime);
       gan.gain.exponentialRampToValueAtTime(1, c.currentTime + Math.max(0.05, fundido));
@@ -297,11 +291,10 @@ export const audio = {
       src.start(c.currentTime + Math.max(0, retardoMs) / 1000);
       actual = { src, gan, nombre };
     }).catch(() => {
-      /* sin música no se rompe nada */
+      
     });
   },
 
-  // transición fuera de la fanfarria: al empezar una partida o volver al menú
   pararMusica(fade = 0.9) {
     detenerMusicaActual(fade);
   },
@@ -313,7 +306,7 @@ export const audio = {
       const fn = SONIDOS[nombre];
       if (fn) fn(datos || {});
     } catch (err) {
-      /* Un sonido que falla no puede detener la partida. */
+      
     }
   },
 };

@@ -1,5 +1,3 @@
-// Servidor estático de desarrollo: sin caché y con fallback de rutas del juego.
-// Sirve el sitio en la raíz (dominio propio / preview) y también bajo /minesweeper/.
 
 import http from 'node:http';
 import fs from 'node:fs';
@@ -70,8 +68,7 @@ const servidor = http.createServer((peticion, respuesta) => {
     }
 
     const aceptaHtml = (peticion.headers.accept || '').includes('text/html');
-    // fallback SPA también en la raíz del dominio: cualquier ruta sin
-    // extensión que pida html cae en index.html
+
     const pareceArchivo = /\.[a-z0-9]+$/i.test(rutaOriginal);
     if (aceptaHtml && !pareceArchivo) {
       const index = path.join(RAIZ, 'index.html');

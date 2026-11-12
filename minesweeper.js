@@ -1,17 +1,12 @@
-/* minesweeper — un solo fichero, sin módulos. generado por tools/build.mjs (2026-11-12 · v15).
-   no lo edites a mano: cambia js/*.js y vuelve a ejecutar node tools/build.mjs */
 (function () {
 'use strict';
 const modulos = { board: {}, presets: {}, audio: {}, input: {}, engine: {}, i18n: {}, campaign: {}, main: {} };
 
-// ---- board ----
 (function (modulo) {
 'use strict';
-// lógica pura del buscaminas: sin DOM, sin canvas y sin temporizador.
-// el motor la usa para jugar; tools/check.mjs la prueba en node.
 
 class Tablero {
-  // cfg: { filas, columnas, minas }. rng inyectable para las pruebas.
+
   constructor(cfg, rng = Math.random) {
     const filas = Math.floor(Number(cfg && cfg.filas));
     const columnas = Math.floor(Number(cfg && cfg.columnas));
@@ -36,7 +31,7 @@ class Tablero {
     }));
 
     this.sembradas = false;
-    this.estado = 'jugando'; // 'jugando' | 'ganado' | 'perdido'
+    this.estado = 'jugando';
     this.reveladas = 0;
     this.explosionIndice = -1;
   }
@@ -64,8 +59,6 @@ class Tablero {
     return out;
   }
 
-  // coloca las minas después del primer clic, lejos de la casilla elegida
-  // (y de sus vecinas): el primer clic nunca explota y suele abrir hueco.
   sembrar(indiceSeguro) {
     if (this.sembradas) return;
     const zonaSegura = new Set([indiceSeguro, ...this.vecinos(indiceSeguro)]);
@@ -75,14 +68,13 @@ class Tablero {
       if (!zonaSegura.has(i)) candidatas.push(i);
     }
     if (candidatas.length < this.minas) {
-      // tableros diminutos: al menos la casilla del clic queda a salvo
+
       candidatas = [];
       for (let i = 0; i < this.total; i += 1) {
         if (i !== indiceSeguro) candidatas.push(i);
       }
     }
 
-    // mezcla de Fisher–Yates con el rng inyectable
     for (let i = candidatas.length - 1; i > 0; i -= 1) {
       const j = Math.floor(this.rng() * (i + 1));
       const tmp = candidatas[i];
@@ -104,8 +96,6 @@ class Tablero {
     this.sembradas = true;
   }
 
-  // revelado en cadena desde indice. cosecha: lista de { indice, distancia }.
-  // la distancia sirve para animar la apertura en oleada.
   _revelarZona(indice, cosecha, distanciaBase = 0) {
     const inicio = this.celdas[indice];
     if (inicio.revelada || inicio.bandera) return;
@@ -136,7 +126,7 @@ class Tablero {
     if (this.estado !== 'jugando') return false;
     if (this.reveladas === this.total - this.minas) {
       this.estado = 'ganado';
-      // al ganar se izan las banderas que falten sobre las minas restantes
+
       for (const celda of this.celdas) {
         if (celda.mina) celda.bandera = true;
       }
@@ -145,7 +135,6 @@ class Tablero {
     return false;
   }
 
-  // revela una casilla cubierta. devuelve { reveladas, explosion }.
   revelar(indice) {
     const vacio = { reveladas: [], explosion: -1 };
     if (this.estado !== 'jugando') return vacio;
@@ -172,16 +161,12 @@ class Tablero {
     return { reveladas: cosecha, explosion: -1 };
   }
 
-  // pulsación sobre una casilla: revela si está cubierta y hace el acorde
-  // (chord) si ya está abierta. Es el comportamiento de los buscaminas modernos.
   pulsar(indice) {
     const celda = Number.isInteger(indice) && this.celdas[indice];
     if (celda && celda.revelada) return this.acorde(indice);
     return this.revelar(indice);
   }
 
-  // acorde: con tantas banderas alrededor como indica el número, abre el resto.
-  // si alguna bandera estaba mal puesta, la mina que quede a la vista explota.
   acorde(indice) {
     const vacio = { reveladas: [], explosion: -1 };
     if (this.estado !== 'jugando') return vacio;
@@ -218,9 +203,6 @@ class Tablero {
     return { reveladas: cosecha, explosion: -1, victoria: gano };
   }
 
-  // al perder, destapa el tablero entero: la partida ha terminado y el
-  // campo queda a la vista, como un mapa que ya no sirve a nadie.
-  // de paso anota cuántas casillas seguras destapó el jugador.
   revelarTodo() {
     this.despejadasPorJugador = this.celdas.filter((c) => c.revelada && !c.mina).length;
     for (const celda of this.celdas) {
@@ -228,7 +210,6 @@ class Tablero {
     }
   }
 
-  // pone o quita la bandera. devuelve 'bandera' | 'sin-bandera' | null.
   alternarBandera(indice) {
     if (this.estado !== 'jugando') return null;
     if (!Number.isInteger(indice) || indice < 0 || indice >= this.total) return null;
@@ -250,7 +231,6 @@ class Tablero {
     return this.minas - this.contarBanderas();
   }
 
-  // minas que quedan por descubrir/marcar al perder: para el motor
   minasOcultas() {
     const out = [];
     for (let i = 0; i < this.total; i += 1) {
@@ -259,7 +239,6 @@ class Tablero {
     return out;
   }
 
-  // banderas mal puestas (sobre una casilla sin mina) para el resumen final
   banderasErroneas() {
     const out = [];
     for (let i = 0; i < this.total; i += 1) {
@@ -272,10 +251,8 @@ class Tablero {
   Object.assign(modulo, { Tablero });
 })(modulos['board']);
 
-// ---- presets ----
 (function (modulo) {
 'use strict';
-// dificultades del buscaminas y límites del tablero personalizado
 
 const DIFICULTADES = [
   { id: 'beginner', filas: 9, columnas: 9, minas: 10 },
@@ -285,15 +262,13 @@ const DIFICULTADES = [
 
 const DIFICULTAD_POR_DEFECTO = 'beginner';
 
-// límites del tablero personalizado (los clásicos de Windows: 8–24 x 8–30,
-// densidades razonables). aquí se relaja un poco por ambos lados.
 const LIMITES_PERSONALIZADA = {
   filasMin: 5,
   filasMax: 24,
   columnasMin: 5,
   columnasMax: 30,
   minasMin: 1,
-  // nunca más del 85 % de las casillas: siempre queda algo que descubrir
+
   densidadMax: 0.85,
 };
 
@@ -331,19 +306,15 @@ function esDificultadFija(id) {
   Object.assign(modulo, { DIFICULTADES, DIFICULTAD_POR_DEFECTO, LIMITES_PERSONALIZADA, limitesMinas, normalizarPersonalizada, dificultadPorId, esDificultadFija });
 })(modulos['presets']);
 
-// ---- audio ----
 (function (modulo) {
 'use strict';
-// Sonido sintetizado en tiempo real para los efectos; la victoria y la
-// derrota llevan su propia pieza (audio/Win.mp3 / audio/Death.mp3), y el
-// estallido usa audio/Boom.mp3 (recortado a seis décimas de segundo).
 
 let ctx = null;
 let master = null;
 let musicGain = null;
 let noiseBuf = null;
 let roto = false;
-let nivelMusica = 1; // 0..1; las piezas del final van del archivo, más bajas
+let nivelMusica = 1;
 
 function build() {
   if (ctx) return ctx;
@@ -359,7 +330,7 @@ function build() {
     master = ctx.createGain();
     master.gain.value = audio.enabled ? 0.15 : 0;
     musicGain = ctx.createGain();
-    musicGain.gain.value = 1.5 * nivelMusica; // las piezas llegan bajas del archivo: aquí se equilibran
+    musicGain.gain.value = 1.5 * nivelMusica;
 
     musicGain.connect(master);
     if (typeof ctx.createDynamicsCompressor === 'function') {
@@ -374,14 +345,14 @@ function build() {
       master.connect(ctx.destination);
     }
 
-    const len = Math.floor(ctx.sampleRate * 2); // 2 s: la explosión respira
+    const len = Math.floor(ctx.sampleRate * 2);
     noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate);
     const data = noiseBuf.getChannelData(0);
     for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
     precargarEfectos();
     return ctx;
   } catch (err) {
-    // Sin audio se puede jugar con normalidad.
+
     roto = true;
     ctx = null;
     master = null;
@@ -439,16 +410,16 @@ function ruido(dur, opts = {}) {
 }
 
 function boomSintetico() {
-    // capa 1 — el estruendo: ruido ancho que cae en barrido largo
+
     ruido(1.7, { desde: 1050, hasta: 52, vol: 0.5, ataque: 0.002 });
-    // capa 2 — el cuerpo: un sub que muere muy abajo, como la onda de presión
+
     tono(57, 1.25, { tipo: 'sine', vol: 0.42, fin: 29, release: 0.6 });
-    // capa 3 — el crack metálico: el chasquido que rompe el aire
+
     tono(150, 0.2, { tipo: 'sawtooth', vol: 0.28, fin: 58 });
     tono(320, 0.09, { tipo: 'square', vol: 0.12, fin: 180, delay: 0.012 });
-    // capa 4 — los escombros: metralla breve justo por encima, con retardo
+
     ruido(0.42, { desde: 3400, hasta: 640, vol: 0.17, delay: 0.085, ataque: 0.004 });
-    // capa 5 — el eco en el valle: casi nada, pero sigue vivo un segundo
+
     ruido(1.15, { desde: 320, hasta: 58, vol: 0.2, delay: 0.27 });
     tono(41, 0.9, { tipo: 'triangle', vol: 0.15, fin: 26, delay: 0.22, release: 0.5 });
 }
@@ -458,13 +429,12 @@ const MUSICA = {
   death: 'audio/Death.mp3',
 };
 
-// el estallido real del jugador; si no carga, la explosión sintética lo sustituye
 const EFECTOS = {
   boom: 'audio/Boom.mp3',
 };
 
-const buffersFx = new Map(); // nombre -> Promise<AudioBuffer>
-const fxListos = new Map();  // nombre -> AudioBuffer ya decodificado
+const buffersFx = new Map();
+const fxListos = new Map();
 
 function precargarEfectos() {
   if (!ctx) return;
@@ -486,7 +456,7 @@ function precargarEfectos() {
 }
 
 const buffersMusica = new Map();
-let actual = null; // { src, gan, nombre }
+let actual = null;
 let generacion = 0;
 
 function cargarMusica(nombre) {
@@ -504,7 +474,7 @@ function cargarMusica(nombre) {
 }
 
 function detenerMusicaActual(fade = 0.35) {
-  generacion += 1; // invalida cualquier carga en vuelo
+  generacion += 1;
   const c = ctx;
   const corriente = actual;
   actual = null;
@@ -517,7 +487,7 @@ function detenerMusicaActual(fade = 0.35) {
     gan.gain.setTargetAtTime(0.0001, t, fade / 4);
     src.stop(t + fade + 0.25);
   } catch (err) {
-    try { src.stop(); } catch (err2) { /* silencio */ }
+    try { src.stop(); } catch (err2) {  }
   }
 }
 
@@ -526,7 +496,7 @@ const SONIDOS = {
     tono(260, 0.085, { tipo: 'triangle', vol: 0.16, fin: 430 });
     tono(620, 0.08, { tipo: 'sine', vol: 0.08, delay: 0.045, fin: 760 });
   },
-  // el tic de destapar: sube un poco el tono cuantas más casillas caen de golpe
+
   reveal({ size = 1 } = {}) {
     const n = Math.min(8, Math.max(1, size | 0));
     const base = 340 + n * 28;
@@ -551,13 +521,13 @@ const SONIDOS = {
       try {
         const src = c.createBufferSource();
         const gan = c.createGain();
-        gan.gain.value = 1.8; // la bomba es el suceso del juego: que se oiga desde la calle
+        gan.gain.value = 1.8;
         src.buffer = buf;
         src.connect(gan).connect(master);
         src.start(c.currentTime + 0.001);
         return;
       } catch (err) {
-        /* si el estallido del archivo falla, suena la síntesis */
+        
       }
     }
     boomSintetico();
@@ -578,7 +548,7 @@ const audio = {
       const c = build();
       if (c && c.state === 'suspended') c.resume().catch(() => {});
     } catch (err) {
-      /* El juego continúa en silencio. */
+      
     }
   },
 
@@ -599,7 +569,6 @@ const audio = {
     return this.enabled;
   },
 
-  // volumen de las piezas (0–100). los efectos no lo tocan: la bomba manda
   setVolumen(porcentaje) {
     const v = Math.max(0, Math.min(100, Math.round(Number(porcentaje) || 0)));
     nivelMusica = v / 100;
@@ -612,7 +581,6 @@ const audio = {
     }
   },
 
-  // fanfarria de victoria o derrota: entra con fade, sale al siguiente paso
   musica(nombre, retardoMs = 0, fundido = 1.2) {
     if (!this.enabled || !MUSICA[nombre]) return;
     const c = build();
@@ -620,7 +588,7 @@ const audio = {
     detenerMusicaActual(0.85);
     const gen = generacion;
     cargarMusica(nombre).then((buf) => {
-      if (gen !== generacion || !this.enabled) return; // se pidió otra cosa entretanto
+      if (gen !== generacion || !this.enabled) return;
       const gan = c.createGain();
       gan.gain.setValueAtTime(0.0001, c.currentTime);
       gan.gain.exponentialRampToValueAtTime(1, c.currentTime + Math.max(0.05, fundido));
@@ -633,11 +601,10 @@ const audio = {
       src.start(c.currentTime + Math.max(0, retardoMs) / 1000);
       actual = { src, gan, nombre };
     }).catch(() => {
-      /* sin música no se rompe nada */
+      
     });
   },
 
-  // transición fuera de la fanfarria: al empezar una partida o volver al menú
   pararMusica(fade = 0.9) {
     detenerMusicaActual(fade);
   },
@@ -649,7 +616,7 @@ const audio = {
       const fn = SONIDOS[nombre];
       if (fn) fn(datos || {});
     } catch (err) {
-      /* Un sonido que falla no puede detener la partida. */
+      
     }
   },
 };
@@ -657,10 +624,8 @@ const audio = {
   Object.assign(modulo, { audio });
 })(modulos['audio']);
 
-// ---- input ----
 (function (modulo) {
 'use strict';
-// teclado, gestos y mando. habla en acciones, no en teclas
 
 const TECLAS = {
   ArrowUp: 'up',
@@ -690,8 +655,6 @@ const BOTONES = { 12: 'up', 13: 'down', 14: 'left', 15: 'right', 0: 'confirm', 1
 
 const RETARDO_PULSACION_LARGA = 450;
 
-// main.js registra el conversor real: píxeles CSS → casilla { x, y } del tablero.
-// sin él no hay gestos sobre el tablero, solo teclado y menús.
 let conversorPunto = null;
 function registrarConversorPunto(fn) {
   conversorPunto = typeof fn === 'function' ? fn : null;
@@ -702,7 +665,6 @@ function puntoACasilla(clientX, clientY) {
 }
 
 const toque = { id: -1, x: 0, y: 0, activo: false, marcado: false, temporizador: 0 };
-
 
 function attachInput({ stage, actions }) {
   const fire = (accion, repetido = false, datos) => actions(accion, repetido, datos);
@@ -715,13 +677,12 @@ function attachInput({ stage, actions }) {
     if (!accion) return;
     if (e.code === 'Space' || e.code === 'Enter' || e.code.startsWith('Arrow')
       || e.code === 'PageUp' || e.code === 'PageDown' || e.code === 'Home' || e.code === 'End') e.preventDefault();
-    // las direcciones y el scroll sí se repiten al mantener pulsado
+
     const repetible = ['up', 'down', 'left', 'right', 'scrollUp', 'scrollDown', 'scrollTop', 'scrollBottom'].includes(accion);
     if (e.repeat && !repetible) return;
     fire(accion, e.repeat);
   });
 
-  // clic derecho: bandera. clic central: acorde (abre vecinos de un número servido)
   stage.addEventListener('contextmenu', (e) => {
     e.preventDefault();
     const celda = puntoACasilla(e.clientX, e.clientY);
@@ -730,7 +691,7 @@ function attachInput({ stage, actions }) {
 
   stage.addEventListener('pointerdown', (e) => {
     if (e.target.closest('button, #overlay')) return;
-    // al tocar el tablero, el foco vuelve a la página: las teclas llegan siempre
+
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     if (typeof window.focus === 'function') window.focus();
 
@@ -745,7 +706,6 @@ function attachInput({ stage, actions }) {
       return;
     }
 
-    // táctil: tocar revela, mantener pulsado pone la bandera
     toque.id = e.pointerId;
     toque.x = e.clientX;
     toque.y = e.clientY;
@@ -779,7 +739,6 @@ function attachInput({ stage, actions }) {
     clearTimeout(toque.temporizador);
   });
 
-  // mando: estado por frame, sin eventos
   let previo = {};
   let conectado = false;
 
@@ -823,21 +782,15 @@ function attachInput({ stage, actions }) {
   Object.assign(modulo, { registrarConversorPunto, attachInput });
 })(modulos['input']);
 
-// ---- engine ----
 (function (modulo) {
 'use strict';
-// motor del buscaminas: máquina de estados + dibujado en lienzo.
-// la lógica del tablero vive en board.js; aquí se anima y se pinta.
 
 const { Tablero } = modulos['board'];
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const ACENTO = '#ff2b2b';
-// la monoespaciada de la casa (var(--mono) en styles.css)
 const FUENTE_MONO = 'ui-monospace, "SFMono-Regular", "SF Mono", "Roboto Mono", Menlo, Consolas, monospace';
 
-// números: el color clásico del buscaminas sobre la tinta, planos, en la
-// monoespaciada de la casa — sin halos
 const COLORES_NUMERO = ['', '#4aa3ff', '#35d07f', '#ff4d4d', '#8f7bff', '#ff7a1f', '#22c8c8', '#ffd60a', '#f2f2f2'];
 const COLOR_NUMERO = (n) => COLORES_NUMERO[clamp(n, 1, 8)] || ACENTO;
 
@@ -847,22 +800,21 @@ class Game {
     this.tablero = new Tablero(this.cfg);
     this.onEvent = typeof onEvent === 'function' ? onEvent : () => {};
 
-    // 'antes' = aún no hay primer clic · 'jugando' · 'ganado' · 'perdido'
     this.estado = 'antes';
     this.pausado = false;
     this.tiempoMs = 0;
-    this.reloj = 0; // ms acumulados en esta partida, para las animaciones
+    this.reloj = 0;
 
     this.cursor = {
       x: Math.floor(this.cfg.columnas / 2),
       y: Math.floor(this.cfg.filas / 2),
     };
-    this.cursorVisible = false; // se enciende con el teclado, se apaga con el ratón
-    this.casillaArmada = null; // { x, y } marcada por el doble clic de confirmación
+    this.cursorVisible = false;
+    this.casillaArmada = null;
     this.hover = null;
 
-    this.flashes = []; // { indice, t0 } — destello al destapar, en oleada
-    this.shake = 0; // sacudida del lienzo al estallar
+    this.flashes = [];
+    this.shake = 0;
     this.explosionT = -1;
     this.winT = -1;
   }
@@ -876,7 +828,7 @@ class Game {
   get terminada() { return this.estado === 'ganado' || this.estado === 'perdido'; }
   get minasRestantes() { return this.tablero.restantesMinas(); }
   get tableroRevelado() {
-    // al perder se muestran las minas; al ganar ya está todo abierto salvo las minas
+
     return this.estado === 'perdido' || this.estado === 'ganado';
   }
 
@@ -887,8 +839,6 @@ class Game {
   dentro(x, y) {
     return this.tablero.dentro(x, y);
   }
-
-  // ------------------------------------------------------------------ acciones
 
   moverCursor(dx, dy) {
     this.cursorVisible = true;
@@ -912,7 +862,7 @@ class Game {
       this.estado = 'perdido';
       this.explosionT = ahora;
       this.shake = 16;
-      this.tablero.revelarTodo(); // el campo queda al descubierto
+      this.tablero.revelarTodo();
       this.emit('boom', { indice: resultado.explosion });
       return;
     }
@@ -925,8 +875,6 @@ class Game {
     if (this.estado === 'antes' && this.tablero.sembradas) this.estado = 'jugando';
   }
 
-  // destapa la casilla (x, y): si está cerrada la revela; si ya estaba abierta,
-  // hace el acorde. Es el comportamiento de los buscaminas modernos.
   pulsar(x, y) {
     if (this.pausado || this.terminada) return;
     if (!this.dentro(x, y)) return;
@@ -977,8 +925,6 @@ class Game {
     }
   }
 
-  // ------------------------------------------------------------------ dibujado
-
   draw(ctx, view) {
     const { cell, ox, oy, width, height, dpr } = view;
     const filas = this.filas;
@@ -1015,7 +961,7 @@ class Game {
         if (celda.revelada) {
           this._celdaAbierta(ctx, X, Y, lado, gap, celda, i);
         } else if (perdido && celda.mina && !celda.bandera) {
-          // mina descubierta al perder: celda negra con la mina en blanco
+
           this._celdaAbierta(ctx, X, Y, lado, gap, { mina: true, adj: 0 }, i, true);
         } else {
           this._celdaCerrada(ctx, X, Y, lado, gap, esHover);
@@ -1026,13 +972,12 @@ class Game {
         }
 
         if (perdido && celda.bandera && !celda.mina) {
-          // bandera mal puesta: bloque con la equis roja
+
           this._equisMala(ctx, X, Y, lado, gap);
         }
       }
     }
 
-    // la casilla que estalló: rojo entero, la mina en negro
     if (perdido && this.explosionT >= 0 && this.tablero.explosionIndice >= 0) {
       const i = this.tablero.explosionIndice;
       const ex = i % columnas;
@@ -1049,7 +994,6 @@ class Game {
       }
     }
 
-    // oleada al ganar: una franja de luz diagonal cruza el tablero una vez
     if (abrir && this.winT >= 0) {
       const dur = 950;
       const t = clamp((this.reloj - this.winT - 120) / dur, 0, 1);
@@ -1073,7 +1017,6 @@ class Game {
       }
     }
 
-    // destellos de oleada al destapar
     for (const f of this.flashes) {
       const edad = this.reloj - f.t0;
       if (edad < 0 || edad > 210) continue;
@@ -1087,13 +1030,12 @@ class Game {
       }
     }
 
-    // marco exterior: dos trazos en las esquinas, como el resto de la casa
     ctx.strokeStyle = 'rgba(255,255,255,0.85)';
     ctx.lineWidth = 2;
     const W = columnas * cell;
     const H = filas * cell;
     const tramo = Math.max(6, Math.round(cell * 0.7));
-    const b = 2; // el trazo va por dentro: en el borde se recortaría
+    const b = 2;
     ctx.beginPath();
     ctx.moveTo(ox + b, oy + b + tramo); ctx.lineTo(ox + b, oy + b); ctx.lineTo(ox + b + tramo, oy + b);
     ctx.moveTo(ox + W - b - tramo, oy + b); ctx.lineTo(ox + W - b, oy + b); ctx.lineTo(ox + W - b, oy + b + tramo);
@@ -1102,9 +1044,7 @@ class Game {
     ctx.stroke();
     ctx.globalAlpha = 1;
 
-    // cursor del teclado: cuatro marcas de esquina sobre cualquier casilla,
-    // abierta o cerrada, para no perderlo de vista al destapar
-    if (this.casillaArmada && !this.terminada) { // el rojo de la casa: armada, aún sin destapar
+    if (this.casillaArmada && !this.terminada) {
       this._marcas(ctx, px(this.casillaArmada.x), py(this.casillaArmada.y), cell, '#ff2b2b');
     }
     if (this.cursorVisible && !this.terminada) {
@@ -1128,7 +1068,7 @@ class Game {
   }
 
   _celdaCerrada(ctx, X, Y, lado, gap, hover) {
-    // bloque plano: la rejilla la marcan los huecos negros, como en snake
+
     const ix = X + gap;
     const iy = Y + gap;
     const w = lado - gap * 2;
@@ -1156,30 +1096,30 @@ class Game {
   }
 
   _mina(ctx, X, Y, lado, color) {
-    const u = Math.max(1, Math.round(lado / 16)); // unidad base de la mina
+    const u = Math.max(1, Math.round(lado / 16));
     const cx = X + lado / 2;
     const cy = Y + lado / 2;
-    const tono = color === '#000' ? '#000' : null; // cuerpo plano cuando se pinta sobre rojo
-    // halo de profundidad bajo el cuerpo
+    const tono = color === '#000' ? '#000' : null;
+
     ctx.fillStyle = tono || 'rgba(0,0,0,0.35)';
     ctx.fillRect(Math.round(cx - 4 * u), Math.round(cy - 2 * u) + 1, 8 * u, 5 * u);
-    // cuerpo: bloque grueso con cruz ampliada
+
     ctx.fillStyle = color;
     ctx.fillRect(Math.round(cx - 3 * u), Math.round(cy - 3 * u), 6 * u, 6 * u);
     ctx.fillRect(Math.round(cx - 4 * u), Math.round(cy - 2 * u), 8 * u, 4 * u);
     ctx.fillRect(Math.round(cx - 2 * u), Math.round(cy - 4 * u), 4 * u, 8 * u);
-    // púas cardinales, más anchas que un píxel de bloque
+
     ctx.fillRect(Math.round(cx - u), Math.round(cy - 6 * u), 2 * u, 2 * u);
     ctx.fillRect(Math.round(cx - u), Math.round(cy + 4 * u), 2 * u, 2 * u);
     ctx.fillRect(Math.round(cx - 6 * u), Math.round(cy - u), 2 * u, 2 * u);
     ctx.fillRect(Math.round(cx + 4 * u), Math.round(cy - u), 2 * u, 2 * u);
-    // púas diagonales
+
     ctx.fillRect(Math.round(cx - 5 * u), Math.round(cy - 5 * u), u + (u >> 1), u + (u >> 1));
     ctx.fillRect(Math.round(cx + 4 * u) - (u >> 1), Math.round(cy - 5 * u), u + (u >> 1), u + (u >> 1));
     ctx.fillRect(Math.round(cx - 5 * u), Math.round(cy + 4 * u) - (u >> 1), u + (u >> 1), u + (u >> 1));
     ctx.fillRect(Math.round(cx + 4 * u) - (u >> 1), Math.round(cy + 4 * u) - (u >> 1), u + (u >> 1), u + (u >> 1));
     if (!tono) {
-      // destello especular arriba-izquierda y sombra abajo-derecha
+
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(Math.round(cx - 2 * u), Math.round(cy - 2 * u), 2 * u, u);
       ctx.fillRect(Math.round(cx - 3 * u), Math.round(cy - u), u, u);
@@ -1200,32 +1140,32 @@ class Game {
       ctx.scale(escala, escala);
       ctx.translate(-cx, -(base + cima) / 2);
     }
-    // asta: cuerpo claro con filo de sombra a la derecha
+
     ctx.fillStyle = '#e8e8e8';
     ctx.fillRect(cx - u, cima, 2 * u, base - cima);
     ctx.fillStyle = '#8f8f8f';
     ctx.fillRect(cx + u - 1, cima, 1, base - cima);
-    // remate del asta
+
     ctx.fillStyle = '#f2f2f2';
     ctx.fillRect(cx - u, cima - u, 2 * u, u);
-    // paño rojo con pliegue y luz: tres tramos escalonados hacia el asta
-    const px = cx + u; // el paño cuelga a la derecha del asta
+
+    const px = cx + u;
     ctx.fillStyle = ACENTO;
     ctx.fillRect(px, cima + u, 5 * u, u);
     ctx.fillRect(px, cima + 2 * u, 6 * u, u);
     ctx.fillRect(px, cima + 3 * u, 5 * u, u);
-    // luz del paño
+
     ctx.fillStyle = '#ff7a7a';
     ctx.fillRect(px, cima + u, 5 * u, 1);
     ctx.fillRect(px, cima + 2 * u, 6 * u, 1);
-    // pliegue en sombra
+
     ctx.fillStyle = '#a31212';
     ctx.fillRect(px, cima + 3 * u, 5 * u, 1);
     ctx.fillRect(px + 4 * u, cima + 2 * u, 2 * u, u);
-    // muesca de golondrina en el vuelo del paño
+
     ctx.fillStyle = '#070707';
     ctx.fillRect(px + 5 * u, cima + 2 * u, u, u);
-    // base del asta: zócalo claro con sombra
+
     ctx.fillStyle = '#d8d8d8';
     ctx.fillRect(cx - 3 * u, base, 6 * u, u);
     ctx.fillStyle = '#4a4a4a';
@@ -1249,7 +1189,7 @@ class Game {
     if (this.winT < 0) return 1;
     const retraso = (x + y) * 24;
     const t = clamp((this.reloj - this.winT - retraso) / 150, 0, 1);
-    // rebote corto: crece un poco de más y se asienta
+
     if (t <= 0) return 0;
     const s = t < 0.6 ? 1.35 * (t / 0.6) : 1.35 - 0.35 * ((t - 0.6) / 0.4);
     return s;
@@ -1259,10 +1199,8 @@ class Game {
   Object.assign(modulo, { Game });
 })(modulos['engine']);
 
-// ---- i18n ----
 (function (modulo) {
 'use strict';
-// Textos del juego y nombre localizados. Sin dependencias ni llamadas externas.
 
 const KEY = 'minesweeper.language';
 const STRINGS = {
@@ -1283,14 +1221,14 @@ const STRINGS = {
     fatalReload: 'recargar limpio',
     noScript: 'este juego necesita su motor en marcha.',
     missingPieces: 'faltan piezas del tablero ({pieces}). vuelve a barajar.',
-    // portada
+
     play: 'jugar',
     playTag: 'tres dificultades y una personalizada',
     profile: 'perfil',
     profileTag: 'récords, partidas y tasa de victorias',
     settings: 'ajustes',
     menuAria: 'menú principal',
-    // dificultad
+
     difficulty: 'DIFICULTAD',
     diffBeginner: 'principiante',
     diffBeginnerTag: '9 × 9 · 10 minas',
@@ -1302,21 +1240,21 @@ const STRINGS = {
     diffCustomTag: '{filas} × {columnas} · {minas} {unit}',
     best: 'mejor {time}',
     noRecord: 'sin récord',
-    // personalizada
+
     custom: 'PERSONALIZADA',
     customRows: 'filas',
     customColumns: 'columnas',
     customMines: 'minas',
     density: 'densidad {pct} %',
     start: 'empezar',
-    // hud
+
     record: 'récord',
-    // pausa
+
     pause: 'en pausa',
     resume: 'seguir',
     restart: 'reiniciar',
     quitToMenu: 'menú principal',
-    // final de partida
+
     youWon: 'despejado.',
     youLost: 'boom.',
     clearedTag: 'despejada',
@@ -1329,7 +1267,7 @@ const STRINGS = {
     again: 'otra vez',
     menu: 'menú',
     minesExploded: 'las minas eran {count}',
-    // perfil
+
     profileTitle: 'PERFIL',
     statsGames: 'partidas',
     statsWins: 'victorias',
@@ -1345,7 +1283,7 @@ const STRINGS = {
     confirmResetBody: 'se borran los récords, las partidas y los ajustes. no hay vuelta atrás.',
     confirmResetYes: 'borrar todo',
     cancel: 'cancelar',
-    // ajustes
+
     settingsTitle: 'AJUSTES',
     settingSound: 'sonido',
     settingTrama: 'trama de fósforo',
@@ -1355,7 +1293,7 @@ const STRINGS = {
     on: 'sí',
     off: 'no',
     back: 'volver',
-    // pistas del pie
+
     hintHome: 'elige una ruta · M silencia',
     hintModes: 'elige dificultad · Esc vuelve',
     hintCustom: '− + ajustan · Enter empieza',
@@ -1368,7 +1306,7 @@ const STRINGS = {
     hintSettings: 'M silencia · Esc vuelve',
     hintCampaign: 'las flechas eligen · ↵ abre · Esc vuelve',
     hintStory: '↵ marchar · Esc vuelve',
-    // campaña · la treinta
+
     campaign: 'campaña',
     campaignTag: 'la treinta · una historia en treinta campos',
     campaignLocked: 'cierra primero el nivel anterior',
@@ -1434,14 +1372,14 @@ const STRINGS = {
     fatalReload: 'reload clean',
     noScript: 'this game needs its engine running.',
     missingPieces: 'board pieces are missing ({pieces}). reload.',
-    // home
+
     play: 'play',
     playTag: 'three difficulties and a custom board',
     profile: 'profile',
     profileTag: 'records, games and win rate',
     settings: 'settings',
     menuAria: 'main menu',
-    // difficulty
+
     difficulty: 'DIFFICULTY',
     diffBeginner: 'beginner',
     diffBeginnerTag: '9 × 9 · 10 mines',
@@ -1453,21 +1391,21 @@ const STRINGS = {
     diffCustomTag: '{filas} × {columnas} · {minas} {unit}',
     best: 'best {time}',
     noRecord: 'no record',
-    // custom
+
     custom: 'CUSTOM',
     customRows: 'rows',
     customColumns: 'columns',
     customMines: 'mines',
     density: 'density {pct}%',
     start: 'start',
-    // hud
+
     record: 'best',
-    // pause
+
     pause: 'paused',
     resume: 'resume',
     restart: 'restart',
     quitToMenu: 'main menu',
-    // end of game
+
     youWon: 'cleared.',
     youLost: 'boom.',
     clearedTag: 'cleared',
@@ -1480,7 +1418,7 @@ const STRINGS = {
     again: 'again',
     menu: 'menu',
     minesExploded: 'there were {count} mines',
-    // profile
+
     profileTitle: 'PROFILE',
     statsGames: 'games',
     statsWins: 'wins',
@@ -1496,7 +1434,7 @@ const STRINGS = {
     confirmResetBody: 'records, games and settings will be wiped. there is no undo.',
     confirmResetYes: 'wipe everything',
     cancel: 'cancel',
-    // settings
+
     settingsTitle: 'SETTINGS',
     settingSound: 'sound',
     settingTrama: 'phosphor scanlines',
@@ -1506,7 +1444,7 @@ const STRINGS = {
     on: 'on',
     off: 'off',
     back: 'back',
-    // footer hints
+
     hintHome: 'pick a route · M mutes',
     hintModes: 'pick a difficulty · Esc goes back',
     hintCustom: '− + adjust · Enter starts',
@@ -1519,7 +1457,7 @@ const STRINGS = {
     hintSettings: 'M mutes · Esc goes back',
     hintCampaign: 'arrows pick · ↵ opens · Esc goes back',
     hintStory: '↵ march · Esc goes back',
-    // campaign · the thirty
+
     campaign: 'campaign',
     campaignTag: 'the thirty · a story in thirty fields',
     campaignLocked: 'beat the previous level first',
@@ -1576,7 +1514,7 @@ try {
   const stored = localStorage.getItem(KEY);
   if (stored === 'es' || stored === 'en') language = stored;
 } catch (error) {
-  // El idioma también funciona sin almacenamiento local.
+
 }
 
 function getLanguage() {
@@ -1588,7 +1526,7 @@ function setLanguage(value) {
   try {
     localStorage.setItem(KEY, language);
   } catch (error) {
-    // El idioma se mantiene en memoria durante esta sesión.
+
   }
   return language;
 }
@@ -1607,7 +1545,6 @@ function unitMinas(count) {
   return n === 1 ? 'mina' : 'minas';
 }
 
-// para tools/check.mjs: las claves de cada idioma, sin duplicar la lista
 function __testClaves() {
   return {
     es: Object.keys(STRINGS.es),
@@ -1638,15 +1575,8 @@ function routeWords() {
   Object.assign(modulo, { getLanguage, setLanguage, t, unitMinas, __testClaves, routeSlug, routeWords });
 })(modulos['i18n']);
 
-// ---- campaign ----
 (function (modulo) {
 'use strict';
-// la treinta — el modo historia del juego.
-// treinta campos minados en cuatro actos, con un solo relato lineal:
-// la guerra llamó a tu puerta. nadie pregunta por qué. nadie se ofrece.
-// cada nivel guarda una línea del avance; las citas van en ES y EN.
-//
-// los niveles fijan tamaño y minas; completar uno abre el siguiente.
 
 const ACTOS = [
   { id: 1, inicio: 0, nombreEs: 'alistamiento', nombreEn: 'enlistment', subEs: 'la carta y el juramento', subEn: 'the letter and the oath' },
@@ -1656,7 +1586,7 @@ const ACTOS = [
 ];
 
 const NIVELES = [
-  // acto I — alistamiento
+
   { act: 1, nombreEs: 'la carta', nombreEn: 'the letter', filas: 6, columnas: 6, minas: 6,
     historiaEs: 'La carta llega un martes. Tu nombre, un número de expediente y una hora. La guerra te ha elegido.',
     historiaEn: 'The letter arrives on a Tuesday. Your name, a file number and an hour. The war has picked you.' },
@@ -1675,7 +1605,7 @@ const NIVELES = [
   { act: 1, nombreEs: 'el ascenso', nombreEn: 'the commission', filas: 9, columnas: 9, minas: 16,
     historiaEs: 'Te ascienden a alférez por cumplir un trámite. El tren parte al amanecer.',
     historiaEn: 'You are commissioned for completing a formality. The train leaves at dawn.' },
-  // acto II — el frente
+
   { act: 2, nombreEs: 'el convoy', nombreEn: 'the convoy', filas: 10, columnas: 10, minas: 18,
     historiaEs: 'Tres días de tren y un puente cortado. El enemigo vuela los puentes.',
     historiaEn: 'Three days of train and a cut bridge. The enemy blows the bridges.' },
@@ -1694,7 +1624,7 @@ const NIVELES = [
   { act: 2, nombreEs: 'la guardia', nombreEn: 'the watch', filas: 14, columnas: 14, minas: 40,
     historiaEs: 'La noche de guardia. Minas nuevas bajo la luna; alguien las siembra cada noche.',
     historiaEn: 'The night watch. New mines under the moon; someone lays them every night.' },
-  // acto III — la operación
+
   { act: 3, nombreEs: 'el puente', nombreEn: 'the bridge', filas: 14, columnas: 14, minas: 44,
     historiaEs: 'Operación Puente: cruzar al otro lado. Dos campos, un vado y una radio muerta.',
     historiaEn: 'Operation Bridge: cross to the other side. Two fields, a ford and a dead radio.' },
@@ -1713,7 +1643,7 @@ const NIVELES = [
   { act: 3, nombreEs: 'el recuento', nombreEn: 'the count', filas: 16, columnas: 16, minas: 66,
     historiaEs: 'El recuento: de cuarenta volvemos nueve. El parte dice «éxito».',
     historiaEn: "The count: of forty, nine return. The report says 'success'." },
-  // acto IV — el final del campo
+
   { act: 4, nombreEs: 'el corredor', nombreEn: 'the corridor', filas: 16, columnas: 16, minas: 69,
     historiaEs: 'El corredor: la única ruta hasta el depósito enemigo. Un kilómetro de hierba y muerte.',
     historiaEn: 'The corridor: the only route to the enemy depot. A kilometre of grass and death.' },
@@ -1773,7 +1703,6 @@ function historiaNivel(indice, idioma) {
   return idioma === 'en' ? nivel.historiaEn : nivel.historiaEs;
 }
 
-// configuración de motor para un nivel de campaña
 function configNivel(indice) {
   const nivel = NIVELES[indice];
   if (!nivel) return null;
@@ -1783,7 +1712,6 @@ function configNivel(indice) {
   Object.assign(modulo, { ACTOS, NIVELES, nivelCampana, actoDe, nombreNivel, historiaNivel, configNivel });
 })(modulos['campaign']);
 
-// ---- main ----
 (function (modulo) {
 'use strict';
 const { Game } = modulos['engine'];
@@ -1795,7 +1723,6 @@ const { NIVELES, ACTOS, configNivel, nivelCampana, actoDe } = modulos['campaign'
 
 const $ = (sel) => document.querySelector(sel);
 
-// si algo se rompe, que se vea en pantalla en vez de quedarse en negro
 function avisar(mensaje) {
   if (typeof window.__minesweeperFallo === 'function') window.__minesweeperFallo(mensaje);
 }
@@ -1812,20 +1739,18 @@ function comprobarPiezas() {
   return true;
 }
 
-/* ------------------------------------------------------------- guardado */
-
 const CLAVE = 'minesweeper.v1';
 
 function nuevoRegistro() {
   return {
-    best: { beginner: 0, intermediate: 0, expert: 0 }, // ms; 0 = sin récord
+    best: { beginner: 0, intermediate: 0, expert: 0 },
     stats: { games: 0, wins: 0, streak: 0, bestStreak: 0, timeMs: 0 },
     sound: true,
     trama: true,
     dobleClick: false,
     volumen: 100,
     custom: { filas: 9, columnas: 16, minas: 40 },
-    campaign: { unlocked: 1, best: {} }, // unlocked: niveles alcanzables; best: ms por nivel
+    campaign: { unlocked: 1, best: {} },
   };
 }
 
@@ -1879,25 +1804,23 @@ function guardar() {
   try {
     localStorage.setItem(CLAVE, JSON.stringify(guardado));
   } catch (err) {
-    /* sin almacenamiento se juega igual */
+    
   }
 }
-
-/* ---------------------------------------------------------------- estado */
 
 const app = {
   pantalla: 'home',
   juego: null,
   modo: DIFICULTAD_POR_DEFECTO,
-  nivel: null, // índice del nivel de campaña cuando modo === 'campaign'
-  historia: null, // índice del nivel cuya historia se está contando
-  record: false, // la última partida ganada fue récord
+  nivel: null,
+  historia: null,
+  record: false,
   flagMode: false,
-  demo: null, // partida automática de fondo en la portada
+  demo: null,
   demoAcum: 0,
-  mapaSel: null, // casilla seleccionada en el mapa de la treinta
-  resetDesde: 'profile', // pantalla a la que vuelve el borrado de progreso
-  hud: { meta: '', score: '', mult: '', best: '' },
+  mapaSel: null,
+  resetDesde: 'profile',
+  hud: { meta: '', score: '', timer: '', best: '' },
 };
 
 const BASE_PATH = (typeof location !== 'undefined' && location.protocol === 'file:') ? './' : '/';
@@ -1917,7 +1840,7 @@ const el = {
   hint: $('#hint'),
   meta: $('#hud-meta'),
   score: $('#hud-score'),
-  mult: $('#hud-mult'),
+  timer: $('#hud-timer'),
   best: $('#hud-best'),
   langSwitch: $('#lang-switch'),
   avisoFoco: $('#aviso-foco'),
@@ -1975,8 +1898,6 @@ function esTactil() {
   return window.matchMedia('(pointer: coarse)').matches;
 }
 
-/* --------------------------------------------------------- overlay/pantallas */
-
 const FOCO_SEL = '.row:not(.stat), .acciones button, .mapa-nodo';
 let focoIndice = -1;
 
@@ -2032,8 +1953,6 @@ function activarFoco() {
   if (sel && typeof sel.click === 'function') sel.click();
 }
 
-/* --------------------------------------------------- barrido de pantallas */
-
 const barrido = { ctx: null, ancho: 0, alto: 0, dpr: 1, t: 0, activo: false, celdas: null };
 const DURACION_BARRIDO = 260;
 
@@ -2079,15 +1998,15 @@ function pintarBarrido(progreso) {
   ctx.fillStyle = '#000';
   for (const celda of barrido.celdas) {
     const d = celda.orden + celda.aleatorio * 1.4;
-    if (d < barridoPos - 1.3) continue; // ya descubierta
-    if (d > barridoPos + 1.3) continue; // aún sin barrer
+    if (d < barridoPos - 1.3) continue;
+    if (d > barridoPos + 1.3) continue;
     ctx.fillRect(celda.x * lado, celda.y * lado, lado + 0.5, lado + 0.5);
   }
 }
 
 function taparPantalla() {
   if (sinMovimiento()) return;
-  // se reajusta en cada cambio de pantalla: puede haber cambiado el tamaño
+
   if (!ajustarBarrido()) return;
   if (el.barrido.hidden) el.barrido.hidden = false;
   barrido.t = 0;
@@ -2107,9 +2026,7 @@ function pasoBarrido(dt) {
 
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
-/* ------------------- la muerte y la tele: la imagen pierde la señal */
-
-const DURACION_RUIDO = 800; // ms de estática, solo cuando abre la barra «boom.»
+const DURACION_RUIDO = 800;
 const ruidoFx = { t: 0, activo: false, lienzoBase: null, img: null };
 
 function efectoTubos() {
@@ -2121,7 +2038,7 @@ function efectoTubos() {
   lienzo.height = Math.round(window.innerHeight * dpr);
   lienzo.style.width = `${window.innerWidth}px`;
   lienzo.style.height = `${window.innerHeight}px`;
-  // buffer de nieve en baja resolución: cubos gordos, como la casa y como la tele
+
   const ladoX = 180, ladoY = 100;
   if (!ruidoFx.lienzoBase) {
     ruidoFx.lienzoBase = document.createElement('canvas');
@@ -2131,7 +2048,7 @@ function efectoTubos() {
   ruidoFx.img = ruidoFx.lienzoBase.getContext('2d').createImageData(ladoX, ladoY);
   if (el.stage) {
     el.stage.classList.remove('tubo');
-    void el.stage.offsetWidth; // reinicia la animación si quedaba a medias
+    void el.stage.offsetWidth;
     el.stage.classList.add('tubo');
   }
   if (lienzo.hidden) lienzo.hidden = false;
@@ -2148,7 +2065,7 @@ function pasoRuido(dt) {
   const { img, lienzoBase } = ruidoFx;
   if (ctx && img && lienzoBase) {
     const datos = img.data;
-    const intensidad = 1 - progreso * 0.72; // la señal se rinde poco a poco
+    const intensidad = 1 - progreso * 0.72;
     for (let i = 0; i < datos.length; i += 4) {
       const v = Math.random() < 0.52 ? Math.random() * 255 : 0;
       datos[i] = v;
@@ -2162,7 +2079,7 @@ function pasoRuido(dt) {
     ctx.imageSmoothingEnabled = false;
     ctx.globalAlpha = 0.92;
     ctx.drawImage(lienzoBase, 0, 0, lienzo.width, lienzo.height);
-    // dos bandas de rasgado: la imagen salta unos píxeles, la vieja tele lo hacía
+
     for (const banda of [0.31, 0.68]) {
       if (Math.random() < 0.55) {
         const sy = Math.floor(lienzo.height * banda * Math.random());
@@ -2184,8 +2101,8 @@ function pasoRuido(dt) {
   }
 }
 
-const LUPA_LADO = 190; // px CSS: el recuadro de inspección
-const LUPA_ZOOM = 3;   // ampliación de la mina al triple, sin suavizar
+const LUPA_LADO = 190;
+const LUPA_ZOOM = 3;
 
 function pintarLupa(evento) {
   const lienzo = el.lupa;
@@ -2197,7 +2114,7 @@ function pintarLupa(evento) {
     lienzo.height = LUPA_LADO * dpr;
   }
   const rect = origen.getBoundingClientRect();
-  // coordenadas del cursor dentro del lienzo, en píxeles de respaldo
+
   const mx = (evento.clientX - rect.left) * (origen.width / rect.width);
   const my = (evento.clientY - rect.top) * (origen.height / rect.height);
   const lado = (LUPA_LADO * (origen.width / rect.width)) / LUPA_ZOOM;
@@ -2208,7 +2125,7 @@ function pintarLupa(evento) {
   ctx.imageSmoothingEnabled = false;
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, lienzo.width, lienzo.height);
-  // fuera del tablero, el plano se queda en negro
+
   const recorteX = Math.max(0, sx);
   const recorteY = Math.max(0, sy);
   const solapeX = Math.min(origen.width, sx + lado) - recorteX;
@@ -2221,7 +2138,7 @@ function pintarLupa(evento) {
       solapeX * (lienzo.width / lado), solapeY * (lienzo.height / lado),
     );
   }
-  // las cuatro marcas de la casa: encuadre del detalle
+
   const m = Math.round(9 * dpr);
   const largo = Math.round(16 * dpr);
   ctx.strokeStyle = '#ffffff';
@@ -2232,7 +2149,7 @@ function pintarLupa(evento) {
   ctx.moveTo(m, lienzo.height - m - largo); ctx.lineTo(m, lienzo.height - m); ctx.lineTo(m + largo, lienzo.height - m);
   ctx.moveTo(lienzo.width - m - largo, lienzo.height - m); ctx.lineTo(lienzo.width - m, lienzo.height - m); ctx.lineTo(lienzo.width - m, lienzo.height - m - largo);
   ctx.stroke();
-  // posición: junto al cursor, siempre dentro de la ventana
+
   const margen = 14;
   const ancho = LUPA_LADO;
   let x = evento.clientX + margen;
@@ -2247,8 +2164,6 @@ function pintarLupa(evento) {
 function ocultarLupa() {
   if (el.lupa) el.lupa.hidden = true;
 }
-
-/* --------------------------------------------------------------- pistas */
 
 const PISTAS = {
   home: 'hintHome',
@@ -2284,13 +2199,11 @@ function pantalla(nombre) {
   if (RUTAS.listas && !RUTAS.restaurando) sincronizarRuta(false);
 }
 
-/* ------------------------------------------------------------------ HUD */
-
-function escribirHud(meta, score, mult, best) {
+function escribirHud(meta, score, timer, best) {
   const hud = app.hud;
   if (hud.meta !== meta) { el.meta.textContent = meta; hud.meta = meta; }
   if (hud.score !== score) { el.score.textContent = score; hud.score = score; }
-  if (hud.mult !== mult) { el.mult.textContent = mult; hud.mult = mult; }
+  if (hud.timer !== timer) { el.timer.textContent = timer; hud.timer = timer; }
   if (hud.best !== best) { el.best.textContent = best; hud.best = best; }
 }
 
@@ -2316,11 +2229,9 @@ function actualizarMarcador() {
   escribirHud(meta, String(j.minasRestantes), formatoTiempo(j.tiempoMs), bestTxt);
 }
 
-/* -------------------------------------------------------- ajustar lienzo */
-
-let huecoFin = 0; // alto reservado bajo el tablero en la barra de final de partida
-let casillaArmada = null; // { x, y, t } armada por el doble clic de confirmación
-const RETARDO_DOBLE = 400; // ms para el segundo clic sobre la misma casilla
+let huecoFin = 0;
+let casillaArmada = null;
+const RETARDO_DOBLE = 400;
 
 function ajustarLienzo() {
   const j = app.juego;
@@ -2358,16 +2269,12 @@ function conversorDePuntos(clientX, clientY) {
   return { x, y };
 }
 
-/* --------------------------------------------------------- la demo */
-// la portada juega sola tu siguiente nivel de la treinta:
-// la mina se despeja sola mientras decides qué jugar
-
 function nivelDemo() {
-  return campañaSiguiente(); // primer nivel sin superar; el último campo si ya los tienes todos
+  return campañaSiguiente();
 }
 
 function crearDemo() {
-  el.demoCtx = null; // la portada puede haberse reconstruido: canvas nuevo
+  el.demoCtx = null;
   const cfg = configNivel(nivelDemo());
   app.demo = new Game(cfg, () => {});
   app.demoAcum = 0;
@@ -2402,7 +2309,6 @@ function pintarTituloDemo() {
   nota.textContent = t('previewNote', { n: dosDigitos(i + 1), name: nombreNivel(i) });
 }
 
-// elige la siguiente jugada: primero lo lógico seguro, luego frontera segura
 function demoElegirJugada(j) {
   const t = j.tablero;
   if (!t.sembradas) {
@@ -2438,7 +2344,7 @@ function demoElegirJugada(j) {
       if (restantes === 0) return { x: ocultas[0][0], y: ocultas[0][1] };
     }
   }
-  // sin jugada lógica: frontera segura (casillas cerradas no minadas junto a lo abierto)
+
   const frontera = [];
   const lejos = [];
   for (let y = 0; y < j.filas; y += 1) {
@@ -2453,7 +2359,7 @@ function demoElegirJugada(j) {
     }
   }
   const candidatas = frontera.length ? frontera : lejos;
-  if (!candidatas.length) return null; // tablero resuelto o imposible: renacer
+  if (!candidatas.length) return null;
   return ((pick) => ({ x: pick[0], y: pick[1] }))(candidatas[Math.floor(Math.random() * candidatas.length)]);
 }
 
@@ -2478,7 +2384,6 @@ function renderDemo() {
   if (!el.demoCtx) el.demoCtx = lienzo.getContext('2d');
   j.draw(el.demoCtx, vistaDemo);
 }
-/* ------------------------------------------------------------ pantallas */
 
 function filaHTML({ accion = null, campo = null, idx, nombre, detalle = '', derecha = '', peligro = false, stat = false, dim = false, acento = false, hecho = false, titulo = '' }) {
   const clases = ['row'];
@@ -2508,7 +2413,7 @@ function cabeceraPanel(titulo, extra = '') {
 const botonVolver = () => `<button class="ghost" type="button" data-accion="back">${t('back')}<kbd>Esc</kbd></button>`;
 
 function mostrarPortada() {
-  audio.pararMusica(1.0); // transición: adiós a la fanfarria
+  audio.pararMusica(1.0);
   app.juego = null;
   app.contado = false;
   const hechos = campañaHechos();
@@ -2544,18 +2449,17 @@ function mostrarPortada() {
   enfocarPrimero();
 }
 
-// logotipo «minesweeper.» pintado en canvas, como la casa de snake: estático
 function dibujarLogo(canvas) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
-  const DPR = 2; // rótulo a doble densidad: nítido en pantallas con mucha luz de píxel
+  const DPR = 2;
   const texto = 'minesweeper';
   const alto = 104;
   ctx.font = '900 88px ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
-  // medir antes de pintar: el lienzo se ajusta al rótulo, nunca lo recorta
+
   const anchoTexto = Math.ceil(ctx.measureText(texto).width);
-  // el punto es la mina del juego: bloque blanco de ocho púas, destello arriba-izq.
-  const u = 2.6; // unidad base de la mina
+
+  const u = 2.6;
   const centroX = anchoTexto + 8 + 6 * u;
   const ancho = Math.ceil(centroX + 6 * u + 5);
   canvas.width = ancho * DPR;
@@ -2568,27 +2472,27 @@ function dibujarLogo(canvas) {
   ctx.textAlign = 'left';
   const y = alto / 2 + 2;
   ctx.fillText(texto, 0, y);
-  // mismas coordenadas que _mina() del motor, a escala u
+
   ctx.save();
   ctx.translate(centroX, y);
   ctx.scale(u, u);
   ctx.translate(-8, -8);
   ctx.fillStyle = '#f2f2f2';
-  ctx.fillRect(5, 5, 6, 6);      // cuerpo
+  ctx.fillRect(5, 5, 6, 6);
   ctx.fillRect(4, 6, 8, 4);
   ctx.fillRect(6, 4, 4, 8);
-  ctx.fillRect(7, 2, 2, 2);      // púas cardinales
+  ctx.fillRect(7, 2, 2, 2);
   ctx.fillRect(7, 12, 2, 2);
   ctx.fillRect(2, 7, 2, 2);
   ctx.fillRect(12, 7, 2, 2);
-  ctx.fillRect(3, 3, 1.5, 1.5);  // púas diagonales
+  ctx.fillRect(3, 3, 1.5, 1.5);
   ctx.fillRect(11.5, 3, 1.5, 1.5);
   ctx.fillRect(3, 11.5, 1.5, 1.5);
   ctx.fillRect(11.5, 11.5, 1.5, 1.5);
-  ctx.fillStyle = '#ffffff';      // destello especular
+  ctx.fillStyle = '#ffffff';
   ctx.fillRect(6, 6, 2, 1);
   ctx.fillRect(5, 7, 1, 1);
-  ctx.fillStyle = 'rgba(0,0,0,0.28)'; // sombra abajo-derecha
+  ctx.fillStyle = 'rgba(0,0,0,0.28)';
   ctx.fillRect(9, 9, 2, 2);
   ctx.restore();
 }
@@ -2603,8 +2507,6 @@ function densidadCustom() {
   return Math.round((c.minas / (c.filas * c.columnas)) * 100);
 }
 
-// el mapa de la treinta: treinta posiciones y cuatro actos, más alto que ancho de brazo;
-// se recorre desplazándolo a lo ancho, como un parte desplegado sobre la mesa
 const MAPA_ANCHO = 2400;
 const MAPA_ALTO = 650;
 const MAPA_RUTA = [
@@ -2614,23 +2516,22 @@ const MAPA_RUTA = [
   [1750, 505], [1805, 410], [1865, 470], [1895, 350], [1955, 410], [1975, 290],
   [2035, 350], [2055, 230], [2115, 290], [2130, 170], [2195, 230], [2290, 105],
 ];
-const MAPA_DIVISORES = [520, 1040, 1660]; // las fronteras de los cuatro actos
-const MAPA_ACTOS_X = [245, 780, 1340, 2005]; // rótulos de acto al pie del mapa
+const MAPA_DIVISORES = [520, 1040, 1660];
+const MAPA_ACTOS_X = [245, 780, 1340, 2005];
 const MAPA_ROMANOS = ['I', 'II', 'III', 'IV'];
 
-// dibujos del mapa: bloques de trazo, como todo el juego; nada más
-const TINTA = '#3f3f3f';    // elementos del terreno
-const TINTA_LEVE = '#242424'; // cotas y fondo
+const TINTA = '#3f3f3f';
+const TINTA_LEVE = '#242424';
 
 const DIBUJOS = [
-  // brújula, esquina noroeste
+
   `<g class="mapa-tinta" fill="none" stroke="${TINTA}" stroke-width="2.4">
     <circle cx="110" cy="86" r="27"/>
     <path d="M110 47v12M110 113v12M71 86h12M137 86h12"/>
     <path d="M110 66 L117 92 L110 86 L103 92 Z" fill="${TINTA}" stroke="none"/>
   </g>
   <text class="mapa-brujula" x="110" y="36" text-anchor="middle">N</text>`,
-  // acto I · alistamiento: la carta y el cuartel
+
   `<g fill="none" stroke="${TINTA}" stroke-width="2.6" stroke-linejoin="round">
     <rect x="55" y="190" width="104" height="64"/>
     <path d="M55 194 L107 236 L159 194"/>
@@ -2642,10 +2543,10 @@ const DIBUJOS = [
     <path d="M368 108 V72"/>
     <path d="M368 72 L404 80 L368 92" fill="${TINTA}" stroke="none"/>
   </g>`,
-  // la estrella del ascenso
+
   `<path fill="none" stroke="${TINTA}" stroke-width="2.4" stroke-linejoin="round"
     d="M470 122 L477.6 138.6 L496.3 139.9 L482.7 152.4 L487.5 170.6 L470 160.6 L452.5 170.6 L457.3 152.4 L443.7 139.9 L462.4 138.6 Z"/>`,
-  // acto II · el frente: torreón y sacos terreros
+
   `<g fill="none" stroke="${TINTA}" stroke-width="2.6" stroke-linejoin="round">
     <path d="M946 118 H1066 L1044 190 H968 Z"/>
     <path d="M936 118 L1006 66 L1076 118"/>
@@ -2657,7 +2558,7 @@ const DIBUJOS = [
     <path d="M714 592 a 38 14 0 0 1 76 0"/>
     <path d="M776 592 a 38 14 0 0 1 76 0"/>
   </g>`,
-  // acto III · la operación: el vado del puente y la antena
+
   `<g fill="none" stroke="${TINTA}" stroke-width="2.6">
     <path d="M1236 158 L1312 108 L1388 158" stroke-linejoin="round"/>
     <path d="M1252 158 V132 M1300 158 V122 M1350 158 V122 M1368 158 V132"/>
@@ -2670,7 +2571,7 @@ const DIBUJOS = [
     <path d="M1622 78 a 40 40 0 0 1 44 26 M1622 106 a 66 66 0 0 1 72 44"/>
     <path d="M1586 78 a 40 40 0 0 0 -44 26 M1586 106 a 66 66 0 0 0 -72 44"/>
   </g>`,
-  // acto IV · el final del campo: el tren y la casa con la puerta en rojo
+
   `<g fill="none" stroke="${TINTA}" stroke-width="2.4" stroke-linejoin="round">
     <path d="M1722 148 h72 v44 h-72 Z"/>
     <path d="M1794 160 h26 v32 h-26"/>
@@ -2683,13 +2584,13 @@ const DIBUJOS = [
     <path d="M2296 268 V342 H2396 V268" fill="#050505"/>
     <path d="M2332 342 V296 H2360 V342" fill="#ff2b2b" stroke="none"/>
   </g>`,
-  // cruces sobre el terreno: los que se quedaron
+
   `<g stroke="${TINTA_LEVE}" stroke-width="2.4" stroke-linecap="round">
     <path d="M540 84 v26 M530 94 h20"/>
     <path d="M1122 556 v22 M1114 564 h16"/>
     <path d="M2276 520 v22 M2268 528 h16"/>
   </g>`,
-  // numerales de acto, casi invisibles bajo la ruta
+
   `<text class="mapa-marca" x="245" y="428" text-anchor="middle">I</text>
    <text class="mapa-marca" x="780" y="438" text-anchor="middle">II</text>
    <text class="mapa-marca" x="1340" y="432" text-anchor="middle">III</text>
@@ -2824,7 +2725,7 @@ function mostrarCampaña() {
   pantalla('campaign');
   animarCifra(document.getElementById('campana-cifra'), hechos, (v) => dosDigitos(Math.round(v)));
   seleccionarNodoMapa(frontera, true);
-  // el parte se abre desplegado sobre tu posición, no sobre el principio
+
   const nodos = el.overlay.querySelectorAll('.mapa-nodo');
   const nodo = nodos && nodos[frontera];
   if (nodo && typeof nodo.scrollIntoView === 'function') {
@@ -2957,18 +2858,16 @@ function pintarLienzoVacio() {
   ctx.fillRect(0, 0, vista.width, vista.height);
 }
 
-/* ---------------------------------------------------- ciclo de partida */
-
 function empezarPartida(modo, nivel = null) {
-  app.demo = null; // la portada se cierra: la demo descansa
+  app.demo = null;
   app.modo = modo;
   app.nivel = modo === 'campaign' ? nivel : null;
   const cfg = modo === 'campaign' ? configNivel(nivel) : configDeModo(modo);
-  if (!cfg) { // nivel bloqueado o inexistente: de vuelta a la campaña
+  if (!cfg) {
     mostrarCampaña();
     return;
   }
-  audio.pararMusica(0.9); // transición: la fanfarria anterior se apaga sola
+  audio.pararMusica(0.9);
   app.juego = new Game(cfg, eventosJuego);
   casillaArmada = null;
   app.record = false;
@@ -2994,7 +2893,7 @@ function reiniciarPartida() {
 function pausarJuego() {
   const j = app.juego;
   if (!j || j.terminada) return;
-  j.pausado = true; // también vale antes del primer clic: hay menú que abrir
+  j.pausado = true;
 
   ponerOverlay(`<div class="panel fin">
     <header class="fin-cabeza">
@@ -3038,7 +2937,7 @@ function contabilizarFin(gano) {
       guardado.campaign.best[app.nivel] = Math.max(1, Math.floor(app.juego.tiempoMs));
       app.record = true;
     }
-    // completar un nivel desbloquea el siguiente
+
     const siguiente = Math.min(NIVELES.length, app.nivel + 2);
     if (guardado.campaign.unlocked < siguiente) guardado.campaign.unlocked = siguiente;
   } else if (gano && esDificultadFija(app.modo)) {
@@ -3070,11 +2969,11 @@ function eventosJuego(tipo, datos) {
     case 'boom': {
       contabilizarFin(false);
       if (typeof navigator.vibrate === 'function') navigator.vibrate([50, 40, 90]);
-      audio.play('boom'); // la bomba suena con el flash, sin un milisegundo de más
+      audio.play('boom');
       const destello = document.getElementById('flash');
       if (destello) {
         destello.classList.remove('activo');
-        void destello.offsetWidth; // reinicia la animación si quedaba a medias
+        void destello.offsetWidth;
         destello.classList.add('activo');
       }
       setTimeout(() => {
@@ -3106,7 +3005,7 @@ function haySiguienteNivel() {
 }
 
 function accionesFin({ hayMas }) {
-  // en campaña, al ganar, el atajo es el siguiente capítulo; al perder, reintentar
+
   if (app.modo === 'campaign') {
     const siguiente = hayMas && haySiguienteNivel()
       ? `<button class="principal" type="button" data-accion="nextLevel"><span>${t('campaignNext')}</span><kbd>↵</kbd></button>`
@@ -3121,7 +3020,7 @@ function accionesFin({ hayMas }) {
 function mostrarFinGanada() {
   const j = app.juego;
   if (!j) return;
-  audio.musica('win', 0, 1.1); // la pieza de victoria suena con su pantalla
+  audio.musica('win', 0, 1.1);
   const fija = esDificultadFija(app.modo);
   const enCampaña = app.modo === 'campaign';
   const bestMs = enCampaña ? (guardado.campaign.best[app.nivel] || 0) : (fija ? guardado.best[app.modo] : 0);
@@ -3132,7 +3031,7 @@ function mostrarFinGanada() {
       ? `<span class="record-tag">${t('newRecord')}</span>`
       : `<span>${t('yourRecord', { time: formatoTiempo(bestMs) })}</span>`;
   if (enCampaña && app.nivel === NIVELES.length - 1) {
-    // se cerró el último campo: epílogo del viaje
+
     ponerOverlay(`<div class="panel fin">
       <header class="fin-cabeza">
         <p class="kicker">${t('epilogueKicker')}</p>
@@ -3170,8 +3069,6 @@ function mostrarFinGanada() {
   });
 }
 
-// la barra baja del final de partida: una sola pieza para victoria y derrota.
-// el tablero completo queda a la vista por encima; el lienzo reserva el alto.
 function datoFin(valor, etiqueta) {
   return `<div class="fin-dato"><b>${valor}</b><span>${etiqueta}</span></div>`;
 }
@@ -3197,7 +3094,7 @@ function ponerBarraFin({ variante, kicker, titulo, susurro, stats, parcela, acci
   </div>`, variante);
   pantalla(pantallaId);
   enfocarPrimero();
-  // el tablero completo queda por encima de la barra: se reserva el alto real
+
   const panel = el.overlay.querySelector('.fin-barra');
   const alto = panel ? Math.ceil(panel.getBoundingClientRect().height) : 0;
   if (alto > 0) {
@@ -3210,8 +3107,8 @@ function ponerBarraFin({ variante, kicker, titulo, susurro, stats, parcela, acci
 function mostrarFinPerdida() {
   const j = app.juego;
   if (!j) return;
-  audio.musica('death', 0, 1.2); // la pieza de derrota suena con la barra
-  efectoTubos(); // el tubo ensancha la pantalla y la imagen hierve, solo aquí
+  audio.musica('death', 0, 1.2);
+  efectoTubos();
   const totalSeguras = j.cfg.filas * j.cfg.columnas - j.cfg.minas;
   const despejadas = typeof j.tablero.despejadasPorJugador === 'number' ? j.tablero.despejadasPorJugador : 0;
   const enCampaña = app.modo === 'campaign';
@@ -3230,8 +3127,6 @@ function mostrarFinPerdida() {
     pantallaId: 'dead',
   });
 }
-
-/* ------------------------------------------------------- perfil y ajustes */
 
 function filaStat(idx, nombre, valor) {
   return filaHTML({ idx, nombre, derecha: valor, stat: true });
@@ -3331,7 +3226,7 @@ function borrarTodo() {
   try {
     localStorage.removeItem(CLAVE);
   } catch (err) {
-    /* sin almacenamiento da igual */
+    
   }
   const limpio = nuevoRegistro();
   guardado.best = limpio.best;
@@ -3392,8 +3287,6 @@ function mostrarAjustes() {
   enfocarPrimero();
 }
 
-/* ------------------------------------------------------- ejecutar botones */
-
 function ejecutar(nombre) {
   audio.unlock();
   if (!nombre) return;
@@ -3409,7 +3302,7 @@ function ejecutar(nombre) {
       return;
     }
     if (app.pantalla === 'campaign') {
-      // primer toque: inspecciona; segundo toque sobre el mismo: marcha
+
       if (app.mapaSel === i) mostrarHistoria(i);
       else seleccionarNodoMapa(i);
       return;
@@ -3520,8 +3413,6 @@ function volverAtras() {
   }
 }
 
-/* ---------------------------------------------------------------- teclado */
-
 function accion(nombre, repetido = false, datos) {
   if (nombre === 'mute') {
     guardado.sound = !guardado.sound;
@@ -3555,7 +3446,7 @@ function accion(nombre, repetido = false, datos) {
             j.casillaArmada = null;
             j.alternarBanderaEn(datos.x, datos.y);
           } else if (guardado.dobleClick) {
-            // el primer clic arma la casilla (rojo); el segundo sobre la misma destapa
+
             const ahora = Date.now();
             if (casillaArmada && casillaArmada.x === datos.x && casillaArmada.y === datos.y && ahora - casillaArmada.t <= RETARDO_DOBLE) {
               casillaArmada = null;
@@ -3597,7 +3488,6 @@ function accion(nombre, repetido = false, datos) {
     }
   }
 
-  // menús y paneles
   if (app.pantalla === 'campaign'
     && (nombre === 'up' || nombre === 'down' || nombre === 'left' || nombre === 'right')) {
     const delta = (nombre === 'up' || nombre === 'left') ? -1 : 1;
@@ -3620,7 +3510,7 @@ function accion(nombre, repetido = false, datos) {
         mostrarHistoria(app.nivel + 1);
         return;
       }
-      // el epílogo: ↵ hace lo que promete su botón — cerrar y volver a la puerta
+
       if (app.pantalla === 'won' && app.modo === 'campaign' && app.nivel === NIVELES.length - 1) {
         mostrarPortada();
         return;
@@ -3653,8 +3543,6 @@ function animarCifra(nodo, total, formato = (v) => String(Math.round(v))) {
   }, duracion + 80);
 }
 
-/* ------------------------------------------------------------- rutas */
-
 function coincideRuta(segmento, clave) {
   return (ALIAS_RUTA[clave] || []).includes(segmento);
 }
@@ -3664,7 +3552,7 @@ function rutaActual() {
   try {
     camino = decodeURIComponent(camino);
   } catch (error) {
-    // sin decodificar si el escape no es válido
+
   }
   camino = camino.replace(/\/+$/, '');
   if (camino === '/' || camino === '') return [];
@@ -3756,8 +3644,6 @@ window.addEventListener('popstate', () => {
   sincronizarRuta(true);
 });
 
-/* ----------------------------------------------------------------- bucle */
-
 let ultimoT = 0;
 
 function renderJuego() {
@@ -3795,8 +3681,6 @@ function bucle(t) {
     }
   }
 }
-
-/* ------------------------------------------------------------------ boot */
 
 function aplicarSonido() {
   audio.enabled = guardado.sound;

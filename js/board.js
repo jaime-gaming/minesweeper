@@ -1,8 +1,6 @@
-// lógica pura del buscaminas: sin DOM, sin canvas y sin temporizador.
-// el motor la usa para jugar; tools/check.mjs la prueba en node.
 
 export class Tablero {
-  // cfg: { filas, columnas, minas }. rng inyectable para las pruebas.
+
   constructor(cfg, rng = Math.random) {
     const filas = Math.floor(Number(cfg && cfg.filas));
     const columnas = Math.floor(Number(cfg && cfg.columnas));
@@ -27,7 +25,7 @@ export class Tablero {
     }));
 
     this.sembradas = false;
-    this.estado = 'jugando'; // 'jugando' | 'ganado' | 'perdido'
+    this.estado = 'jugando';
     this.reveladas = 0;
     this.explosionIndice = -1;
   }
@@ -55,8 +53,6 @@ export class Tablero {
     return out;
   }
 
-  // coloca las minas después del primer clic, lejos de la casilla elegida
-  // (y de sus vecinas): el primer clic nunca explota y suele abrir hueco.
   sembrar(indiceSeguro) {
     if (this.sembradas) return;
     const zonaSegura = new Set([indiceSeguro, ...this.vecinos(indiceSeguro)]);
@@ -66,14 +62,13 @@ export class Tablero {
       if (!zonaSegura.has(i)) candidatas.push(i);
     }
     if (candidatas.length < this.minas) {
-      // tableros diminutos: al menos la casilla del clic queda a salvo
+
       candidatas = [];
       for (let i = 0; i < this.total; i += 1) {
         if (i !== indiceSeguro) candidatas.push(i);
       }
     }
 
-    // mezcla de Fisher–Yates con el rng inyectable
     for (let i = candidatas.length - 1; i > 0; i -= 1) {
       const j = Math.floor(this.rng() * (i + 1));
       const tmp = candidatas[i];
@@ -95,8 +90,6 @@ export class Tablero {
     this.sembradas = true;
   }
 
-  // revelado en cadena desde indice. cosecha: lista de { indice, distancia }.
-  // la distancia sirve para animar la apertura en oleada.
   _revelarZona(indice, cosecha, distanciaBase = 0) {
     const inicio = this.celdas[indice];
     if (inicio.revelada || inicio.bandera) return;
@@ -127,7 +120,7 @@ export class Tablero {
     if (this.estado !== 'jugando') return false;
     if (this.reveladas === this.total - this.minas) {
       this.estado = 'ganado';
-      // al ganar se izan las banderas que falten sobre las minas restantes
+
       for (const celda of this.celdas) {
         if (celda.mina) celda.bandera = true;
       }
@@ -136,7 +129,6 @@ export class Tablero {
     return false;
   }
 
-  // revela una casilla cubierta. devuelve { reveladas, explosion }.
   revelar(indice) {
     const vacio = { reveladas: [], explosion: -1 };
     if (this.estado !== 'jugando') return vacio;
@@ -163,16 +155,12 @@ export class Tablero {
     return { reveladas: cosecha, explosion: -1 };
   }
 
-  // pulsación sobre una casilla: revela si está cubierta y hace el acorde
-  // (chord) si ya está abierta. Es el comportamiento de los buscaminas modernos.
   pulsar(indice) {
     const celda = Number.isInteger(indice) && this.celdas[indice];
     if (celda && celda.revelada) return this.acorde(indice);
     return this.revelar(indice);
   }
 
-  // acorde: con tantas banderas alrededor como indica el número, abre el resto.
-  // si alguna bandera estaba mal puesta, la mina que quede a la vista explota.
   acorde(indice) {
     const vacio = { reveladas: [], explosion: -1 };
     if (this.estado !== 'jugando') return vacio;
@@ -209,9 +197,6 @@ export class Tablero {
     return { reveladas: cosecha, explosion: -1, victoria: gano };
   }
 
-  // al perder, destapa el tablero entero: la partida ha terminado y el
-  // campo queda a la vista, como un mapa que ya no sirve a nadie.
-  // de paso anota cuántas casillas seguras destapó el jugador.
   revelarTodo() {
     this.despejadasPorJugador = this.celdas.filter((c) => c.revelada && !c.mina).length;
     for (const celda of this.celdas) {
@@ -219,7 +204,6 @@ export class Tablero {
     }
   }
 
-  // pone o quita la bandera. devuelve 'bandera' | 'sin-bandera' | null.
   alternarBandera(indice) {
     if (this.estado !== 'jugando') return null;
     if (!Number.isInteger(indice) || indice < 0 || indice >= this.total) return null;
@@ -241,7 +225,6 @@ export class Tablero {
     return this.minas - this.contarBanderas();
   }
 
-  // minas que quedan por descubrir/marcar al perder: para el motor
   minasOcultas() {
     const out = [];
     for (let i = 0; i < this.total; i += 1) {
@@ -250,7 +233,6 @@ export class Tablero {
     return out;
   }
 
-  // banderas mal puestas (sobre una casilla sin mina) para el resumen final
   banderasErroneas() {
     const out = [];
     for (let i = 0; i < this.total; i += 1) {

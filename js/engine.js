@@ -1,15 +1,10 @@
-// motor del buscaminas: máquina de estados + dibujado en lienzo.
-// la lógica del tablero vive en board.js; aquí se anima y se pinta.
 
 import { Tablero } from './board.js?v=8';
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const ACENTO = '#ff2b2b';
-// la monoespaciada de la casa (var(--mono) en styles.css)
 const FUENTE_MONO = 'ui-monospace, "SFMono-Regular", "SF Mono", "Roboto Mono", Menlo, Consolas, monospace';
 
-// números: el color clásico del buscaminas sobre la tinta, planos, en la
-// monoespaciada de la casa — sin halos
 const COLORES_NUMERO = ['', '#4aa3ff', '#35d07f', '#ff4d4d', '#8f7bff', '#ff7a1f', '#22c8c8', '#ffd60a', '#f2f2f2'];
 const COLOR_NUMERO = (n) => COLORES_NUMERO[clamp(n, 1, 8)] || ACENTO;
 
@@ -19,22 +14,21 @@ export class Game {
     this.tablero = new Tablero(this.cfg);
     this.onEvent = typeof onEvent === 'function' ? onEvent : () => {};
 
-    // 'antes' = aún no hay primer clic · 'jugando' · 'ganado' · 'perdido'
     this.estado = 'antes';
     this.pausado = false;
     this.tiempoMs = 0;
-    this.reloj = 0; // ms acumulados en esta partida, para las animaciones
+    this.reloj = 0;
 
     this.cursor = {
       x: Math.floor(this.cfg.columnas / 2),
       y: Math.floor(this.cfg.filas / 2),
     };
-    this.cursorVisible = false; // se enciende con el teclado, se apaga con el ratón
-    this.casillaArmada = null; // { x, y } marcada por el doble clic de confirmación
+    this.cursorVisible = false;
+    this.casillaArmada = null;
     this.hover = null;
 
-    this.flashes = []; // { indice, t0 } — destello al destapar, en oleada
-    this.shake = 0; // sacudida del lienzo al estallar
+    this.flashes = [];
+    this.shake = 0;
     this.explosionT = -1;
     this.winT = -1;
   }
@@ -48,7 +42,7 @@ export class Game {
   get terminada() { return this.estado === 'ganado' || this.estado === 'perdido'; }
   get minasRestantes() { return this.tablero.restantesMinas(); }
   get tableroRevelado() {
-    // al perder se muestran las minas; al ganar ya está todo abierto salvo las minas
+
     return this.estado === 'perdido' || this.estado === 'ganado';
   }
 
@@ -59,8 +53,6 @@ export class Game {
   dentro(x, y) {
     return this.tablero.dentro(x, y);
   }
-
-  // ------------------------------------------------------------------ acciones
 
   moverCursor(dx, dy) {
     this.cursorVisible = true;
@@ -84,7 +76,7 @@ export class Game {
       this.estado = 'perdido';
       this.explosionT = ahora;
       this.shake = 16;
-      this.tablero.revelarTodo(); // el campo queda al descubierto
+      this.tablero.revelarTodo();
       this.emit('boom', { indice: resultado.explosion });
       return;
     }
@@ -97,8 +89,6 @@ export class Game {
     if (this.estado === 'antes' && this.tablero.sembradas) this.estado = 'jugando';
   }
 
-  // destapa la casilla (x, y): si está cerrada la revela; si ya estaba abierta,
-  // hace el acorde. Es el comportamiento de los buscaminas modernos.
   pulsar(x, y) {
     if (this.pausado || this.terminada) return;
     if (!this.dentro(x, y)) return;
@@ -149,8 +139,6 @@ export class Game {
     }
   }
 
-  // ------------------------------------------------------------------ dibujado
-
   draw(ctx, view) {
     const { cell, ox, oy, width, height, dpr } = view;
     const filas = this.filas;
@@ -187,7 +175,7 @@ export class Game {
         if (celda.revelada) {
           this._celdaAbierta(ctx, X, Y, lado, gap, celda, i);
         } else if (perdido && celda.mina && !celda.bandera) {
-          // mina descubierta al perder: celda negra con la mina en blanco
+
           this._celdaAbierta(ctx, X, Y, lado, gap, { mina: true, adj: 0 }, i, true);
         } else {
           this._celdaCerrada(ctx, X, Y, lado, gap, esHover);
@@ -198,13 +186,12 @@ export class Game {
         }
 
         if (perdido && celda.bandera && !celda.mina) {
-          // bandera mal puesta: bloque con la equis roja
+
           this._equisMala(ctx, X, Y, lado, gap);
         }
       }
     }
 
-    // la casilla que estalló: rojo entero, la mina en negro
     if (perdido && this.explosionT >= 0 && this.tablero.explosionIndice >= 0) {
       const i = this.tablero.explosionIndice;
       const ex = i % columnas;
@@ -221,7 +208,6 @@ export class Game {
       }
     }
 
-    // oleada al ganar: una franja de luz diagonal cruza el tablero una vez
     if (abrir && this.winT >= 0) {
       const dur = 950;
       const t = clamp((this.reloj - this.winT - 120) / dur, 0, 1);
@@ -245,7 +231,6 @@ export class Game {
       }
     }
 
-    // destellos de oleada al destapar
     for (const f of this.flashes) {
       const edad = this.reloj - f.t0;
       if (edad < 0 || edad > 210) continue;
@@ -259,13 +244,12 @@ export class Game {
       }
     }
 
-    // marco exterior: dos trazos en las esquinas, como el resto de la casa
     ctx.strokeStyle = 'rgba(255,255,255,0.85)';
     ctx.lineWidth = 2;
     const W = columnas * cell;
     const H = filas * cell;
     const tramo = Math.max(6, Math.round(cell * 0.7));
-    const b = 2; // el trazo va por dentro: en el borde se recortaría
+    const b = 2;
     ctx.beginPath();
     ctx.moveTo(ox + b, oy + b + tramo); ctx.lineTo(ox + b, oy + b); ctx.lineTo(ox + b + tramo, oy + b);
     ctx.moveTo(ox + W - b - tramo, oy + b); ctx.lineTo(ox + W - b, oy + b); ctx.lineTo(ox + W - b, oy + b + tramo);
@@ -274,9 +258,7 @@ export class Game {
     ctx.stroke();
     ctx.globalAlpha = 1;
 
-    // cursor del teclado: cuatro marcas de esquina sobre cualquier casilla,
-    // abierta o cerrada, para no perderlo de vista al destapar
-    if (this.casillaArmada && !this.terminada) { // el rojo de la casa: armada, aún sin destapar
+    if (this.casillaArmada && !this.terminada) {
       this._marcas(ctx, px(this.casillaArmada.x), py(this.casillaArmada.y), cell, '#ff2b2b');
     }
     if (this.cursorVisible && !this.terminada) {
@@ -300,7 +282,7 @@ export class Game {
   }
 
   _celdaCerrada(ctx, X, Y, lado, gap, hover) {
-    // bloque plano: la rejilla la marcan los huecos negros, como en snake
+
     const ix = X + gap;
     const iy = Y + gap;
     const w = lado - gap * 2;
@@ -328,30 +310,30 @@ export class Game {
   }
 
   _mina(ctx, X, Y, lado, color) {
-    const u = Math.max(1, Math.round(lado / 16)); // unidad base de la mina
+    const u = Math.max(1, Math.round(lado / 16));
     const cx = X + lado / 2;
     const cy = Y + lado / 2;
-    const tono = color === '#000' ? '#000' : null; // cuerpo plano cuando se pinta sobre rojo
-    // halo de profundidad bajo el cuerpo
+    const tono = color === '#000' ? '#000' : null;
+
     ctx.fillStyle = tono || 'rgba(0,0,0,0.35)';
     ctx.fillRect(Math.round(cx - 4 * u), Math.round(cy - 2 * u) + 1, 8 * u, 5 * u);
-    // cuerpo: bloque grueso con cruz ampliada
+
     ctx.fillStyle = color;
     ctx.fillRect(Math.round(cx - 3 * u), Math.round(cy - 3 * u), 6 * u, 6 * u);
     ctx.fillRect(Math.round(cx - 4 * u), Math.round(cy - 2 * u), 8 * u, 4 * u);
     ctx.fillRect(Math.round(cx - 2 * u), Math.round(cy - 4 * u), 4 * u, 8 * u);
-    // púas cardinales, más anchas que un píxel de bloque
+
     ctx.fillRect(Math.round(cx - u), Math.round(cy - 6 * u), 2 * u, 2 * u);
     ctx.fillRect(Math.round(cx - u), Math.round(cy + 4 * u), 2 * u, 2 * u);
     ctx.fillRect(Math.round(cx - 6 * u), Math.round(cy - u), 2 * u, 2 * u);
     ctx.fillRect(Math.round(cx + 4 * u), Math.round(cy - u), 2 * u, 2 * u);
-    // púas diagonales
+
     ctx.fillRect(Math.round(cx - 5 * u), Math.round(cy - 5 * u), u + (u >> 1), u + (u >> 1));
     ctx.fillRect(Math.round(cx + 4 * u) - (u >> 1), Math.round(cy - 5 * u), u + (u >> 1), u + (u >> 1));
     ctx.fillRect(Math.round(cx - 5 * u), Math.round(cy + 4 * u) - (u >> 1), u + (u >> 1), u + (u >> 1));
     ctx.fillRect(Math.round(cx + 4 * u) - (u >> 1), Math.round(cy + 4 * u) - (u >> 1), u + (u >> 1), u + (u >> 1));
     if (!tono) {
-      // destello especular arriba-izquierda y sombra abajo-derecha
+
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(Math.round(cx - 2 * u), Math.round(cy - 2 * u), 2 * u, u);
       ctx.fillRect(Math.round(cx - 3 * u), Math.round(cy - u), u, u);
@@ -372,32 +354,32 @@ export class Game {
       ctx.scale(escala, escala);
       ctx.translate(-cx, -(base + cima) / 2);
     }
-    // asta: cuerpo claro con filo de sombra a la derecha
+
     ctx.fillStyle = '#e8e8e8';
     ctx.fillRect(cx - u, cima, 2 * u, base - cima);
     ctx.fillStyle = '#8f8f8f';
     ctx.fillRect(cx + u - 1, cima, 1, base - cima);
-    // remate del asta
+
     ctx.fillStyle = '#f2f2f2';
     ctx.fillRect(cx - u, cima - u, 2 * u, u);
-    // paño rojo con pliegue y luz: tres tramos escalonados hacia el asta
-    const px = cx + u; // el paño cuelga a la derecha del asta
+
+    const px = cx + u;
     ctx.fillStyle = ACENTO;
     ctx.fillRect(px, cima + u, 5 * u, u);
     ctx.fillRect(px, cima + 2 * u, 6 * u, u);
     ctx.fillRect(px, cima + 3 * u, 5 * u, u);
-    // luz del paño
+
     ctx.fillStyle = '#ff7a7a';
     ctx.fillRect(px, cima + u, 5 * u, 1);
     ctx.fillRect(px, cima + 2 * u, 6 * u, 1);
-    // pliegue en sombra
+
     ctx.fillStyle = '#a31212';
     ctx.fillRect(px, cima + 3 * u, 5 * u, 1);
     ctx.fillRect(px + 4 * u, cima + 2 * u, 2 * u, u);
-    // muesca de golondrina en el vuelo del paño
+
     ctx.fillStyle = '#070707';
     ctx.fillRect(px + 5 * u, cima + 2 * u, u, u);
-    // base del asta: zócalo claro con sombra
+
     ctx.fillStyle = '#d8d8d8';
     ctx.fillRect(cx - 3 * u, base, 6 * u, u);
     ctx.fillStyle = '#4a4a4a';
@@ -421,7 +403,7 @@ export class Game {
     if (this.winT < 0) return 1;
     const retraso = (x + y) * 24;
     const t = clamp((this.reloj - this.winT - retraso) / 150, 0, 1);
-    // rebote corto: crece un poco de más y se asienta
+
     if (t <= 0) return 0;
     const s = t < 0.6 ? 1.35 * (t / 0.6) : 1.35 - 0.35 * ((t - 0.6) / 0.4);
     return s;

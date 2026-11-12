@@ -1,4 +1,3 @@
-// dificultades del buscaminas y límites del tablero personalizado
 
 export const DIFICULTADES = [
   { id: 'beginner', filas: 9, columnas: 9, minas: 10 },
@@ -8,15 +7,13 @@ export const DIFICULTADES = [
 
 export const DIFICULTAD_POR_DEFECTO = 'beginner';
 
-// límites del tablero personalizado (los clásicos de Windows: 8–24 x 8–30,
-// densidades razonables). aquí se relaja un poco por ambos lados.
 export const LIMITES_PERSONALIZADA = {
   filasMin: 5,
   filasMax: 24,
   columnasMin: 5,
   columnasMax: 30,
   minasMin: 1,
-  // nunca más del 85 % de las casillas: siempre queda algo que descubrir
+
   densidadMax: 0.85,
 };
 

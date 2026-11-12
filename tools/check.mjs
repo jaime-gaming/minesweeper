@@ -1,7 +1,3 @@
-// comprobaciones del juego, sin navegador.
-//   node tools/check.mjs
-// prueba las reglas del tablero, los topes de las dificultades y que los
-// dos idiomas digan lo mismo. sale con código 1 si algo falla.
 
 import { Tablero } from '../js/board.js';
 import {
@@ -44,7 +40,6 @@ function mulberry32(semilla) {
   };
 }
 
-// monta un tablero con minas conocidas y el contador de adyacencia calculado
 function tableroConMinas(filas, columnas, minasIdx) {
   const tablero = new Tablero({ filas, columnas, minas: minasIdx.length });
   for (const i of minasIdx) tablero.celdas[i].mina = true;
@@ -139,7 +134,7 @@ prueba('el primer clic nunca estalla', () => {
 });
 
 prueba('la zona segura evita las vecinas del primer clic', () => {
-  // con 99 minas en experto el clic y sus vecinas no pueden ser minas
+
   for (let semilla = 1; semilla <= 40; semilla += 1) {
     const rng = mulberry32(semilla * 31337);
     const tablero = new Tablero({ filas: 16, columnas: 30, minas: 99 }, rng);
@@ -192,7 +187,7 @@ prueba('se pueden agotar las minas en negativo', () => {
 
 prueba('el acorde sin banderas suficientes no abre nada', () => {
   const tablero = tableroConMinas(3, 3, [0]);
-  tablero.revelar(4); // número 1
+  tablero.revelar(4);
   const r = tablero.acorde(4);
   afirma(r.reveladas.length === 0, 'acorde sin marcar no hace nada');
   afirma(tablero.celdas[1].revelada === false, 'las vecinas siguen cerradas');
@@ -200,8 +195,8 @@ prueba('el acorde sin banderas suficientes no abre nada', () => {
 
 prueba('el acorde correcto abre lo que queda sin minas ni banderas', () => {
   const tablero = tableroConMinas(3, 3, [0]);
-  tablero.revelar(4); // centro, adj 1
-  tablero.alternarBandera(0); // la mina
+  tablero.revelar(4);
+  tablero.alternarBandera(0);
   const r = tablero.acorde(4);
   afirma(r.explosion === -1, 'sin explosión');
   afirma(tablero.estado === 'ganado', 'acorde cierra la partida');
@@ -212,7 +207,7 @@ prueba('el acorde correcto abre lo que queda sin minas ni banderas', () => {
 prueba('el acorde con una bandera mal puesta destapa la mina', () => {
   const tablero = tableroConMinas(3, 3, [0]);
   tablero.revelar(4);
-  tablero.alternarBandera(1); // bandera equivocada: 1 no tiene mina
+  tablero.alternarBandera(1);
   const r = tablero.acorde(4);
   afirma(r.explosion === 0, 'estalla la mina sin marcar');
   afirma(tablero.estado === 'perdido', 'estado perdido');
@@ -263,7 +258,7 @@ prueba('cada nivel de campaña es jugable y progresivo en actos', () => {
     if (n.reloj) afirma(n.reloj >= 60 && n.reloj <= 900, `reloj ${n.reloj}s razonable`);
     if (n.senal) afirma(n.senal >= 1 && n.senal < n.minas, `señal ${n.senal} < minas`);
   }
-  // el acto IV es más duro que el acto I, y no por poco
+
   const maxMinas = (act) => Math.max(...NIVELES.filter((n) => n.act === act).map((n) => n.minas));
   afirma(maxMinas(4) > maxMinas(1), 'el último acto muerde más que el primero');
 });

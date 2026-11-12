@@ -1,9 +1,3 @@
-// la treinta — el modo historia del juego.
-// treinta campos minados en cuatro actos, con un solo relato lineal:
-// la guerra llamó a tu puerta. nadie pregunta por qué. nadie se ofrece.
-// cada nivel guarda una línea del avance; las citas van en ES y EN.
-//
-// los niveles fijan tamaño y minas; completar uno abre el siguiente.
 
 export const ACTOS = [
   { id: 1, inicio: 0, nombreEs: 'alistamiento', nombreEn: 'enlistment', subEs: 'la carta y el juramento', subEn: 'the letter and the oath' },
@@ -13,7 +7,7 @@ export const ACTOS = [
 ];
 
 export const NIVELES = [
-  // acto I — alistamiento
+
   { act: 1, nombreEs: 'la carta', nombreEn: 'the letter', filas: 6, columnas: 6, minas: 6,
     historiaEs: 'La carta llega un martes. Tu nombre, un número de expediente y una hora. La guerra te ha elegido.',
     historiaEn: 'The letter arrives on a Tuesday. Your name, a file number and an hour. The war has picked you.' },
@@ -32,7 +26,7 @@ export const NIVELES = [
   { act: 1, nombreEs: 'el ascenso', nombreEn: 'the commission', filas: 9, columnas: 9, minas: 16,
     historiaEs: 'Te ascienden a alférez por cumplir un trámite. El tren parte al amanecer.',
     historiaEn: 'You are commissioned for completing a formality. The train leaves at dawn.' },
-  // acto II — el frente
+
   { act: 2, nombreEs: 'el convoy', nombreEn: 'the convoy', filas: 10, columnas: 10, minas: 18,
     historiaEs: 'Tres días de tren y un puente cortado. El enemigo vuela los puentes.',
     historiaEn: 'Three days of train and a cut bridge. The enemy blows the bridges.' },
@@ -51,7 +45,7 @@ export const NIVELES = [
   { act: 2, nombreEs: 'la guardia', nombreEn: 'the watch', filas: 14, columnas: 14, minas: 40,
     historiaEs: 'La noche de guardia. Minas nuevas bajo la luna; alguien las siembra cada noche.',
     historiaEn: 'The night watch. New mines under the moon; someone lays them every night.' },
-  // acto III — la operación
+
   { act: 3, nombreEs: 'el puente', nombreEn: 'the bridge', filas: 14, columnas: 14, minas: 44,
     historiaEs: 'Operación Puente: cruzar al otro lado. Dos campos, un vado y una radio muerta.',
     historiaEn: 'Operation Bridge: cross to the other side. Two fields, a ford and a dead radio.' },
@@ -70,7 +64,7 @@ export const NIVELES = [
   { act: 3, nombreEs: 'el recuento', nombreEn: 'the count', filas: 16, columnas: 16, minas: 66,
     historiaEs: 'El recuento: de cuarenta volvemos nueve. El parte dice «éxito».',
     historiaEn: "The count: of forty, nine return. The report says 'success'." },
-  // acto IV — el final del campo
+
   { act: 4, nombreEs: 'el corredor', nombreEn: 'the corridor', filas: 16, columnas: 16, minas: 69,
     historiaEs: 'El corredor: la única ruta hasta el depósito enemigo. Un kilómetro de hierba y muerte.',
     historiaEn: 'The corridor: the only route to the enemy depot. A kilometre of grass and death.' },
@@ -130,7 +124,6 @@ export function historiaNivel(indice, idioma) {
   return idioma === 'en' ? nivel.historiaEn : nivel.historiaEs;
 }
 
-// configuración de motor para un nivel de campaña
 export function configNivel(indice) {
   const nivel = NIVELES[indice];
   if (!nivel) return null;

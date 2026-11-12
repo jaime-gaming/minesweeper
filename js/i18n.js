@@ -1,4 +1,3 @@
-// Textos del juego y nombre localizados. Sin dependencias ni llamadas externas.
 
 const KEY = 'minesweeper.language';
 const STRINGS = {
@@ -19,14 +18,14 @@ const STRINGS = {
     fatalReload: 'recargar limpio',
     noScript: 'este juego necesita su motor en marcha.',
     missingPieces: 'faltan piezas del tablero ({pieces}). vuelve a barajar.',
-    // portada
+
     play: 'jugar',
     playTag: 'tres dificultades y una personalizada',
     profile: 'perfil',
     profileTag: 'récords, partidas y tasa de victorias',
     settings: 'ajustes',
     menuAria: 'menú principal',
-    // dificultad
+
     difficulty: 'DIFICULTAD',
     diffBeginner: 'principiante',
     diffBeginnerTag: '9 × 9 · 10 minas',
@@ -38,21 +37,21 @@ const STRINGS = {
     diffCustomTag: '{filas} × {columnas} · {minas} {unit}',
     best: 'mejor {time}',
     noRecord: 'sin récord',
-    // personalizada
+
     custom: 'PERSONALIZADA',
     customRows: 'filas',
     customColumns: 'columnas',
     customMines: 'minas',
     density: 'densidad {pct} %',
     start: 'empezar',
-    // hud
+
     record: 'récord',
-    // pausa
+
     pause: 'en pausa',
     resume: 'seguir',
     restart: 'reiniciar',
     quitToMenu: 'menú principal',
-    // final de partida
+
     youWon: 'despejado.',
     youLost: 'boom.',
     clearedTag: 'despejada',
@@ -65,7 +64,7 @@ const STRINGS = {
     again: 'otra vez',
     menu: 'menú',
     minesExploded: 'las minas eran {count}',
-    // perfil
+
     profileTitle: 'PERFIL',
     statsGames: 'partidas',
     statsWins: 'victorias',
@@ -81,7 +80,7 @@ const STRINGS = {
     confirmResetBody: 'se borran los récords, las partidas y los ajustes. no hay vuelta atrás.',
     confirmResetYes: 'borrar todo',
     cancel: 'cancelar',
-    // ajustes
+
     settingsTitle: 'AJUSTES',
     settingSound: 'sonido',
     settingTrama: 'trama de fósforo',
@@ -91,7 +90,7 @@ const STRINGS = {
     on: 'sí',
     off: 'no',
     back: 'volver',
-    // pistas del pie
+
     hintHome: 'elige una ruta · M silencia',
     hintModes: 'elige dificultad · Esc vuelve',
     hintCustom: '− + ajustan · Enter empieza',
@@ -104,7 +103,7 @@ const STRINGS = {
     hintSettings: 'M silencia · Esc vuelve',
     hintCampaign: 'las flechas eligen · ↵ abre · Esc vuelve',
     hintStory: '↵ marchar · Esc vuelve',
-    // campaña · la treinta
+
     campaign: 'campaña',
     campaignTag: 'la treinta · una historia en treinta campos',
     campaignLocked: 'cierra primero el nivel anterior',
@@ -170,14 +169,14 @@ const STRINGS = {
     fatalReload: 'reload clean',
     noScript: 'this game needs its engine running.',
     missingPieces: 'board pieces are missing ({pieces}). reload.',
-    // home
+
     play: 'play',
     playTag: 'three difficulties and a custom board',
     profile: 'profile',
     profileTag: 'records, games and win rate',
     settings: 'settings',
     menuAria: 'main menu',
-    // difficulty
+
     difficulty: 'DIFFICULTY',
     diffBeginner: 'beginner',
     diffBeginnerTag: '9 × 9 · 10 mines',
@@ -189,21 +188,21 @@ const STRINGS = {
     diffCustomTag: '{filas} × {columnas} · {minas} {unit}',
     best: 'best {time}',
     noRecord: 'no record',
-    // custom
+
     custom: 'CUSTOM',
     customRows: 'rows',
     customColumns: 'columns',
     customMines: 'mines',
     density: 'density {pct}%',
     start: 'start',
-    // hud
+
     record: 'best',
-    // pause
+
     pause: 'paused',
     resume: 'resume',
     restart: 'restart',
     quitToMenu: 'main menu',
-    // end of game
+
     youWon: 'cleared.',
     youLost: 'boom.',
     clearedTag: 'cleared',
@@ -216,7 +215,7 @@ const STRINGS = {
     again: 'again',
     menu: 'menu',
     minesExploded: 'there were {count} mines',
-    // profile
+
     profileTitle: 'PROFILE',
     statsGames: 'games',
     statsWins: 'wins',
@@ -232,7 +231,7 @@ const STRINGS = {
     confirmResetBody: 'records, games and settings will be wiped. there is no undo.',
     confirmResetYes: 'wipe everything',
     cancel: 'cancel',
-    // settings
+
     settingsTitle: 'SETTINGS',
     settingSound: 'sound',
     settingTrama: 'phosphor scanlines',
@@ -242,7 +241,7 @@ const STRINGS = {
     on: 'on',
     off: 'off',
     back: 'back',
-    // footer hints
+
     hintHome: 'pick a route · M mutes',
     hintModes: 'pick a difficulty · Esc goes back',
     hintCustom: '− + adjust · Enter starts',
@@ -255,7 +254,7 @@ const STRINGS = {
     hintSettings: 'M mutes · Esc goes back',
     hintCampaign: 'arrows pick · ↵ opens · Esc goes back',
     hintStory: '↵ march · Esc goes back',
-    // campaign · the thirty
+
     campaign: 'campaign',
     campaignTag: 'the thirty · a story in thirty fields',
     campaignLocked: 'beat the previous level first',
@@ -312,7 +311,7 @@ try {
   const stored = localStorage.getItem(KEY);
   if (stored === 'es' || stored === 'en') language = stored;
 } catch (error) {
-  // El idioma también funciona sin almacenamiento local.
+
 }
 
 export function getLanguage() {
@@ -324,7 +323,7 @@ export function setLanguage(value) {
   try {
     localStorage.setItem(KEY, language);
   } catch (error) {
-    // El idioma se mantiene en memoria durante esta sesión.
+
   }
   return language;
 }
@@ -343,7 +342,6 @@ export function unitMinas(count) {
   return n === 1 ? 'mina' : 'minas';
 }
 
-// para tools/check.mjs: las claves de cada idioma, sin duplicar la lista
 export function __testClaves() {
   return {
     es: Object.keys(STRINGS.es),

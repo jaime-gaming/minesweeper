@@ -1,5 +1,3 @@
-// Humo de arranque: ejecuta minesweeper.js con un DOM/canvas simulados y
-// juega una partida contra sí mismo. No deja rastro en el repo.
 import fs from 'node:fs';
 
 let opsCanvas = 0;
@@ -179,7 +177,6 @@ try {
   console.log('pantalla inicial:', api.app.pantalla);
   if (api.app.pantalla !== 'home') throw new Error('no arranca en home');
 
-  // entra en una partida intermedia
   api.ejecutar('play:intermediate');
   frames(5);
   console.log('pantalla tras jugar:', api.app.pantalla);
@@ -187,7 +184,6 @@ try {
   const juego = api.app.juego;
   console.log('tablero:', juego.columnas, 'x', juego.filas, 'minas:', juego.cfg.minas);
 
-  // juega destapando todo por orden hasta terminar (perderá en una mina)
   let clicks = 0;
   outer: for (let y = 0; y < juego.filas; y += 1) {
     for (let x = 0; x < juego.columnas; x += 1) {
@@ -217,11 +213,10 @@ try {
     if (!panel.includes('fin-stats')) throw new Error('faltan las estadísticas de la pantalla de muerte');
   }
 
-  // reinicia con R y fuerza la victoria acorde a acorde
   api.accion('restart');
   frames(5);
   const j2 = api.app.juego;
-  // primer clic seguro en (0,0) y luego abrir toda la zona segura
+
   api.accion('confirm', false, { x: 0, y: 0, puntero: true });
   let guardia = 5000;
   while (!j2.terminada && guardia > 0) {
@@ -233,7 +228,7 @@ try {
         const celda = j2.tablero.celdas[i];
         if (!celda.revelada && !celda.bandera && !celda.mina) {
           api.accion('confirm', false, { x, y, puntero: true });
-          frames(1); // deja correr el reloj entre clics, como en una partida real
+          frames(1);
           avanzo = true;
         }
       }
@@ -253,16 +248,14 @@ try {
   console.log('récord intermedia guardado (ms):', best);
   if (!(best > 0)) throw new Error('el récord no se guardó');
 
-  // cambia el idioma en caliente
   api.ejecutar('toMenu');
   frames(5);
   const pista = elementos.get('#hint')?.textContent;
   console.log('pista home (es):', pista);
 
-  // ---- campaña: la ruta profunda abre la historia; descend baja al tablero
   console.log('demo activa en la portada:', !!api.app.demo);
   if (!api.app.demo) throw new Error('la demo no arrancó en la portada');
-  listeners.get('keydown'); // (referencia viva)
+  listeners.get('keydown');
   api.ejecutar('playCampaign:0');
   frames(5);
   console.log('pantalla tras tocar el nivel 1:', api.app.pantalla);
@@ -274,10 +267,10 @@ try {
   if (api.app.pantalla !== 'playing') throw new Error('descend no bajó al tablero');
   const cam = api.app.juego;
   console.log('nivel 1:', cam.columnas, 'x', cam.filas, 'minas:', cam.cfg.minas);
-  // fuerza la victoria: destapa todo lo que no sea mina
+
   cam.tablero.celdas.forEach((c, i) => { c.demoSegura = !c.mina; });
   const objetivo = { x: -1, y: -1 };
-  // siembra desconocida: usa la lógica de forzar victoria del harness
+
   api.accion('confirm', false, { x: 0, y: 0, puntero: true });
   let guardiaCam = 5000;
   while (!cam.terminada && guardiaCam > 0) {
@@ -305,13 +298,13 @@ try {
   console.log('campaña en guardado: unlocked =', save.campaign.unlocked, 'best[0] =', save.campaign.best[0]);
   if (save.campaign.unlocked !== 2) throw new Error('el nivel 2 no se desbloqueó');
   if (!(save.campaign.best[0] > 0)) throw new Error('el mejor tiempo no se guardó');
-  // la victoria ofrece el siguiente capítulo: R abre la historia del nivel 2
+
   api.accion('restart');
   frames(5);
   if (api.app.pantalla !== 'story') throw new Error('el siguiente capítulo no abrió la historia');
   if (api.app.historia !== 1) throw new Error('la historia no es la del nivel 2');
   console.log('siguiente capítulo: historia del nivel 2 ok');
-  api.accion('back'); // vuelve al mapa de la treinta
+  api.accion('back');
   frames(3);
   if (api.app.pantalla !== 'campaign') throw new Error('Esc no devolvió al mapa');
   console.log('mapa de la treinta ok');
@@ -321,11 +314,10 @@ try {
   if (!mapa.includes('→')) throw new Error('la fila de tu posición no lleva la flecha');
   console.log('mapa: posición marcada, bloqueadas en dash ok');
 
-  // ---- epílogo: cerrar el corazón de piedra (nivel 30) muestra el panel de final
-  api.empezarPartida('campaign', 29); // último nivel
+  api.empezarPartida('campaign', 29);
   frames(3);
   const corazon = api.app.juego;
-  api.accion('confirm', false, { x: 0, y: 0, puntero: true }); // primer clic siembra minas
+  api.accion('confirm', false, { x: 0, y: 0, puntero: true });
   let guardiaCorazon = 6000;
   while (!corazon.terminada && guardiaCorazon > 0) {
     guardiaCorazon -= 1;
@@ -350,27 +342,24 @@ try {
   frames(10);
   if (api.app.pantalla !== 'won') throw new Error('el epílogo no se abrió');
   console.log('epílogo abierto en la pantalla final ok');
-  api.accion('restart'); // ↵ en el epílogo: también vuelve a la puerta
+  api.accion('restart');
   frames(5);
   if (api.app.pantalla !== 'home') throw new Error('↵ en el epílogo no devolvió a la portada');
   console.log('epílogo cierra y devuelve a la portada ok');
 
-  // ---- la historia: volver a la campaña desde la historia con Esc
   api.empezarPartida('campaign', 1);
   frames(3);
-  api.accion('pause'); // pausa
+  api.accion('pause');
   frames(2);
-  api.accion('back'); // vuelve (reanuda)
+  api.accion('back');
   frames(2);
 
-  // ---- popstate a la portada
   locationStub.pathname = '/';
   listeners.get('popstate').forEach((fn) => fn());
   frames(5);
   console.log('tras popstate a /:', api.app.pantalla);
   if (api.app.pantalla !== 'home') throw new Error('popstate no devolvió a la portada');
 
-  // ---- la treinta: pantalla con 30 niveles
   api.ejecutar('campaign');
   frames(5);
   console.log('pantalla campaña:', api.app.pantalla);
@@ -381,22 +370,20 @@ try {
   if (!mapaHTML.includes('mapa-lateral')) throw new Error('el mapa no lleva el acta del campo seleccionado');
   console.log('mapa: treinta posiciones y acta lateral ok');
 
-  // ---- el mapa: la selección de una posición bloqueada no abre nada; la de una abierta sí
   api.ejecutar('lockedNode');
   frames(2);
   if (api.app.pantalla !== 'campaign') throw new Error('lockedNode sacó de la campaña');
-  api.ejecutar('playCampaign:0'); // primera pasada: selecciona la casilla ya seleccionada? no: selecciona y no marches
+  api.ejecutar('playCampaign:0');
   frames(2);
   console.log('primer toque sobre pos 1:', api.app.pantalla);
   if (api.app.pantalla !== 'campaign') throw new Error('el primer toque sobre el mapa no seleccionó, marchó');
-  api.ejecutar('playCampaign:0'); // segundo toque sobre la misma: marcha
+  api.ejecutar('playCampaign:0');
   frames(2);
   if (api.app.pantalla !== 'story') throw new Error('el segundo toque no abrió la historia');
   console.log('mapa: primer toque inspecciona, segundo marcha ok');
-  api.accion('back'); // vuelta al mapa
+  api.accion('back');
   frames(3);
 
-  // ---- ajustes: la pantalla por grupos, con el volumen
   api.ejecutar('settings');
   frames(3);
   const ajustesHTML = documentStub.querySelector('#overlay').innerHTML;
@@ -408,10 +395,9 @@ try {
   api.ejecutar('toggleDobleClick');
   frames(2);
   if (!JSON.parse(localStorageStub.getItem('minesweeper.v1')).dobleClick) throw new Error('el doble clic no persistió');
-  api.ejecutar('toggleDobleClick'); // de vuelta al estado original
+  api.ejecutar('toggleDobleClick');
   frames(2);
 
-  // ---- perfil: la carta de servicios
   api.ejecutar('profile');
   frames(3);
   const perfilHTML = documentStub.querySelector('#overlay').innerHTML;
@@ -421,7 +407,6 @@ try {
   if (!perfilHTML.includes('statsFieldTime') && !perfilHTML.includes('tiempo en el campo') && !perfilHTML.includes('time in the field')) throw new Error('perfil perdió el tiempo en el campo');
   console.log('perfil: cifras, ticks y tiempo total ok');
 
-  // ---- la ayuda ya no existe: Esc desde la campaña vuelve a la portada
   api.ejecutar('campaign');
   frames(3);
   api.accion('back');

@@ -1,10 +1,3 @@
-// empaqueta js/*.js en un solo minesweeper.js sin módulos, para que la página
-// funcione también abriendo index.html a doble clic (file://) y en cualquier
-// hosting estático sin configurar nada. sin dependencias.
-//
-//   node tools/build.mjs          escribe minesweeper.js
-//   node tools/build.mjs --check  falla si minesweeper.js no coincide con js/*.js
-
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,7 +5,6 @@ import { fileURLToPath } from 'node:url';
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SALIDA = path.join(RAIZ, 'minesweeper.js');
 
-// orden de dependencias: cada módulo sólo usa los anteriores
 const ORDEN = ['board', 'presets', 'audio', 'input', 'engine', 'i18n', 'campaign', 'main'];
 
 const RE_IMPORT = /^import\s*\{([^}]*)\}\s*from\s*'\.\/([a-z0-9]+)\.js[^']*';?$/gm;
@@ -40,7 +32,7 @@ function transformar(id, fuente) {
     ? `\n  Object.assign(modulo, { ${exportados.join(', ')} });\n`
     : '';
 
-  return `\n// ---- ${id} ----\n(function (modulo) {\n'use strict';\n${codigo}${entrega}})(modulos['${id}']);\n`;
+  return `\n(function (modulo) {\n'use strict';\n${codigo}${entrega}})(modulos['${id}']);\n`;
 }
 
 function generar() {
@@ -51,16 +43,8 @@ function generar() {
   });
 
   const modulos = ORDEN.map((id) => `${id}: {}`).join(', ');
-  const version = fs.readFileSync(path.join(RAIZ, 'index.html'), 'utf8').match(/minesweeper\.js\?v=(\d+)/);
-  const sello = `${new Date().toISOString().slice(0, 10)} · v${version ? version[1] : '?'}`;
 
-  return `/* minesweeper — un solo fichero, sin módulos. generado por tools/build.mjs (${sello}).
-   no lo edites a mano: cambia js/*.js y vuelve a ejecutar node tools/build.mjs */
-(function () {
-'use strict';
-const modulos = { ${modulos} };
-${partes.join('')}})();
-`;
+  return `(function () {\n'use strict';\nconst modulos = { ${modulos} };\n${partes.join('')}})();\n`;
 }
 
 const contenido = generar();
@@ -68,8 +52,7 @@ const modoCheck = process.argv.includes('--check');
 
 if (modoCheck) {
   const actual = fs.existsSync(SALIDA) ? fs.readFileSync(SALIDA, 'utf8') : '';
-  const limpio = (t) => t.replace(/generado por tools\/build\.mjs \([^)]*\)/, '');
-  if (limpio(actual) !== limpio(contenido)) {
+  if (actual !== contenido) {
     process.stderr.write('minesweeper.js está desfasado: ejecuta node tools/build.mjs\n');
     process.exit(1);
   }

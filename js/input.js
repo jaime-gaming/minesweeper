@@ -1,4 +1,3 @@
-// teclado, gestos y mando. habla en acciones, no en teclas
 
 const TECLAS = {
   ArrowUp: 'up',
@@ -28,8 +27,6 @@ const BOTONES = { 12: 'up', 13: 'down', 14: 'left', 15: 'right', 0: 'confirm', 1
 
 const RETARDO_PULSACION_LARGA = 450;
 
-// main.js registra el conversor real: píxeles CSS → casilla { x, y } del tablero.
-// sin él no hay gestos sobre el tablero, solo teclado y menús.
 let conversorPunto = null;
 export function registrarConversorPunto(fn) {
   conversorPunto = typeof fn === 'function' ? fn : null;
@@ -40,7 +37,6 @@ function puntoACasilla(clientX, clientY) {
 }
 
 const toque = { id: -1, x: 0, y: 0, activo: false, marcado: false, temporizador: 0 };
-
 
 export function attachInput({ stage, actions }) {
   const fire = (accion, repetido = false, datos) => actions(accion, repetido, datos);
@@ -53,13 +49,12 @@ export function attachInput({ stage, actions }) {
     if (!accion) return;
     if (e.code === 'Space' || e.code === 'Enter' || e.code.startsWith('Arrow')
       || e.code === 'PageUp' || e.code === 'PageDown' || e.code === 'Home' || e.code === 'End') e.preventDefault();
-    // las direcciones y el scroll sí se repiten al mantener pulsado
+
     const repetible = ['up', 'down', 'left', 'right', 'scrollUp', 'scrollDown', 'scrollTop', 'scrollBottom'].includes(accion);
     if (e.repeat && !repetible) return;
     fire(accion, e.repeat);
   });
 
-  // clic derecho: bandera. clic central: acorde (abre vecinos de un número servido)
   stage.addEventListener('contextmenu', (e) => {
     e.preventDefault();
     const celda = puntoACasilla(e.clientX, e.clientY);
@@ -68,7 +63,7 @@ export function attachInput({ stage, actions }) {
 
   stage.addEventListener('pointerdown', (e) => {
     if (e.target.closest('button, #overlay')) return;
-    // al tocar el tablero, el foco vuelve a la página: las teclas llegan siempre
+
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     if (typeof window.focus === 'function') window.focus();
 
@@ -83,7 +78,6 @@ export function attachInput({ stage, actions }) {
       return;
     }
 
-    // táctil: tocar revela, mantener pulsado pone la bandera
     toque.id = e.pointerId;
     toque.x = e.clientX;
     toque.y = e.clientY;
@@ -117,7 +111,6 @@ export function attachInput({ stage, actions }) {
     clearTimeout(toque.temporizador);
   });
 
-  // mando: estado por frame, sin eventos
   let previo = {};
   let conectado = false;
 

@@ -1,4 +1,3 @@
-/* minesweeper — negro, rejilla, un rojo y un verde */
 
 
 :root {
@@ -40,13 +39,10 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-
-/* los datos y las etiquetas cortas siguen en mono; el texto respira en sans */
-
 .score,
 .meta,
 .best,
-.mult,
+.timer,
 .row-idx,
 .row-right,
 .kicker,
@@ -64,8 +60,6 @@ body {
   font-family: var(--mono);
 }
 
-
-/* trama de fósforo, se puede quitar desde el menú */
 html.trama body::after {
   content: "";
   position: fixed;
@@ -112,8 +106,6 @@ button:disabled {
     max(5px, env(safe-area-inset-bottom));
 }
 
-/* barra superior: marca, marcador y botones en una sola línea */
-
 #topbar {
   position: relative;
   z-index: 50;
@@ -140,7 +132,6 @@ button:disabled {
   margin-left: 0.16em;
   vertical-align: -0.14em;
 }
-
 
 .language-control {
   display: inline-flex;
@@ -205,7 +196,7 @@ button:disabled {
   font-variant-numeric: tabular-nums;
 }
 
-.mult {
+.timer {
   font-size: 11px;
   font-weight: 600;
   color: var(--dim);
@@ -218,7 +209,7 @@ button:disabled {
   letter-spacing: 0.06em;
   color: var(--dim);
   white-space: nowrap;
-  /* si el récord no cabe, se recorta */
+  
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
@@ -230,8 +221,6 @@ button:disabled {
   flex: none;
 }
 
-/* el marcador solo se pinta en partida: en lo demás la barra se queda en negro,
-   con la marca y el idioma, y no pisa nada */
 body:not([data-screen="playing"]):not([data-screen="paused"]):not([data-screen="dead"]):not([data-screen="won"]) .stats {
   visibility: hidden;
 }
@@ -252,7 +241,6 @@ body:not([data-screen="playing"]):not([data-screen="paused"]):not([data-screen="
   overflow: hidden;
 }
 
-/* el marco lo dibuja el motor a bloques: aquí no hay borde fijo */
 #board {
   display: block;
   background: #000;
@@ -280,15 +268,12 @@ body:not([data-screen="playing"]):not([data-screen="paused"]):not([data-screen="
   opacity: 1;
 }
 
-/* capa de menús */
-
 #overlay {
   position: fixed;
   inset: 0;
   z-index: 40;
   display: flex;
-  /* en columna, el margen auto se resuelve a 0 cuando el panel es más
-     alto que la pantalla y el contenido se puede recorrer desde arriba */
+  
   flex-direction: column;
   align-items: center;
   padding:
@@ -367,8 +352,6 @@ h1 {
   line-height: 0.78;
   letter-spacing: -0.06em;
 }
-
-/* inicio */
 
 .inicio {
   display: grid;
@@ -500,8 +483,6 @@ h1 {
   border-color: var(--line2);
 }
 
-/* foco de teclado: un marco de 2 px, sin sombras ni adornos */
-
 button.foco {
   outline: 2px solid #ffffff;
   outline-offset: -2px;
@@ -520,8 +501,6 @@ button.foco {
   color: #ffffff;
 }
 
-/* portada: tres grupos, cada uno abre su subpágina */
-
 .portada .filas .row {
   padding: clamp(10px, 2.2vh, 16px) 10px;
 }
@@ -531,9 +510,6 @@ button.foco {
   letter-spacing: 0.01em;
   text-transform: none;
 }
-
-
-/* niveles */
 
 .niveles {
   display: flex;
@@ -571,8 +547,6 @@ button.foco {
   color: #4a4a4a;
 }
 
-/* fin de partida */
-
 .fin {
   max-width: 400px;
   display: flex;
@@ -581,7 +555,6 @@ button.foco {
   padding: clamp(16px, 4vw, 24px);
   border: 1px solid var(--line2);
 }
-
 
 .fin-cabeza {
   display: flex;
@@ -648,8 +621,6 @@ button.foco {
   border-color: #b9b9b9;
 }
 
-/* aviso de foco, para cuando el juego va dentro de un iframe */
-
 #aviso-foco {
   position: fixed;
   left: 50%;
@@ -669,8 +640,6 @@ button.foco {
 #aviso-foco[hidden] {
   display: none !important;
 }
-
-/* pie */
 
 #footer {
   display: flex;
@@ -697,9 +666,6 @@ button.foco {
   text-overflow: ellipsis;
 }
 
-
-/* ajustes de tamaño */
-
 @media (max-width: 760px) {
   .inicio {
     grid-template-columns: minmax(0, 1fr) 148px;
@@ -712,7 +678,6 @@ button.foco {
     font-size: 11px;
     letter-spacing: 0.2em;
   }
-
 
   #lang-switch {
     min-width: 35px;
@@ -753,22 +718,15 @@ button.foco {
   }
 }
 
-
-/* ═════════════════════════════════════════════════════════════
-   transición de bloques entre pantallas
-   ═════════════════════════════════════════════════════════════ */
-
 #barrido {
   position: fixed;
   inset: 0;
   z-index: 90;
   pointer-events: none;
-  /* cubos nítidos, sin suavizar */
+  
   image-rendering: pixelated;
 }
 
-/* en la pantalla de «boom.», la tele vieja pierde la señal: el tubo
-   ensancha el tablero y la imagen se cubre de estática, solo entonces */
 #ruido {
   position: fixed;
   inset: 0;
@@ -791,8 +749,6 @@ button.foco {
   100% { transform: none; }
 }
 
-/* con la partida perdida se puede pasear el tablero con la lupa:
-   los cubos amplificados, sin suavizar */
 #lupa {
   position: fixed;
   z-index: 130;
@@ -805,8 +761,6 @@ button.foco {
   image-rendering: pixelated;
 }
 
-
-/* filas de solo lectura del perfil */
 .row.peligro {
   margin-top: 14px;
   border: 1px solid #351010;
@@ -840,14 +794,12 @@ button.foco {
   font-variant-numeric: tabular-nums;
 }
 
-/* el temporizador va en mono y con su sitio reservado */
-.mult {
+.timer {
   color: var(--fg);
   font-variant-numeric: tabular-nums;
   min-width: 3ch;
 }
 
-/* la derrota es del único rojo disponible; la victoria se queda en blanco */
 .cifra.derrota {
   color: var(--accent);
 }
@@ -864,7 +816,6 @@ button.foco {
   text-transform: uppercase;
 }
 
-/* pasos de la pantalla personalizada */
 .paso-row {
   cursor: default;
 }
@@ -912,7 +863,6 @@ button.foco {
   border-color: #000;
 }
 
-/* bandera grande para jugar al tacto */
 #flag-toggle {
   position: absolute;
   right: 10px;
@@ -945,7 +895,6 @@ button.foco {
   }
 }
 
-/* pantalla de arranque roto */
 #fatal {
   position: fixed;
   left: 50%;
@@ -1013,11 +962,6 @@ button.foco {
   padding: 20px;
 }
 
-/* =================================================================
-   la treinta · la historia y el mapa de la operación
-   ================================================================= */
-
-/* portada: logotipo pintado en canvas + demo en vivo de tu siguiente nivel */
 .logo-canvas {
   display: block;
   width: min(430px, 100%);
@@ -1045,7 +989,6 @@ button.foco {
   letter-spacing: 0.18em;
 }
 
-/* la treinta: el mapa de la operación */
 .campana {
   max-width: 1120px;
 }
@@ -1071,7 +1014,6 @@ button.foco {
   font-variant-numeric: tabular-nums;
 }
 
-/* la historia de un nivel, antes de picar */
 .historia {
   max-width: 640px;
   display: flex;
@@ -1118,7 +1060,6 @@ button.foco {
   }
 }
 
-/* destello de estallido: blanco seco, negro, y la muerte se queda mirando */
 #flash {
   position: fixed;
   inset: 0;
@@ -1165,8 +1106,6 @@ button.foco {
   }
 }
 
-/* la muerte no tapa el campo: el tablero completo queda a la vista y el
-   panel se queda abajo, en una barra negra de 1 px de borde */
 #overlay.muerte,
 #overlay.victoria {
   background: linear-gradient(to bottom,
@@ -1176,7 +1115,7 @@ button.foco {
     #000 92%);
   justify-content: flex-end;
   padding-bottom: 0;
-  /* mientras la pieza de derrota entra (1.5 s), el velo lo hace también */
+  
   transition: opacity 1.2s ease, visibility 1.2s;
 }
 
@@ -1263,7 +1202,6 @@ button.foco {
   color: var(--dim);
 }
 
-/* el borde superior de la barra habla: rojo en la muerte, blanco al despejar */
 .panel.fin-muerte {
   border-top: 1px solid var(--accent);
 }
@@ -1276,7 +1214,6 @@ button.foco {
   color: var(--fg);
 }
 
-/* intriga en capas: kicker, golpe, susurro, parte y parcela, en orden */
 @keyframes aparecer {
   from {
     opacity: 0;
@@ -1331,8 +1268,6 @@ button.foco {
   }
 }
 
-/* título grande de panel (perfil, ajustes) */
-
 .panel-titulo {
   margin: 4px 0 0;
   font-size: clamp(26px, 6vw, 40px);
@@ -1340,8 +1275,6 @@ button.foco {
   letter-spacing: -0.04em;
   line-height: 0.95;
 }
-
-/* ---------- la treinta: el mapa de la operación ---------- */
 
 .mapa-nota {
   margin: 0 0 10px;
@@ -1383,7 +1316,6 @@ button.foco {
   background: transparent;
 }
 
-/* el parte desplegado: ancho fijo, se recorre a lo ancho */
 .mapa {
   position: relative;
   flex: none;
@@ -1417,7 +1349,6 @@ button.foco {
   letter-spacing: 0.1em;
 }
 
-/* numerales de acto bajo la ruta */
 .mapa-marca {
   fill: #0e0e0e;
   font-family: var(--mono);
@@ -1447,7 +1378,6 @@ button.foco {
   letter-spacing: 0.18em;
 }
 
-/* las treinta posiciones: bloques sobre el mapa */
 .mapa-nodo {
   position: absolute;
   width: 46px;
@@ -1557,7 +1487,6 @@ button.foco {
   background: #0a0a0a;
 }
 
-/* la casilla del detalle, a la derecha del mapa */
 .mapa-lateral {
   display: flex;
   flex-direction: column;
@@ -1646,8 +1575,6 @@ button.foco {
   padding: 2px 4px;
 }
 
-/* ---------- perfil: la carta de servicios ---------- */
-
 .perfil-cifras {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1680,7 +1607,6 @@ button.foco {
   color: var(--muted);
 }
 
-/* la treinta en treinta trazos: blanco, rojo es tu frontera */
 .perfil-ticks {
   display: flex;
   gap: 2px;
@@ -1713,8 +1639,6 @@ button.foco {
     opacity: 0.35;
   }
 }
-
-/* ---------- responsive: el mapa se explora desplazándolo en pequeño ---------- */
 
 @media (max-width: 860px) {
   .mapa-cuerpo {
