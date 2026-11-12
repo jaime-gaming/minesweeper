@@ -9,7 +9,7 @@ import {
 } from './presets.js?v=1';
 import { audio } from './audio.js?v=7';
 import { attachInput, registrarConversorPunto } from './input.js?v=1';
-import { t, getLanguage, setLanguage, unitMinas, routeSlug, routeWords } from './i18n.js?v=12';
+import { t, getLanguage, setLanguage, unitMinas, routeSlug, routeWords } from './i18n.js?v=13';
 import { NIVELES, ACTOS, configNivel, nivelCampana, actoDe } from './campaign.js?v=7';
 
 const $ = (sel) => document.querySelector(sel);
@@ -137,6 +137,8 @@ const el = {
   avisoFoco: $('#aviso-foco'),
   flagToggle: $('#flag-toggle'),
   barrido: $('#barrido'),
+  ruido: $('#ruido'),
+  lupa: $('#lupa'),
   demoCtx: null,
 };
 
@@ -318,6 +320,147 @@ function pasoBarrido(dt) {
 }
 
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
+
+/* ------------------- la muerte y la tele: la imagen pierde la señal */
+
+const DURACION_RUIDO = 800; // ms de estática, solo cuando abre la barra «boom.»
+const ruidoFx = { t: 0, activo: false, lienzoBase: null, img: null };
+
+function efectoTubos() {
+  if (sinMovimiento()) return;
+  const lienzo = el.ruido;
+  if (!lienzo) return;
+  const dpr = Math.min(1.5, window.devicePixelRatio || 1);
+  lienzo.width = Math.round(window.innerWidth * dpr);
+  lienzo.height = Math.round(window.innerHeight * dpr);
+  lienzo.style.width = `${window.innerWidth}px`;
+  lienzo.style.height = `${window.innerHeight}px`;
+  // buffer de nieve en baja resolución: cubos gordos, como la casa y como la tele
+  const ladoX = 180, ladoY = 100;
+  if (!ruidoFx.lienzoBase) {
+    ruidoFx.lienzoBase = document.createElement('canvas');
+  }
+  ruidoFx.lienzoBase.width = ladoX;
+  ruidoFx.lienzoBase.height = ladoY;
+  ruidoFx.img = ruidoFx.lienzoBase.getContext('2d').createImageData(ladoX, ladoY);
+  if (el.stage) {
+    el.stage.classList.remove('tubo');
+    void el.stage.offsetWidth; // reinicia la animación si quedaba a medias
+    el.stage.classList.add('tubo');
+  }
+  if (lienzo.hidden) lienzo.hidden = false;
+  ruidoFx.t = 0;
+  ruidoFx.activo = true;
+}
+
+function pasoRuido(dt) {
+  if (!ruidoFx.activo) return;
+  ruidoFx.t += dt;
+  const progreso = clamp01(ruidoFx.t / DURACION_RUIDO);
+  const lienzo = el.ruido;
+  const ctx = lienzo ? lienzo.getContext('2d') : null;
+  const { img, lienzoBase } = ruidoFx;
+  if (ctx && img && lienzoBase) {
+    const datos = img.data;
+    const intensidad = 1 - progreso * 0.72; // la señal se rinde poco a poco
+    for (let i = 0; i < datos.length; i += 4) {
+      const v = Math.random() < 0.52 ? Math.random() * 255 : 0;
+      datos[i] = v;
+      datos[i + 1] = v;
+      datos[i + 2] = v;
+      datos[i + 3] = 255 * intensidad * (Math.random() < 0.86 ? 1 : 0.25);
+    }
+    lienzoBase.getContext('2d').putImageData(img, 0, 0);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, lienzo.width, lienzo.height);
+    ctx.imageSmoothingEnabled = false;
+    ctx.globalAlpha = 0.92;
+    ctx.drawImage(lienzoBase, 0, 0, lienzo.width, lienzo.height);
+    // dos bandas de rasgado: la imagen salta unos píxeles, la vieja tele lo hacía
+    for (const banda of [0.31, 0.68]) {
+      if (Math.random() < 0.55) {
+        const sy = Math.floor(lienzo.height * banda * Math.random());
+        const alto = Math.max(4, Math.floor(lienzo.height * (0.015 + Math.random() * 0.05)));
+        const desplaz = (Math.random() - 0.5) * lienzo.width * 0.09;
+        ctx.drawImage(lienzo, 0, sy, lienzo.width, alto, desplaz, sy, lienzo.width, alto);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+  if (progreso >= 1) {
+    ruidoFx.activo = false;
+    if (el.ruido) {
+      const c = el.ruido.getContext('2d');
+      if (c) c.clearRect(0, 0, el.ruido.width, el.ruido.height);
+      el.ruido.hidden = true;
+    }
+    if (el.stage) el.stage.classList.remove('tubo');
+  }
+}
+
+const LUPA_LADO = 190; // px CSS: el recuadro de inspección
+const LUPA_ZOOM = 3;   // ampliación de la mina al triple, sin suavizar
+
+function pintarLupa(evento) {
+  const lienzo = el.lupa;
+  const origen = el.canvas;
+  if (!lienzo || !origen) return;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  if (lienzo.width !== LUPA_LADO * dpr) {
+    lienzo.width = LUPA_LADO * dpr;
+    lienzo.height = LUPA_LADO * dpr;
+  }
+  const rect = origen.getBoundingClientRect();
+  // coordenadas del cursor dentro del lienzo, en píxeles de respaldo
+  const mx = (evento.clientX - rect.left) * (origen.width / rect.width);
+  const my = (evento.clientY - rect.top) * (origen.height / rect.height);
+  const lado = (LUPA_LADO * (origen.width / rect.width)) / LUPA_ZOOM;
+  const sx = mx - lado / 2;
+  const sy = my - lado / 2;
+  const ctx = lienzo.getContext('2d');
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, lienzo.width, lienzo.height);
+  // fuera del tablero, el plano se queda en negro
+  const recorteX = Math.max(0, sx);
+  const recorteY = Math.max(0, sy);
+  const solapeX = Math.min(origen.width, sx + lado) - recorteX;
+  const solapeY = Math.min(origen.height, sy + lado) - recorteY;
+  if (solapeX > 0 && solapeY > 0) {
+    ctx.drawImage(
+      origen,
+      recorteX, recorteY, solapeX, solapeY,
+      (recorteX - sx) * (lienzo.width / lado), (recorteY - sy) * (lienzo.height / lado),
+      solapeX * (lienzo.width / lado), solapeY * (lienzo.height / lado),
+    );
+  }
+  // las cuatro marcas de la casa: encuadre del detalle
+  const m = Math.round(9 * dpr);
+  const largo = Math.round(16 * dpr);
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = Math.max(1, Math.round(dpr));
+  ctx.beginPath();
+  ctx.moveTo(m, m + largo); ctx.lineTo(m, m); ctx.lineTo(m + largo, m);
+  ctx.moveTo(lienzo.width - m - largo, m); ctx.lineTo(lienzo.width - m, m); ctx.lineTo(lienzo.width - m, m + largo);
+  ctx.moveTo(m, lienzo.height - m - largo); ctx.lineTo(m, lienzo.height - m); ctx.lineTo(m + largo, lienzo.height - m);
+  ctx.moveTo(lienzo.width - m - largo, lienzo.height - m); ctx.lineTo(lienzo.width - m, lienzo.height - m); ctx.lineTo(lienzo.width - m, lienzo.height - m - largo);
+  ctx.stroke();
+  // posición: junto al cursor, siempre dentro de la ventana
+  const margen = 14;
+  const ancho = LUPA_LADO;
+  let x = evento.clientX + margen;
+  let y = evento.clientY + margen;
+  if (x + ancho > window.innerWidth - 8) x = evento.clientX - ancho - margen;
+  if (y + ancho > window.innerHeight - 8) y = evento.clientY - ancho - margen;
+  lienzo.style.left = `${Math.max(8, x)}px`;
+  lienzo.style.top = `${Math.max(8, y)}px`;
+  if (lienzo.hidden) lienzo.hidden = false;
+}
+
+function ocultarLupa() {
+  if (el.lupa) el.lupa.hidden = true;
+}
 
 /* --------------------------------------------------------------- pistas */
 
@@ -864,6 +1007,7 @@ function empezarPartida(modo, nivel = null) {
   el.flagToggle.setAttribute('aria-pressed', 'false');
   el.flagToggle.classList.remove('activo');
   ponerOverlay(null);
+  ocultarLupa();
   pantalla('playing');
   el.senal.textContent = t('startSignal');
   el.senal.classList.add('visible');
@@ -1096,6 +1240,7 @@ function mostrarFinPerdida() {
   const j = app.juego;
   if (!j) return;
   audio.musica('death', 0, 1.2); // la pieza de derrota suena con la barra
+  efectoTubos(); // el tubo ensancha la pantalla y la imagen hierve, solo aquí
   const totalSeguras = j.cfg.filas * j.cfg.columnas - j.cfg.minas;
   const despejadas = typeof j.tablero.despejadasPorJugador === 'number' ? j.tablero.despejadasPorJugador : 0;
   const enCampaña = app.modo === 'campaign';
@@ -1603,6 +1748,7 @@ function bucle(t) {
   const dt = Math.min(100, Math.max(0, t - ultimoT));
   ultimoT = t;
   pasoBarrido(dt);
+  pasoRuido(dt);
   const j = app.juego;
   if (j) {
     if (casillaArmada && Date.now() - casillaArmada.t > RETARDO_DOBLE) {
@@ -1701,10 +1847,13 @@ function arrancar() {
     if (!j) return;
     j.cursorVisible = false;
     j.hover = conversorDePuntos(evento.clientX, evento.clientY);
+    if (app.pantalla === 'dead' && evento.pointerType !== 'touch') pintarLupa(evento);
+    else ocultarLupa();
   });
   el.canvas.addEventListener('pointerleave', () => {
     const j = app.juego;
     if (j) j.hover = null;
+    ocultarLupa();
   });
 
   el.flagToggle.addEventListener('click', () => {

@@ -807,35 +807,42 @@ button.foco {
   image-rendering: pixelated;
 }
 
-/* cuando «boom.» aparece, la vieja tele se engancha a la señal:
-   saltos de sintonía en la propia barra y en el velo, nunca durante el flash */
-#overlay.muerte {
-  animation: sintonia-velo 0.72s steps(1, end) 0.18s backwards;
+/* en la pantalla de «boom.», la tele vieja pierde la señal: el tubo
+   ensancha el tablero y la imagen se cubre de estática, solo entonces */
+#ruido {
+  position: fixed;
+  inset: 0;
+  z-index: 125;
+  pointer-events: none;
+  image-rendering: pixelated;
 }
 
-.panel.fin-muerte {
-  animation: sintonia 0.9s steps(1, end) 0.18s backwards;
+#stage.tubo {
+  animation: tubo 0.85s steps(1, end) 1;
 }
 
-@keyframes sintonia {
-  0%   { opacity: 0; transform: translateY(-14px) scaleY(0.62); filter: brightness(2.6); }
-  9%   { opacity: 1; transform: translateY(12px) scaleY(1.16); filter: brightness(0.32); }
-  17%  { opacity: 0.35; transform: translateY(-7px) scaleY(0.9); filter: brightness(2.15); }
-  25%  { opacity: 1; transform: translateY(3px) scaleY(1.07); filter: brightness(0.5); }
-  34%  { opacity: 0.6; transform: translateY(1px) scaleY(0.97); filter: brightness(1.7); }
-  47%  { opacity: 1; transform: none; filter: brightness(0.62); }
-  62%  { opacity: 0.92; filter: brightness(1.4); }
-  78%  { opacity: 1; filter: brightness(0.85); }
-  100% { opacity: 1; transform: none; filter: none; }
+@keyframes tubo {
+  0% { transform: scaleX(1.06) translateY(-1.6vh); }
+  16% { transform: scaleX(0.965) translateY(1.1vh); }
+  31% { transform: scaleX(1.03) translateY(-0.7vh); }
+  48% { transform: scaleX(0.985) translateY(0.5vh); }
+  64% { transform: scaleX(1.012) translateY(-0.2vh); }
+  80% { transform: scaleX(0.997); }
+  100% { transform: none; }
 }
 
-@keyframes sintonia-velo {
-  0% { opacity: 0; }
-  12% { opacity: 0.65; }
-  22% { opacity: 0.15; }
-  34% { opacity: 0.8; }
-  46% { opacity: 0.4; }
-  100% { opacity: 1; }
+/* con la partida perdida se puede pasear el tablero con la lupa:
+   los cubos amplificados, sin suavizar */
+#lupa {
+  position: fixed;
+  z-index: 130;
+  width: 190px;
+  height: 190px;
+  pointer-events: none;
+  background: #000;
+  border: 1px solid rgba(255, 255, 255, 0.92);
+  box-shadow: 0 0 0 1px #000, 0 14px 36px rgba(0, 0, 0, 0.65);
+  image-rendering: pixelated;
 }
 
 
@@ -1212,8 +1219,7 @@ button.foco {
     animation-duration: 0.35s;
   }
 
-  #overlay.muerte,
-  .panel.fin-muerte {
+  #stage.tubo {
     animation: none;
   }
 
@@ -1249,6 +1255,7 @@ button.foco {
 }
 
 .panel.fin-barra {
+  animation: subir-muerte 1.25s cubic-bezier(0.16, 0.84, 0.3, 1) 0.18s backwards;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
@@ -1365,7 +1372,6 @@ button.foco {
 
 .panel.fin-victoria {
   border-top: 1px solid var(--fg);
-  animation: subir-muerte 1.25s cubic-bezier(0.16, 0.84, 0.3, 1) 0.18s backwards;
 }
 
 .cifra.limpia {
