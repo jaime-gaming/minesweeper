@@ -425,8 +425,9 @@ function boomSintetico() {
 }
 
 const MUSICA = {
-  win: 'audio/Win.mp3',
-  death: 'audio/Death.mp3',
+  ambience: { url: 'audio/Ambience.mp3', bucle: true, vol: 0.55 },
+  win: { url: 'audio/Win.mp3', bucle: false, vol: 1 },
+  death: { url: 'audio/Death.mp3', bucle: false, vol: 1 },
 };
 
 const EFECTOS = {
@@ -437,7 +438,7 @@ const buffersFx = new Map();
 const fxListos = new Map();
 
 function precargarEfectos() {
-  if (!ctx) return;
+  if (!ctx || typeof fetch !== 'function') return;
   for (const nombre of Object.keys(EFECTOS)) {
     if (buffersFx.has(nombre)) continue;
     const peticion = fetch(EFECTOS[nombre])
@@ -457,12 +458,14 @@ function precargarEfectos() {
 
 const buffersMusica = new Map();
 let actual = null;
+let solicitada = null;
 let generacion = 0;
 
 function cargarMusica(nombre) {
   if (buffersMusica.has(nombre)) return buffersMusica.get(nombre);
   const c = build();
-  const promesa = fetch(MUSICA[nombre])
+  if (!c || typeof fetch !== 'function') return Promise.reject(new Error('audio listo'));
+  const promesa = fetch(MUSICA[nombre].url)
     .then((r) => {
       if (!r.ok) throw new Error(`audio ${r.status}`);
       return r.arrayBuffer();
@@ -475,6 +478,7 @@ function cargarMusica(nombre) {
 
 function detenerMusicaActual(fade = 0.35) {
   generacion += 1;
+  solicitada = null;
   const c = ctx;
   const corriente = actual;
   actual = null;
@@ -489,6 +493,16 @@ function detenerMusicaActual(fade = 0.35) {
   } catch (err) {
     try { src.stop(); } catch (err2) {  }
   }
+}
+
+let precargaHecha = false;
+function precargarTodo() {
+  if (precargaHecha) return;
+  const c = build();
+  if (!c || typeof fetch !== 'function') return;
+  precargaHecha = true;
+  for (const nombre of Object.keys(MUSICA)) cargarMusica(nombre);
+  precargarEfectos();
 }
 
 const SONIDOS = {
@@ -550,6 +564,7 @@ const audio = {
     } catch (err) {
       
     }
+    precargarTodo();
   },
 
   set(on) {
@@ -581,32 +596,50 @@ const audio = {
     }
   },
 
+  precargar: precargarTodo,
+
   musica(nombre, retardoMs = 0, fundido = 1.2) {
     if (!this.enabled || !MUSICA[nombre]) return;
+    if (actual && actual.nombre === nombre) return;
+    if (solicitada === nombre) return;
     const c = build();
     if (!c) return;
     detenerMusicaActual(0.85);
     const gen = generacion;
+    solicitada = nombre;
+    const cfg = MUSICA[nombre];
     cargarMusica(nombre).then((buf) => {
-      if (gen !== generacion || !this.enabled) return;
+      if (gen !== generacion) return;
+      if (!this.enabled) {
+        if (solicitada === nombre) solicitada = null;
+        return;
+      }
       const gan = c.createGain();
       gan.gain.setValueAtTime(0.0001, c.currentTime);
-      gan.gain.exponentialRampToValueAtTime(1, c.currentTime + Math.max(0.05, fundido));
+      gan.gain.exponentialRampToValueAtTime(Math.max(0.02, cfg.vol ?? 1), c.currentTime + Math.max(0.05, fundido));
       const src = c.createBufferSource();
       src.buffer = buf;
+      src.loop = !!cfg.bucle;
       src.connect(gan).connect(musicGain);
       src.addEventListener('ended', () => {
         if (actual && actual.src === src) actual = null;
       });
       src.start(c.currentTime + Math.max(0, retardoMs) / 1000);
+      solicitada = null;
       actual = { src, gan, nombre };
     }).catch(() => {
-      
+      if (solicitada === nombre) solicitada = null;
     });
   },
 
   pararMusica(fade = 0.9) {
     detenerMusicaActual(fade);
+  },
+
+  pararAmbiente(fade = 0.8) {
+    const enMarcha = Boolean(actual && actual.nombre === 'ambience');
+    const arrancando = solicitada === 'ambience';
+    if (enMarcha || arrancando) detenerMusicaActual(fade);
   },
 
   play(nombre, datos) {
@@ -620,6 +653,8 @@ const audio = {
     }
   },
 };
+
+precargarTodo();
 
   Object.assign(modulo, { audio });
 })(modulos['audio']);
@@ -1339,7 +1374,7 @@ const STRINGS = {
     groupGame: 'juego',
     groupData: 'datos',
     settingVolume: 'volumen de la música',
-    settingVolumeTag: 'las piezas de final; los efectos van aparte',
+    settingVolumeTag: 'el ambiente del campo y las piezas de final; los efectos van aparte',
     mapStamp: 'no pisar',
     mapScroll: 'el mapa se desplaza a lo ancho',
     campaignHereShort: 'tu posición',
@@ -1490,7 +1525,7 @@ const STRINGS = {
     groupGame: 'game',
     groupData: 'data',
     settingVolume: 'music volume',
-    settingVolumeTag: 'the end pieces; the effects stay as they are',
+    settingVolumeTag: 'the field ambience and the end pieces; the effects stay as they are',
     mapStamp: 'do not step',
     mapScroll: 'the map scrolls sideways',
     campaignHereShort: 'your position',
@@ -1845,6 +1880,7 @@ const el = {
   langSwitch: $('#lang-switch'),
   avisoFoco: $('#aviso-foco'),
   flagToggle: $('#flag-toggle'),
+  app: $('#app'),
   barrido: $('#barrido'),
   ruido: $('#ruido'),
   lupa: $('#lupa'),
@@ -2027,10 +2063,9 @@ function pasoBarrido(dt) {
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
 const DURACION_RUIDO = 800;
-const ruidoFx = { t: 0, activo: false, lienzoBase: null, img: null };
+const ruidoFx = { t: 0, activo: false, persistente: false, lienzoBase: null, img: null };
 
-function efectoTubos() {
-  if (sinMovimiento()) return;
+function ajustarRuido() {
   const lienzo = el.ruido;
   if (!lienzo) return;
   const dpr = Math.min(1.5, window.devicePixelRatio || 1);
@@ -2046,14 +2081,35 @@ function efectoTubos() {
   ruidoFx.lienzoBase.width = ladoX;
   ruidoFx.lienzoBase.height = ladoY;
   ruidoFx.img = ruidoFx.lienzoBase.getContext('2d').createImageData(ladoX, ladoY);
-  if (el.stage) {
-    el.stage.classList.remove('tubo');
-    void el.stage.offsetWidth;
-    el.stage.classList.add('tubo');
-  }
-  if (lienzo.hidden) lienzo.hidden = false;
+}
+
+function activarEfectoTv() {
+  if (sinMovimiento()) return;
+  if (ruidoFx.persistente) return;
+  ajustarRuido();
+  const lienzo = el.ruido;
+  if (lienzo && lienzo.hidden) lienzo.hidden = false;
   ruidoFx.t = 0;
   ruidoFx.activo = true;
+  ruidoFx.persistente = true;
+  if (el.app) {
+    el.app.classList.add('tv-muerte');
+    el.app.classList.add('tv-entrada');
+    setTimeout(() => el.app && el.app.classList.remove('tv-entrada'), 950);
+  }
+}
+
+function desactivarEfectoTv() {
+  if (!ruidoFx.activo && !ruidoFx.persistente) return;
+  ruidoFx.activo = false;
+  ruidoFx.persistente = false;
+  const lienzo = el.ruido;
+  if (lienzo) {
+    const c = lienzo.getContext('2d');
+    if (c) c.clearRect(0, 0, lienzo.width, lienzo.height);
+    lienzo.hidden = true;
+  }
+  if (el.app) el.app.classList.remove('tv-muerte', 'tv-entrada');
 }
 
 function pasoRuido(dt) {
@@ -2065,7 +2121,7 @@ function pasoRuido(dt) {
   const { img, lienzoBase } = ruidoFx;
   if (ctx && img && lienzoBase) {
     const datos = img.data;
-    const intensidad = 1 - progreso * 0.72;
+    const intensidad = ruidoFx.persistente ? 0.58 + (1 - progreso) * 0.42 : 1 - progreso * 0.72;
     for (let i = 0; i < datos.length; i += 4) {
       const v = Math.random() < 0.52 ? Math.random() * 255 : 0;
       datos[i] = v;
@@ -2090,14 +2146,14 @@ function pasoRuido(dt) {
     }
     ctx.globalAlpha = 1;
   }
-  if (progreso >= 1) {
+  if (progreso >= 1 && !ruidoFx.persistente) {
     ruidoFx.activo = false;
     if (el.ruido) {
       const c = el.ruido.getContext('2d');
       if (c) c.clearRect(0, 0, el.ruido.width, el.ruido.height);
       el.ruido.hidden = true;
     }
-    if (el.stage) el.stage.classList.remove('tubo');
+    if (el.app) el.app.classList.remove('tv-muerte', 'tv-entrada');
   }
 }
 
@@ -2188,6 +2244,14 @@ function actualizarPista() {
   el.hint.textContent = clave ? t(clave) : '';
 }
 
+function gestionarMusicaPantalla(nombre) {
+  if (nombre === 'playing' || nombre === 'paused') {
+    if (app.juego && !app.juego.terminada) audio.musica('ambience', 200, 1.4);
+    return;
+  }
+  audio.pararAmbiente();
+}
+
 function pantalla(nombre) {
   const antes = app.pantalla;
   app.pantalla = nombre;
@@ -2195,6 +2259,9 @@ function pantalla(nombre) {
   el.flagToggle.hidden = !(nombre === 'playing' && esTactil());
   if (nombre !== 'playing') el.senal.classList.remove('visible');
   if (antes !== nombre) taparPantalla();
+  gestionarMusicaPantalla(nombre);
+  if (nombre === 'dead') activarEfectoTv();
+  else desactivarEfectoTv();
   actualizarPista();
   if (RUTAS.listas && !RUTAS.restaurando) sincronizarRuta(false);
 }
@@ -2233,16 +2300,19 @@ function actualizarMarcador() {
 let huecoFin = 0;
 let casillaArmada = null;
 const RETARDO_DOBLE = 400;
+const RETARDO_INFORME = 1500;
 
 function ajustarLienzo() {
   const j = app.juego;
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   const banda = el.stage.getBoundingClientRect();
+  const bandaAncho = el.stage.clientWidth || banda.width;
+  const bandaAlto = el.stage.clientHeight || banda.height;
   const columnas = j ? j.columnas : 9;
   const filas = j ? j.filas : 9;
   const margen = 4;
-  const availW = Math.max(80, banda.width - margen);
-  const availH = Math.max(80, banda.height - margen - huecoFin);
+  const availW = Math.max(80, bandaAncho - margen);
+  const availH = Math.max(80, bandaAlto - margen - huecoFin);
   const cell = Math.max(8, Math.floor(Math.min(availW / columnas, availH / filas)));
   vista.cell = cell;
   vista.width = cell * columnas;
@@ -2871,7 +2941,6 @@ function empezarPartida(modo, nivel = null) {
     mostrarCampaña();
     return;
   }
-  audio.pararMusica(0.9);
   app.juego = new Game(cfg, eventosJuego);
   casillaArmada = null;
   app.record = false;
@@ -2982,7 +3051,7 @@ function eventosJuego(tipo, datos) {
       }
       setTimeout(() => {
         if (app.juego === j && j.estado === 'perdido') mostrarFinPerdida();
-      }, 900);
+      }, RETARDO_INFORME);
       break;
     }
     case 'win':
@@ -3100,7 +3169,7 @@ function ponerBarraFin({ variante, kicker, titulo, susurro, stats, parcela, acci
   enfocarPrimero();
 
   const panel = el.overlay.querySelector('.fin-barra');
-  const alto = panel ? Math.ceil(panel.getBoundingClientRect().height) : 0;
+  const alto = panel ? Math.ceil(panel.offsetHeight || panel.getBoundingClientRect().height) : 0;
   if (alto > 0) {
     huecoFin = alto;
     el.stage.style.paddingBottom = `${alto}px`;
@@ -3112,7 +3181,6 @@ function mostrarFinPerdida() {
   const j = app.juego;
   if (!j) return;
   audio.musica('death', 0, 1.2);
-  efectoTubos();
   const totalSeguras = j.cfg.filas * j.cfg.columnas - j.cfg.minas;
   const despejadas = typeof j.tablero.despejadasPorJugador === 'number' ? j.tablero.despejadasPorJugador : 0;
   const enCampaña = app.modo === 'campaign';
@@ -3237,6 +3305,7 @@ function borrarTodo() {
   const limpio = nuevoRegistro();
   guardado.best = limpio.best;
   guardado.stats = limpio.stats;
+  guardado.campaign = limpio.campaign;
   guardado.sound = limpio.sound;
   guardado.trama = limpio.trama;
   guardado.dobleClick = limpio.dobleClick;
@@ -3692,6 +3761,7 @@ function bucle(t) {
 function aplicarSonido() {
   audio.enabled = guardado.sound;
   audio.set(guardado.sound);
+  gestionarMusicaPantalla(app.pantalla);
 }
 
 function aplicarIdiomaBase() {
@@ -3790,23 +3860,19 @@ function arrancar() {
     }, { once: true });
   }
 
+  const alRedimensionar = () => {
+    ajustarLienzo();
+    ajustarBarrido();
+    if (ruidoFx.activo) ajustarRuido();
+  };
   if (window.ResizeObserver) {
     try {
-      new ResizeObserver(() => {
-        ajustarLienzo();
-        ajustarBarrido();
-      }).observe(el.stage);
+      new ResizeObserver(alRedimensionar).observe(el.stage);
     } catch (err) {
-      window.addEventListener('resize', () => {
-        ajustarLienzo();
-        ajustarBarrido();
-      });
+      window.addEventListener('resize', alRedimensionar);
     }
   } else {
-    window.addEventListener('resize', () => {
-      ajustarLienzo();
-      ajustarBarrido();
-    });
+    window.addEventListener('resize', alRedimensionar);
   }
   window.addEventListener('orientationchange', () => setTimeout(ajustarLienzo, 140));
 

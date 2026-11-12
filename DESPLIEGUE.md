@@ -7,7 +7,7 @@ El juego se sirve en la **raíz** de `minesweeper.jaime-gaming.com` como
 ## Qué se publica
 
 `npx wrangler deploy` sube **solo el juego**: `index.html`, `styles.css`,
-`minesweeper.js` y `audio/{Boom,Death,Win}.mp3`. `.assetsignore` deja fuera
+`minesweeper.js` y `audio/{Ambience,Boom,Death,Win}.mp3`. `.assetsignore` deja fuera
 `.git`, `.github`, `js/`, `tools/`, `serve.mjs`, `wrangler.toml`, la
 documentación y los propios metaficheros: nada de eso es alcanzable por URL.
 

@@ -14,6 +14,8 @@ const TIPOS = {
   '.json': 'application/json; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
+  '.mp3': 'audio/mpeg',
+  '.m4a': 'audio/mp4',
   '.ico': 'image/x-icon',
   '.txt': 'text/plain; charset=utf-8',
 };

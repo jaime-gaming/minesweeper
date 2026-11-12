@@ -7,9 +7,9 @@ import {
   esDificultadFija,
   limitesMinas,
 } from './presets.js?v=1';
-import { audio } from './audio.js?v=8';
+import { audio } from './audio.js?v=9';
 import { attachInput, registrarConversorPunto } from './input.js?v=1';
-import { t, getLanguage, setLanguage, unitMinas, routeSlug, routeWords } from './i18n.js?v=18';
+import { t, getLanguage, setLanguage, unitMinas, routeSlug, routeWords } from './i18n.js?v=19';
 import { NIVELES, ACTOS, configNivel, nivelCampana, actoDe } from './campaign.js?v=7';
 
 const $ = (sel) => document.querySelector(sel);
@@ -136,6 +136,7 @@ const el = {
   langSwitch: $('#lang-switch'),
   avisoFoco: $('#aviso-foco'),
   flagToggle: $('#flag-toggle'),
+  app: $('#app'),
   barrido: $('#barrido'),
   ruido: $('#ruido'),
   lupa: $('#lupa'),
@@ -318,10 +319,9 @@ function pasoBarrido(dt) {
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
 const DURACION_RUIDO = 800;
-const ruidoFx = { t: 0, activo: false, lienzoBase: null, img: null };
+const ruidoFx = { t: 0, activo: false, persistente: false, lienzoBase: null, img: null };
 
-function efectoTubos() {
-  if (sinMovimiento()) return;
+function ajustarRuido() {
   const lienzo = el.ruido;
   if (!lienzo) return;
   const dpr = Math.min(1.5, window.devicePixelRatio || 1);
@@ -337,14 +337,35 @@ function efectoTubos() {
   ruidoFx.lienzoBase.width = ladoX;
   ruidoFx.lienzoBase.height = ladoY;
   ruidoFx.img = ruidoFx.lienzoBase.getContext('2d').createImageData(ladoX, ladoY);
-  if (el.stage) {
-    el.stage.classList.remove('tubo');
-    void el.stage.offsetWidth;
-    el.stage.classList.add('tubo');
-  }
-  if (lienzo.hidden) lienzo.hidden = false;
+}
+
+function activarEfectoTv() {
+  if (sinMovimiento()) return;
+  if (ruidoFx.persistente) return;
+  ajustarRuido();
+  const lienzo = el.ruido;
+  if (lienzo && lienzo.hidden) lienzo.hidden = false;
   ruidoFx.t = 0;
   ruidoFx.activo = true;
+  ruidoFx.persistente = true;
+  if (el.app) {
+    el.app.classList.add('tv-muerte');
+    el.app.classList.add('tv-entrada');
+    setTimeout(() => el.app && el.app.classList.remove('tv-entrada'), 950);
+  }
+}
+
+function desactivarEfectoTv() {
+  if (!ruidoFx.activo && !ruidoFx.persistente) return;
+  ruidoFx.activo = false;
+  ruidoFx.persistente = false;
+  const lienzo = el.ruido;
+  if (lienzo) {
+    const c = lienzo.getContext('2d');
+    if (c) c.clearRect(0, 0, lienzo.width, lienzo.height);
+    lienzo.hidden = true;
+  }
+  if (el.app) el.app.classList.remove('tv-muerte', 'tv-entrada');
 }
 
 function pasoRuido(dt) {
@@ -356,7 +377,7 @@ function pasoRuido(dt) {
   const { img, lienzoBase } = ruidoFx;
   if (ctx && img && lienzoBase) {
     const datos = img.data;
-    const intensidad = 1 - progreso * 0.72;
+    const intensidad = ruidoFx.persistente ? 0.58 + (1 - progreso) * 0.42 : 1 - progreso * 0.72;
     for (let i = 0; i < datos.length; i += 4) {
       const v = Math.random() < 0.52 ? Math.random() * 255 : 0;
       datos[i] = v;
@@ -381,14 +402,14 @@ function pasoRuido(dt) {
     }
     ctx.globalAlpha = 1;
   }
-  if (progreso >= 1) {
+  if (progreso >= 1 && !ruidoFx.persistente) {
     ruidoFx.activo = false;
     if (el.ruido) {
       const c = el.ruido.getContext('2d');
       if (c) c.clearRect(0, 0, el.ruido.width, el.ruido.height);
       el.ruido.hidden = true;
     }
-    if (el.stage) el.stage.classList.remove('tubo');
+    if (el.app) el.app.classList.remove('tv-muerte', 'tv-entrada');
   }
 }
 
@@ -479,6 +500,14 @@ function actualizarPista() {
   el.hint.textContent = clave ? t(clave) : '';
 }
 
+function gestionarMusicaPantalla(nombre) {
+  if (nombre === 'playing' || nombre === 'paused') {
+    if (app.juego && !app.juego.terminada) audio.musica('ambience', 200, 1.4);
+    return;
+  }
+  audio.pararAmbiente();
+}
+
 function pantalla(nombre) {
   const antes = app.pantalla;
   app.pantalla = nombre;
@@ -486,6 +515,9 @@ function pantalla(nombre) {
   el.flagToggle.hidden = !(nombre === 'playing' && esTactil());
   if (nombre !== 'playing') el.senal.classList.remove('visible');
   if (antes !== nombre) taparPantalla();
+  gestionarMusicaPantalla(nombre);
+  if (nombre === 'dead') activarEfectoTv();
+  else desactivarEfectoTv();
   actualizarPista();
   if (RUTAS.listas && !RUTAS.restaurando) sincronizarRuta(false);
 }
@@ -524,16 +556,19 @@ function actualizarMarcador() {
 let huecoFin = 0;
 let casillaArmada = null;
 const RETARDO_DOBLE = 400;
+const RETARDO_INFORME = 1500;
 
 function ajustarLienzo() {
   const j = app.juego;
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   const banda = el.stage.getBoundingClientRect();
+  const bandaAncho = el.stage.clientWidth || banda.width;
+  const bandaAlto = el.stage.clientHeight || banda.height;
   const columnas = j ? j.columnas : 9;
   const filas = j ? j.filas : 9;
   const margen = 4;
-  const availW = Math.max(80, banda.width - margen);
-  const availH = Math.max(80, banda.height - margen - huecoFin);
+  const availW = Math.max(80, bandaAncho - margen);
+  const availH = Math.max(80, bandaAlto - margen - huecoFin);
   const cell = Math.max(8, Math.floor(Math.min(availW / columnas, availH / filas)));
   vista.cell = cell;
   vista.width = cell * columnas;
@@ -1162,7 +1197,6 @@ function empezarPartida(modo, nivel = null) {
     mostrarCampaña();
     return;
   }
-  audio.pararMusica(0.9);
   app.juego = new Game(cfg, eventosJuego);
   casillaArmada = null;
   app.record = false;
@@ -1273,7 +1307,7 @@ function eventosJuego(tipo, datos) {
       }
       setTimeout(() => {
         if (app.juego === j && j.estado === 'perdido') mostrarFinPerdida();
-      }, 900);
+      }, RETARDO_INFORME);
       break;
     }
     case 'win':
@@ -1391,7 +1425,7 @@ function ponerBarraFin({ variante, kicker, titulo, susurro, stats, parcela, acci
   enfocarPrimero();
 
   const panel = el.overlay.querySelector('.fin-barra');
-  const alto = panel ? Math.ceil(panel.getBoundingClientRect().height) : 0;
+  const alto = panel ? Math.ceil(panel.offsetHeight || panel.getBoundingClientRect().height) : 0;
   if (alto > 0) {
     huecoFin = alto;
     el.stage.style.paddingBottom = `${alto}px`;
@@ -1403,7 +1437,6 @@ function mostrarFinPerdida() {
   const j = app.juego;
   if (!j) return;
   audio.musica('death', 0, 1.2);
-  efectoTubos();
   const totalSeguras = j.cfg.filas * j.cfg.columnas - j.cfg.minas;
   const despejadas = typeof j.tablero.despejadasPorJugador === 'number' ? j.tablero.despejadasPorJugador : 0;
   const enCampaña = app.modo === 'campaign';
@@ -1528,6 +1561,7 @@ function borrarTodo() {
   const limpio = nuevoRegistro();
   guardado.best = limpio.best;
   guardado.stats = limpio.stats;
+  guardado.campaign = limpio.campaign;
   guardado.sound = limpio.sound;
   guardado.trama = limpio.trama;
   guardado.dobleClick = limpio.dobleClick;
@@ -1983,6 +2017,7 @@ function bucle(t) {
 function aplicarSonido() {
   audio.enabled = guardado.sound;
   audio.set(guardado.sound);
+  gestionarMusicaPantalla(app.pantalla);
 }
 
 function aplicarIdiomaBase() {
@@ -2081,23 +2116,19 @@ function arrancar() {
     }, { once: true });
   }
 
+  const alRedimensionar = () => {
+    ajustarLienzo();
+    ajustarBarrido();
+    if (ruidoFx.activo) ajustarRuido();
+  };
   if (window.ResizeObserver) {
     try {
-      new ResizeObserver(() => {
-        ajustarLienzo();
-        ajustarBarrido();
-      }).observe(el.stage);
+      new ResizeObserver(alRedimensionar).observe(el.stage);
     } catch (err) {
-      window.addEventListener('resize', () => {
-        ajustarLienzo();
-        ajustarBarrido();
-      });
+      window.addEventListener('resize', alRedimensionar);
     }
   } else {
-    window.addEventListener('resize', () => {
-      ajustarLienzo();
-      ajustarBarrido();
-    });
+    window.addEventListener('resize', alRedimensionar);
   }
   window.addEventListener('orientationchange', () => setTimeout(ajustarLienzo, 140));
 

@@ -40,11 +40,14 @@ function crearElemento(id) {
     style: {},
     width: 0,
     height: 0,
+    clientWidth: 800,
+    clientHeight: 600,
+    offsetHeight: 0,
     scrollTop: 0,
     scrollHeight: 200,
     classList: {
-      add: (c) => clases.add(c),
-      remove: (c) => clases.delete(c),
+      add: (...cs) => cs.forEach((c) => clases.add(c)),
+      remove: (...cs) => cs.forEach((c) => clases.delete(c)),
       toggle: (c, force) => {
         const want = force === undefined ? !clases.has(c) : !!force;
         if (want) clases.add(c); else clases.delete(c);
@@ -108,6 +111,8 @@ const windowStub = {
   focus() {},
   AudioContext: undefined,
   ResizeObserver: undefined,
+  setTimeout,
+  clearTimeout,
 };
 windowStub.window = windowStub;
 
@@ -196,25 +201,61 @@ try {
   console.log('terminada como:', juego.estado, 'tras', clicks, 'clics');
   if (!juego.terminada) throw new Error('la partida no terminó destapando todo');
 
-  await dormir(900);
+  if (juego.estado === 'perdido') {
+    await dormir(500);
+    frames(5);
+    if (api.app.pantalla !== 'playing') throw new Error('el informe de muerte no dejó ver el tablero');
+    await dormir(1600);
+  } else {
+    await dormir(1100);
+  }
   frames(10);
   console.log('pantalla final:', api.app.pantalla);
   if (api.app.pantalla !== 'dead' && api.app.pantalla !== 'won') {
     throw new Error('el panel final no se abrió');
   }
-  if (api.app.pantalla === 'dead') {
-    const todas = juego.tablero.celdas.every((c) => c.revelada);
-    console.log('tablero completo revelado tras la muerte:', todas);
-    if (!todas) throw new Error('el tablero no se reveló por completo al morir');
-    const panel = documentStub.querySelector('#overlay').innerHTML;
-    const datos = (panel.match(/fin-dato/g) || []).length;
-    console.log('informe de baja: casillas de datos =', datos);
-    if (datos < 3) throw new Error('el informe de baja no muestra las tres estadísticas');
-    if (!panel.includes('fin-stats')) throw new Error('faltan las estadísticas de la pantalla de muerte');
+  if (api.app.pantalla === 'won') {
+    api.accion('restart');
+    frames(5);
+    const jm = api.app.juego;
+    api.accion('confirm', false, { x: 4, y: 4, puntero: true });
+    frames(2);
+    let mina = -1;
+    for (let i = 0; i < jm.tablero.total && mina < 0; i += 1) {
+      const c = jm.tablero.celdas[i];
+      if (c.mina && !c.revelada) mina = i;
+    }
+    if (mina < 0) throw new Error('no hay mina que pisar');
+    api.accion('confirm', false, { x: mina % jm.columnas, y: Math.floor(mina / jm.columnas), puntero: true });
+    frames(2);
+    if (jm.estado !== 'perdido') throw new Error('la mina forzada no estalló');
+    if (api.app.pantalla !== 'playing') throw new Error('el informe de muerte se abrió demasiado pronto');
+    await dormir(1900);
+    frames(10);
+    if (api.app.pantalla !== 'dead') throw new Error('el informe de muerte forzada no se abrió');
   }
+  const finado = api.app.juego;
+  const todas = finado.tablero.celdas.every((c) => c.revelada);
+  console.log('tablero completo revelado tras la muerte:', todas);
+  if (!todas) throw new Error('el tablero no se reveló por completo al morir');
+  const panel = documentStub.querySelector('#overlay').innerHTML;
+  const datos = (panel.match(/fin-dato/g) || []).length;
+  console.log('informe de baja: casillas de datos =', datos);
+  if (datos < 3) throw new Error('el informe de baja no muestra las tres estadísticas');
+  if (!panel.includes('fin-stats')) throw new Error('faltan las estadísticas de la pantalla de muerte');
+  const appEl = documentStub.querySelector('#app');
+  const ruidoEl = documentStub.querySelector('#ruido');
+  if (!appEl.classList.contains('tv-muerte')) throw new Error('el efecto de televisor no acompaña a la pantalla de muerte');
+  if (ruidoEl.hidden) throw new Error('la nieve no cubre la pantalla de muerte');
+  console.log('pantalla de muerte: informe y efecto de televisor ok');
 
   api.accion('restart');
   frames(5);
+  if (documentStub.querySelector('#app').classList.contains('tv-muerte')) {
+    throw new Error('el efecto de televisor se quedó tras reiniciar');
+  }
+  if (!documentStub.querySelector('#ruido').hidden) throw new Error('la nieve no se apagó al reiniciar');
+  console.log('efecto de televisor solo en la muerte ok');
   const j2 = api.app.juego;
 
   api.accion('confirm', false, { x: 0, y: 0, puntero: true });
@@ -243,6 +284,10 @@ try {
   frames(10);
   console.log('pantalla final:', api.app.pantalla);
   if (api.app.pantalla !== 'won') throw new Error('el panel de victoria no se abrió');
+  if (documentStub.querySelector('#app').classList.contains('tv-muerte')) {
+    throw new Error('el efecto de televisor se coló en la victoria');
+  }
+  console.log('victoria sin efecto de televisor ok');
 
   const best = JSON.parse(localStorageStub.getItem('minesweeper.v1')).best.intermediate;
   console.log('récord intermedia guardado (ms):', best);

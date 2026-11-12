@@ -735,18 +735,29 @@ button.foco {
   image-rendering: pixelated;
 }
 
-#stage.tubo {
-  animation: tubo 0.85s steps(1, end) 1;
+#app.tv-muerte {
+  animation: tv-temblor 3.2s steps(1, end) infinite;
 }
 
-@keyframes tubo {
-  0% { transform: scaleX(1.06) translateY(-1.6vh); }
-  16% { transform: scaleX(0.965) translateY(1.1vh); }
-  31% { transform: scaleX(1.03) translateY(-0.7vh); }
-  48% { transform: scaleX(0.985) translateY(0.5vh); }
-  64% { transform: scaleX(1.012) translateY(-0.2vh); }
-  80% { transform: scaleX(0.997); }
-  100% { transform: none; }
+#app.tv-entrada {
+  animation: tv-entrada 0.85s steps(1, end) 1;
+}
+
+@keyframes tv-temblor {
+  0% { transform: scaleX(1.052) scaleY(1.012) translateY(-0.1vh); }
+  33% { transform: scaleX(1.046) scaleY(1.016) translateY(0.09vh); }
+  66% { transform: scaleX(1.056) scaleY(1.01) translateY(-0.05vh); }
+  100% { transform: scaleX(1.052) scaleY(1.012) translateY(-0.1vh); }
+}
+
+@keyframes tv-entrada {
+  0% { transform: scaleX(1.1) scaleY(0.96) translateY(-1.6vh); }
+  16% { transform: scaleX(0.95) scaleY(1.04) translateY(1.1vh); }
+  31% { transform: scaleX(1.08) scaleY(0.975) translateY(-0.7vh); }
+  48% { transform: scaleX(0.975) scaleY(1.02) translateY(0.5vh); }
+  64% { transform: scaleX(1.055) scaleY(0.995) translateY(-0.2vh); }
+  80% { transform: scaleX(1.03) scaleY(1.008) translateY(-0.08vh); }
+  100% { transform: scaleX(1.052) scaleY(1.012) translateY(-0.1vh); }
 }
 
 #lupa {
@@ -1086,7 +1097,8 @@ button.foco {
     animation-duration: 0.35s;
   }
 
-  #stage.tubo {
+  #app.tv-muerte,
+  #app.tv-entrada {
     animation: none;
   }
 
