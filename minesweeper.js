@@ -1,4 +1,4 @@
-/* minesweeper — un solo fichero, sin módulos. generado por tools/build.mjs (2026-11-12 · v14).
+/* minesweeper — un solo fichero, sin módulos. generado por tools/build.mjs (2026-11-12 · v15).
    no lo edites a mano: cambia js/*.js y vuelve a ejecutar node tools/build.mjs */
 (function () {
 'use strict';
@@ -1403,6 +1403,7 @@ const STRINGS = {
     settingVolume: 'volumen de la música',
     settingVolumeTag: 'las piezas de final; los efectos van aparte',
     mapStamp: 'no pisar',
+    mapScroll: 'el mapa se desplaza a lo ancho',
     campaignHereShort: 'tu posición',
     lockedShort: 'cerrada',
     preview: 'vista previa',
@@ -1553,6 +1554,7 @@ const STRINGS = {
     settingVolume: 'music volume',
     settingVolumeTag: 'the end pieces; the effects stay as they are',
     mapStamp: 'do not step',
+    mapScroll: 'the map scrolls sideways',
     campaignHereShort: 'your position',
     lockedShort: 'locked',
     preview: 'preview',
@@ -2601,17 +2603,98 @@ function densidadCustom() {
   return Math.round((c.minas / (c.filas * c.columnas)) * 100);
 }
 
-// el mapa de la treinta: treinta posiciones dibujadas a mano, del alistamiento a la puerta
+// el mapa de la treinta: treinta posiciones y cuatro actos, más alto que ancho de brazo;
+// se recorre desplazándolo a lo ancho, como un parte desplegado sobre la mesa
+const MAPA_ANCHO = 2400;
+const MAPA_ALTO = 650;
 const MAPA_RUTA = [
-  [60, 460], [105, 375], [155, 430], [185, 305], [235, 355], [225, 230],
-  [300, 455], [335, 350], [390, 400], [410, 285], [470, 340], [460, 205],
-  [530, 445], [565, 345], [620, 400], [640, 285], [700, 335], [700, 205],
-  [770, 460], [810, 380], [860, 435], [880, 340], [935, 395], [955, 300],
-  [1010, 350], [1030, 255], [1085, 300], [1095, 205], [1150, 250], [1165, 140],
+  [72, 505], [150, 390], [240, 465], [290, 330], [380, 400], [425, 250],
+  [610, 505], [675, 380], [770, 445], [815, 295], [905, 360], [900, 220],
+  [1180, 500], [1245, 375], [1335, 440], [1375, 290], [1465, 355], [1460, 210],
+  [1750, 505], [1805, 410], [1865, 470], [1895, 350], [1955, 410], [1975, 290],
+  [2035, 350], [2055, 230], [2115, 290], [2130, 170], [2195, 230], [2290, 105],
 ];
-const MAPA_DIVISORES = [262, 497, 730]; // las fronteras de los cuatro actos
-const MAPA_ACTOS_X = [150, 385, 615, 958]; // rótulos de acto al pie del mapa
+const MAPA_DIVISORES = [520, 1040, 1660]; // las fronteras de los cuatro actos
+const MAPA_ACTOS_X = [245, 780, 1340, 2005]; // rótulos de acto al pie del mapa
 const MAPA_ROMANOS = ['I', 'II', 'III', 'IV'];
+
+// dibujos del mapa: bloques de trazo, como todo el juego; nada más
+const TINTA = '#3f3f3f';    // elementos del terreno
+const TINTA_LEVE = '#242424'; // cotas y fondo
+
+const DIBUJOS = [
+  // brújula, esquina noroeste
+  `<g class="mapa-tinta" fill="none" stroke="${TINTA}" stroke-width="2.4">
+    <circle cx="110" cy="86" r="27"/>
+    <path d="M110 47v12M110 113v12M71 86h12M137 86h12"/>
+    <path d="M110 66 L117 92 L110 86 L103 92 Z" fill="${TINTA}" stroke="none"/>
+  </g>
+  <text class="mapa-brujula" x="110" y="36" text-anchor="middle">N</text>`,
+  // acto I · alistamiento: la carta y el cuartel
+  `<g fill="none" stroke="${TINTA}" stroke-width="2.6" stroke-linejoin="round">
+    <rect x="55" y="190" width="104" height="64"/>
+    <path d="M55 194 L107 236 L159 194"/>
+  </g>`,
+  `<g fill="none" stroke="${TINTA}" stroke-width="2.6" stroke-linejoin="round">
+    <path d="M300 158 L368 108 L436 158"/>
+    <path d="M312 158 V208 H424 V158"/>
+    <path d="M352 208 V170 H384 V208"/>
+    <path d="M368 108 V72"/>
+    <path d="M368 72 L404 80 L368 92" fill="${TINTA}" stroke="none"/>
+  </g>`,
+  // la estrella del ascenso
+  `<path fill="none" stroke="${TINTA}" stroke-width="2.4" stroke-linejoin="round"
+    d="M470 122 L477.6 138.6 L496.3 139.9 L482.7 152.4 L487.5 170.6 L470 160.6 L452.5 170.6 L457.3 152.4 L443.7 139.9 L462.4 138.6 Z"/>`,
+  // acto II · el frente: torreón y sacos terreros
+  `<g fill="none" stroke="${TINTA}" stroke-width="2.6" stroke-linejoin="round">
+    <path d="M946 118 H1066 L1044 190 H968 Z"/>
+    <path d="M936 118 L1006 66 L1076 118"/>
+    <path d="M976 190 V252 M1036 190 V252 M1006 190 V236"/>
+    <path d="M968 208 H1044"/>
+  </g>`,
+  `<g fill="none" stroke="${TINTA}" stroke-width="2.4">
+    <path d="M652 592 a 38 14 0 0 1 76 0"/>
+    <path d="M714 592 a 38 14 0 0 1 76 0"/>
+    <path d="M776 592 a 38 14 0 0 1 76 0"/>
+  </g>`,
+  // acto III · la operación: el vado del puente y la antena
+  `<g fill="none" stroke="${TINTA}" stroke-width="2.6">
+    <path d="M1236 158 L1312 108 L1388 158" stroke-linejoin="round"/>
+    <path d="M1252 158 V132 M1300 158 V122 M1350 158 V122 M1368 158 V132"/>
+    <line x1="1180" y1="150" x2="1440" y2="150" stroke-dasharray="3 10"/>
+    <line x1="1180" y1="196" x2="1440" y2="196" stroke-dasharray="3 10"/>
+  </g>`,
+  `<g fill="none" stroke="${TINTA}" stroke-width="2.6" stroke-linecap="round">
+    <path d="M1604 210 V96"/>
+    <path d="M1572 128 H1636 M1580 168 H1628"/>
+    <path d="M1622 78 a 40 40 0 0 1 44 26 M1622 106 a 66 66 0 0 1 72 44"/>
+    <path d="M1586 78 a 40 40 0 0 0 -44 26 M1586 106 a 66 66 0 0 0 -72 44"/>
+  </g>`,
+  // acto IV · el final del campo: el tren y la casa con la puerta en rojo
+  `<g fill="none" stroke="${TINTA}" stroke-width="2.4" stroke-linejoin="round">
+    <path d="M1722 148 h72 v44 h-72 Z"/>
+    <path d="M1794 160 h26 v32 h-26"/>
+    <path d="M1734 148 v-20 h16 v20"/>
+    <circle cx="1738" cy="204" r="7"/><circle cx="1772" cy="204" r="7"/><circle cx="1808" cy="204" r="7"/>
+    <path d="M1710 214 H1844"/>
+  </g>`,
+  `<g stroke="${TINTA}" stroke-width="2.6" stroke-linejoin="round">
+    <path d="M2282 268 L2346 218 L2410 268" fill="none"/>
+    <path d="M2296 268 V342 H2396 V268" fill="#050505"/>
+    <path d="M2332 342 V296 H2360 V342" fill="#ff2b2b" stroke="none"/>
+  </g>`,
+  // cruces sobre el terreno: los que se quedaron
+  `<g stroke="${TINTA_LEVE}" stroke-width="2.4" stroke-linecap="round">
+    <path d="M540 84 v26 M530 94 h20"/>
+    <path d="M1122 556 v22 M1114 564 h16"/>
+    <path d="M2276 520 v22 M2268 528 h16"/>
+  </g>`,
+  // numerales de acto, casi invisibles bajo la ruta
+  `<text class="mapa-marca" x="245" y="428" text-anchor="middle">I</text>
+   <text class="mapa-marca" x="780" y="438" text-anchor="middle">II</text>
+   <text class="mapa-marca" x="1340" y="432" text-anchor="middle">III</text>
+   <text class="mapa-marca" x="2005" y="442" text-anchor="middle">IV</text>`,
+];
 
 function puntosRuta(desde, hasta) {
   return MAPA_RUTA.slice(desde, hasta).map(([x, y]) => `${x},${y}`).join(' ');
@@ -2623,32 +2706,34 @@ function mapaSVG() {
   const recorrido = puntosRuta(0, frontera + 1);
   const pendiente = frontera + 1 < total ? puntosRuta(frontera, total) : '';
   const divisores = MAPA_DIVISORES
-    .map((x) => `<line x1="${x}" y1="26" x2="${x}" y2="486" stroke="#222222" stroke-width="1" stroke-dasharray="6 8"/>`)
+    .map((x) => `<line x1="${x}" y1="30" x2="${x}" y2="596" stroke="#232323" stroke-width="1" stroke-dasharray="6 9"/>`)
     .join('');
   const rotulos = ACTOS.map((acto, i) => {
     const nombre = getLanguage() === 'en' ? acto.nombreEn : acto.nombreEs;
-    return `<text class="mapa-acto" x="${MAPA_ACTOS_X[i]}" y="530" text-anchor="middle">${MAPA_ROMANOS[i]} · ${nombre}</text>`;
+    return `<text class="mapa-acto" x="${MAPA_ACTOS_X[i]}" y="630" text-anchor="middle">${MAPA_ROMANOS[i]} · ${nombre}</text>`;
   }).join('');
-  return `<svg class="mapa-svg" viewBox="0 0 1200 560" role="img" aria-label="${t('campaign')}">
+  const dibujos = DIBUJOS.join('\n    ');
+  return `<svg class="mapa-svg" viewBox="0 0 ${MAPA_ANCHO} ${MAPA_ALTO}" role="img" aria-label="${t('campaign')}">
     <defs>
-      <pattern id="mapa-puntos" width="36" height="36" patternUnits="userSpaceOnUse">
+      <pattern id="mapa-puntos" width="38" height="38" patternUnits="userSpaceOnUse">
         <circle cx="1.4" cy="1.4" r="1.4" fill="#161616"/>
       </pattern>
     </defs>
-    <rect x="0" y="0" width="1200" height="560" fill="#040404"/>
-    <rect x="0" y="0" width="1200" height="560" fill="url(#mapa-puntos)"/>
-    <path d="M -20 128 Q 260 74 480 132 T 1220 96" fill="none" stroke="#101010" stroke-width="1.4" stroke-dasharray="2 9"/>
-    <path d="M -20 318 Q 320 260 640 330 T 1220 284" fill="none" stroke="#101010" stroke-width="1.4" stroke-dasharray="2 9"/>
+    <rect x="0" y="0" width="${MAPA_ANCHO}" height="${MAPA_ALTO}" fill="#040404"/>
+    <rect x="0" y="0" width="${MAPA_ANCHO}" height="${MAPA_ALTO}" fill="url(#mapa-puntos)"/>
+    <path d="M -20 152 Q 300 96 620 160 T 1240 138 T 1860 158 T 2460 120" fill="none" stroke="${TINTA_LEVE}" stroke-width="1.5" stroke-dasharray="2 10"/>
+    <path d="M -20 372 Q 340 312 700 384 T 1330 356 T 1960 382 T 2460 330" fill="none" stroke="${TINTA_LEVE}" stroke-width="1.5" stroke-dasharray="2 10"/>
+    ${dibujos}
     ${divisores}
-    ${pendiente ? `<polyline points="${pendiente}" fill="none" stroke="#3d3d3d" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="0.1 13"/>` : ''}
-    <polyline points="${recorrido}" fill="none" stroke="#f2f2f2" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+    ${pendiente ? `<polyline points="${pendiente}" fill="none" stroke="#3d3d3d" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="0.1 14"/>` : ''}
+    <polyline points="${recorrido}" fill="none" stroke="#f2f2f2" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
     <g class="mapa-escala">
-      <line x1="1035" y1="472" x2="1172" y2="472" stroke="#3a3a3a" stroke-width="2"/>
-      <line x1="1035" y1="465" x2="1035" y2="479" stroke="#3a3a3a" stroke-width="2"/>
-      <line x1="1172" y1="465" x2="1172" y2="479" stroke="#3a3a3a" stroke-width="2"/>
-      <text x="1103" y="458" text-anchor="middle">1 km</text>
+      <line x1="2200" y1="560" x2="2372" y2="560" stroke="#3a3a3a" stroke-width="2"/>
+      <line x1="2200" y1="553" x2="2200" y2="567" stroke="#3a3a3a" stroke-width="2"/>
+      <line x1="2372" y1="553" x2="2372" y2="567" stroke="#3a3a3a" stroke-width="2"/>
+      <text x="2286" y="545" text-anchor="middle">1 km</text>
     </g>
-    <text class="mapa-sello" x="1158" y="66" text-anchor="end" transform="rotate(-8 1158 66)">${t('mapStamp')}</text>
+    <text class="mapa-sello" x="2382" y="48" text-anchor="end" transform="rotate(-6 2382 48)">${t('mapStamp')}</text>
     ${rotulos}
   </svg>`;
 }
@@ -2667,8 +2752,8 @@ function mapaNodosHTML() {
     const etiqueta = desbloqueado
       ? `${t('levelCell', { n: i + 1 })} · ${nombre}`
       : `${t('levelCell', { n: i + 1 })} · ${t('lockedShort')}`;
-    const left = ((MAPA_RUTA[i][0] / 1200) * 100).toFixed(3);
-    const top = ((MAPA_RUTA[i][1] / 560) * 100).toFixed(3);
+    const left = ((MAPA_RUTA[i][0] / MAPA_ANCHO) * 100).toFixed(3);
+    const top = ((MAPA_RUTA[i][1] / MAPA_ALTO) * 100).toFixed(3);
     return `<button type="button" class="${clases.join(' ')}" data-mapa="${i}" data-accion="${desbloqueado ? `playCampaign:${i}` : 'lockedNode'}" style="left:${left}%;top:${top}%" aria-label="${etiqueta}"><span>${desbloqueado ? i + 1 : '··'}</span></button>`;
   }).join('');
 }
@@ -2731,7 +2816,7 @@ function mostrarCampaña() {
     <div class="mapa-cuerpo">
       <div class="mapa-marco">
         <div class="mapa">${mapaSVG()}${mapaNodosHTML()}</div>
-        <p class="mapa-leyenda"><span class="lg lg-hecha"></span>${t('clearedShort')}<span class="punto">·</span><span class="lg lg-actual"></span>${t('campaignHereShort')}<span class="punto">·</span><span class="lg lg-cerrada"></span>${t('lockedShort')}</p>
+        <p class="mapa-leyenda"><span class="lg lg-hecha"></span>${t('clearedShort')}<span class="punto">·</span><span class="lg lg-actual"></span>${t('campaignHereShort')}<span class="punto">·</span><span class="lg lg-cerrada"></span>${t('lockedShort')}<span class="punto">·</span><span class="leyenda-scroll">${t('mapScroll')}</span></p>
       </div>
       <aside class="mapa-lateral" id="mapa-lateral">${lateralMapaHTML(frontera)}</aside>
     </div>
@@ -2739,6 +2824,12 @@ function mostrarCampaña() {
   pantalla('campaign');
   animarCifra(document.getElementById('campana-cifra'), hechos, (v) => dosDigitos(Math.round(v)));
   seleccionarNodoMapa(frontera, true);
+  // el parte se abre desplegado sobre tu posición, no sobre el principio
+  const nodos = el.overlay.querySelectorAll('.mapa-nodo');
+  const nodo = nodos && nodos[frontera];
+  if (nodo && typeof nodo.scrollIntoView === 'function') {
+    nodo.scrollIntoView({ block: 'nearest', inline: 'center' });
+  }
 }
 
 function mostrarHistoria(indice) {
@@ -3514,7 +3605,7 @@ function accion(nombre, repetido = false, datos) {
     seleccionarNodoMapa((actual + delta + NIVELES.length) % NIVELES.length, false);
     const nodos = filasDelOverlay();
     if (nodos[focoIndice] && typeof nodos[focoIndice].scrollIntoView === 'function') {
-      nodos[focoIndice].scrollIntoView({ block: 'nearest' });
+      nodos[focoIndice].scrollIntoView({ block: 'nearest', inline: 'center' });
     }
     return;
   }

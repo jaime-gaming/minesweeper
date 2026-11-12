@@ -230,6 +230,18 @@ button:disabled {
   flex: none;
 }
 
+/* el marcador solo se pinta en partida: en lo demás la barra se queda en negro,
+   con la marca y el idioma, y no pisa nada */
+body:not([data-screen="playing"]):not([data-screen="paused"]):not([data-screen="dead"]):not([data-screen="won"]) .stats {
+  visibility: hidden;
+}
+
+@media (max-width: 560px) {
+  .best {
+    display: none;
+  }
+}
+
 #stage {
   position: relative;
   display: flex;
@@ -1353,13 +1365,30 @@ button.foco {
   gap: 8px;
   min-width: 0;
   overflow-x: auto;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: #262626 transparent;
+  padding-bottom: 6px;
 }
 
+.mapa-marco::-webkit-scrollbar {
+  height: 10px;
+}
+
+.mapa-marco::-webkit-scrollbar-thumb {
+  background: #262626;
+}
+
+.mapa-marco::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* el parte desplegado: ancho fijo, se recorre a lo ancho */
 .mapa {
   position: relative;
-  width: 100%;
-  min-width: 720px;
-  aspect-ratio: 1200 / 560;
+  flex: none;
+  width: 2400px;
+  height: 650px;
   border: 1px solid var(--line);
   background: #040404;
   overflow: hidden;
@@ -1374,17 +1403,38 @@ button.foco {
 }
 
 .mapa-acto {
-  fill: #555555;
+  fill: #5a5a5a;
   font-family: var(--mono);
-  font-size: 13px;
-  letter-spacing: 0.32em;
+  font-size: 15px;
+  letter-spacing: 0.34em;
   text-transform: uppercase;
+}
+
+.mapa-brujula {
+  fill: #5a5a5a;
+  font-family: var(--mono);
+  font-size: 17px;
+  letter-spacing: 0.1em;
+}
+
+/* numerales de acto bajo la ruta */
+.mapa-marca {
+  fill: #0e0e0e;
+  font-family: var(--mono);
+  font-size: 170px;
+  font-weight: 700;
+}
+
+.leyenda-scroll {
+  color: var(--muted);
+  text-transform: none;
+  letter-spacing: 0.04em;
 }
 
 .mapa-sello {
   fill: #a03434;
   font-family: var(--mono);
-  font-size: 24px;
+  font-size: 30px;
   letter-spacing: 0.34em;
   text-transform: uppercase;
   opacity: 0.85;
@@ -1400,8 +1450,8 @@ button.foco {
 /* las treinta posiciones: bloques sobre el mapa */
 .mapa-nodo {
   position: absolute;
-  width: 38px;
-  height: 38px;
+  width: 46px;
+  height: 46px;
   transform: translate(-50%, -50%);
   display: flex;
   align-items: center;

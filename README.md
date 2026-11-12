@@ -27,7 +27,7 @@ Los efectos van sintetizados en tiempo real, salvo el estallido, que usa `audio/
 
 El **acorde** destapa los vecinos de un número cuando ya tienes a su alrededor tantas banderas como indica el número; si una bandera estaba mal puesta, la mina que queda destapada estalla. Tocar sobre un número descubierto hace el acorde automáticamente. En pantallas táctiles aparece una bandera grande abajo a la derecha para jugar en modo marcar.
 
-El primer clic nunca estalla y siempre abre hueco (la zona del clic y sus vecinas queda libre de minas). Antes del primer clic el cronómetro no corre.
+El primer clic nunca estalla y siempre abre hueco (la zona del clic y sus vecinas queda libre de minas). Antes del primer clic el cronómetro no corre. La barra superior solo pinta el marcador —nivel, minas restantes y tiempo— mientras hay una partida en marcha; en el resto de pantallas se queda en negro con la marca y el idioma.
 
 ## Dificultades
 
@@ -51,7 +51,7 @@ Treinta campos minados dibujados a mano en cuatro actos, con un único relato li
 | III · la operación | 13 – 18 | de 14×14/44 a 16×16/66 — operación puente, el asalto |
 | IV · el final del campo | 19 – 30 | de 16×16/69 a 24×30/132 — la traición, el expediente, la vuelta |
 
-El relato es lineal y acompaña hasta el final: al cerrar el último campo, un epílogo cierra el viaje. Completar un nivel abre el siguiente y guarda tu **mejor tiempo** en su casilla; no hay estrellas, sólo tu marca. La campaña se juega desde **el mapa de la operación**: treinta posiciones unidas por la ruta, del alistamiento a la puerta, con el recorrido hecho en blanco, el que queda por delante como línea de puntos y tu frontera latiendo en rojo. Eliges con las flechas o el ratón, ves el acta de cada campo a la derecha (acto, tamaño, minas, tu mejor marca o su estado) y marchas con ↵ o con el botón; el mapa también es desplazable en pantallas pequeñas. Cada nivel tiene su ruta profunda (`/campaña/nivel-07`) y el botón atrás navega como en cualquier web.
+El relato es lineal y acompaña hasta el final: al cerrar el último campo, un epílogo cierra el viaje. Completar un nivel abre el siguiente y guarda tu **mejor tiempo** en su casilla; no hay estrellas, sólo tu marca. La campaña se juega desde **el mapa de la operación**: un parte dibujado a mano y **desplazable a lo ancho** —más allá del borde de la pantalla, como un mapa de verdad sobre la mesa—. La ruta hecha va en blanco sólido, la que falta en puntos, tu frontera late en rojo y cada acto lleva sus dibujos: la brújula y el sello de «no pisar», la carta y el cuartel del alistamiento, el torreón y los sacos terreros del frente, el puente del vado y la antena de la operación, el tren y la casa con la puerta en rojo. Se elige con las flechas o con el ratón; el primer toque inspecciona y el segundo marcha; el mapa se abre centrado en tu posición. A la derecha, el acta de cada campo (acto, tamaño, minas, tu mejor marca o su estado). Cada nivel tiene su ruta profunda (`/campaña/nivel-07`) y el botón atrás navega como en cualquier web.
 
 ## Perfil
 
@@ -96,7 +96,7 @@ tools/smoke.mjs   humo de arranque: juega una partida con un DOM simulado
 
 ## Despliegue
 
-La publicación en el dominio, la caché y la comprobación posterior están en [DESPLIEGUE.md](DESPLIEGUE.md).
+Preparado para **Cloudflare Pages**: el repositorio es estático, sin paso de build (el bundle viaja siempre al día y la CI lo comprueba), con `_redirects` para las rutas profundas del juego y `_headers` para que el HTML no se cachee nunca. Conecta el repo en *Workers & Pages → Create → Pages*, deja el comando de build vacío, la salida en la raíz y asocia `minesweeper.jaime-gaming.com`. La publicación, la caché y la comprobación posterior —incluida la alternativa con Worker— están en [DESPLIEGUE.md](DESPLIEGUE.md).
 
 ## Creditos de assets
 Musica: LSplash
