@@ -1,0 +1,14 @@
+# Despliegue en Cloudflare Workers (dominio propio: minesweeper.jaime-gaming.com).
+#
+#   npx wrangler deploy
+#
+# Sirve el repositorio completo como estáticos en la raíz del dominio. Sin
+# build previo: el worker empaqueta tal cual los ficheros del repo
+# (index.html, styles.css, minesweeper.js…).
+
+name = "minesweeper"
+compatibility_date = "2026-11-11"
+
+[assets]
+directory = "./"
+not_found_handling = "single-page-application"
