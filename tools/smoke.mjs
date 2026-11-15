@@ -124,6 +124,13 @@ const localStorageStub = {
   removeItem: (k) => localStorageData.delete(k),
 };
 
+const sessionStorageData = new Map();
+const sessionStorageStub = {
+  getItem: (k) => (sessionStorageData.has(k) ? sessionStorageData.get(k) : null),
+  setItem: (k, v) => sessionStorageData.set(k, String(v)),
+  removeItem: (k) => sessionStorageData.delete(k),
+};
+
 const locationStub = { protocol: 'http:', hash: '#debug', pathname: '/', search: '' };
 const historyStub = {
   state: null,
@@ -146,6 +153,8 @@ const globals = {
   location: locationStub,
   history: historyStub,
   localStorage: localStorageStub,
+  sessionStorage: sessionStorageStub,
+  URLSearchParams,
   requestAnimationFrame: (cb) => { rafQueue.push(cb); return rafQueue.length; },
   performance: { now: () => simTime },
   matchMedia: windowStub.matchMedia,
@@ -158,7 +167,7 @@ const globals = {
 };
 
 let simTime = 0;
-const bundle = fs.readFileSync('/home/user/minesweeper/minesweeper.js', 'utf8');
+const bundle = fs.readFileSync(new URL('../minesweeper.js', import.meta.url), 'utf8');
 const vm = await import('node:vm');
 const context = vm.createContext({ ...globals, globalThis: globals });
 
@@ -171,6 +180,20 @@ function frames(n, paso = 16.7) {
 }
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 
+const HUB = 'https://classic.jaime-gaming.com/?from=minesweeper';
+
+function arrancarDeNuevo(ruta) {
+  rafQueue.length = 0;
+  const u = new URL(ruta, 'http://internal.test');
+  locationStub.pathname = u.pathname;
+  locationStub.search = u.search;
+  locationStub.hash = '#debug';
+  const otro = vm.createContext({ ...globals, globalThis: globals });
+  vm.runInContext(bundle, otro, { filename: 'minesweeper.js' });
+  frames(5);
+  return otro.window.__minesweeper;
+}
+
 try {
   vm.runInContext(bundle, context, { filename: 'minesweeper.js' });
   console.log('arranque: ok');
@@ -181,6 +204,9 @@ try {
 
   console.log('pantalla inicial:', api.app.pantalla);
   if (api.app.pantalla !== 'home') throw new Error('no arranca en home');
+  if (documentStub.querySelector('#overlay').innerHTML.includes('hub-volver')) {
+    throw new Error('la portada ofrece volver al hub sin venir de él');
+  }
 
   api.ejecutar('play:intermediate');
   frames(5);
@@ -470,6 +496,43 @@ try {
   frames(3);
   if (api.app.pantalla !== 'home') throw new Error('Esc desde la campaña no devolvió a la portada');
   console.log('campaña cierra a la portada ok');
+
+  const portada = () => documentStub.querySelector('#overlay').innerHTML;
+
+  let hub = arrancarDeNuevo('/?from=hub');
+  if (hub.app.pantalla !== 'home') throw new Error('?from=hub no arranca en la portada');
+  if (!portada().includes('hub-volver')) throw new Error('?from=hub no pinta el botón de volver al hub');
+  if (!portada().includes(`href="${HUB}"`)) throw new Error('el botón no lleva al hub con ?from=minesweeper');
+  if (!portada().includes('volver al hub')) throw new Error('el botón no dice «volver al hub»');
+  if (locationStub.search !== '') throw new Error('?from=hub se quedó en la barra de direcciones');
+  if (sessionStorageStub.getItem('minesweeper.from') !== 'hub') throw new Error('la pestaña no recuerda que viene del hub');
+  hub.ejecutar('play');
+  frames(3);
+  if (portada().includes('hub-volver')) throw new Error('el botón del hub se coló fuera de la portada');
+  hub.accion('back');
+  frames(3);
+  if (hub.app.pantalla !== 'home' || !portada().includes('hub-volver')) {
+    throw new Error('el botón del hub no sobrevive a un paseo por los menús');
+  }
+  console.log('desde el hub: botón en la portada, URL limpia y origen recordado ok');
+
+  hub = arrancarDeNuevo('/');
+  if (!portada().includes('hub-volver')) throw new Error('el botón del hub no sobrevive a una recarga');
+  hub = arrancarDeNuevo('/?from=snake');
+  if (!portada().includes('hub-volver')) throw new Error('otro origen borró el recuerdo del hub en la misma pestaña');
+  console.log('desde el hub: el botón sigue tras recargar ok');
+
+  sessionStorageData.clear();
+  hub = arrancarDeNuevo('/?from=snake');
+  if (portada().includes('hub-volver')) throw new Error('un origen que no es el hub pinta el botón');
+  hub = arrancarDeNuevo('/');
+  if (portada().includes('hub-volver')) throw new Error('una pestaña nueva recuerda el hub');
+  hub = arrancarDeNuevo('/campa%C3%B1a?utm=x&from=HUB');
+  if (hub.app.pantalla !== 'campaign') throw new Error('?from=hub rompió la ruta profunda');
+  hub.accion('back');
+  frames(3);
+  if (!portada().includes('hub-volver')) throw new Error('?from=hub en una ruta profunda no llega a la portada');
+  console.log('desde el hub: otros orígenes, pestaña nueva y rutas profundas ok');
 
   console.log('ops de lienzo validadas:', opsCanvas);
   console.log('OK humo completo');

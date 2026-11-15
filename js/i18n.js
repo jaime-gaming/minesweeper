@@ -25,6 +25,7 @@ const STRINGS = {
     profileTag: 'récords, partidas y tasa de victorias',
     settings: 'ajustes',
     menuAria: 'menú principal',
+    backToHub: 'volver al hub',
 
     difficulty: 'DIFICULTAD',
     diffBeginner: 'principiante',
@@ -176,6 +177,7 @@ const STRINGS = {
     profileTag: 'records, games and win rate',
     settings: 'settings',
     menuAria: 'main menu',
+    backToHub: 'back to hub',
 
     difficulty: 'DIFFICULTY',
     diffBeginner: 'beginner',

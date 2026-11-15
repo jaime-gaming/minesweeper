@@ -1268,6 +1268,7 @@ const STRINGS = {
     profileTag: 'récords, partidas y tasa de victorias',
     settings: 'ajustes',
     menuAria: 'menú principal',
+    backToHub: 'volver al hub',
 
     difficulty: 'DIFICULTAD',
     diffBeginner: 'principiante',
@@ -1419,6 +1420,7 @@ const STRINGS = {
     profileTag: 'records, games and win rate',
     settings: 'settings',
     menuAria: 'main menu',
+    backToHub: 'back to hub',
 
     difficulty: 'DIFFICULTY',
     diffBeginner: 'beginner',
@@ -1864,6 +1866,34 @@ const app = {
 };
 
 const BASE_PATH = (typeof location !== 'undefined' && location.protocol === 'file:') ? './' : '/';
+
+const HUB_URL = 'https://classic.jaime-gaming.com/?from=minesweeper';
+const CLAVE_ORIGEN = 'minesweeper.from';
+const ORIGENES_HUB = ['hub', 'classic'];
+
+function llegaDelHub() {
+  let origen = '';
+  try {
+    origen = (new URLSearchParams(location.search).get('from') || '').trim().toLowerCase();
+  } catch (err) {
+    origen = '';
+  }
+  if (ORIGENES_HUB.includes(origen)) {
+    try {
+      sessionStorage.setItem(CLAVE_ORIGEN, 'hub');
+    } catch (err) {
+
+    }
+    return true;
+  }
+  try {
+    return sessionStorage.getItem(CLAVE_ORIGEN) === 'hub';
+  } catch (err) {
+    return false;
+  }
+}
+
+const vieneDelHub = llegaDelHub();
 const RUTAS = { listas: false, restaurando: false };
 const ALIAS_RUTA = routeWords();
 
@@ -1940,7 +1970,7 @@ function esTactil() {
   return window.matchMedia('(pointer: coarse)').matches;
 }
 
-const FOCO_SEL = '.row:not(.stat), .acciones button, .mapa-nodo';
+const FOCO_SEL = '.row:not(.stat), .acciones button, .mapa-nodo, .hub-volver';
 let focoIndice = -1;
 
 function ponerOverlay(html, variante) {
@@ -1990,6 +2020,11 @@ function enfocarPrimero() {
 }
 
 function activarFoco() {
+  const activo = document.activeElement;
+  if (activo && activo.classList && activo.classList.contains('hub-volver')) {
+    activo.click();
+    return;
+  }
   const filas = filasDelOverlay();
   const sel = filas[focoIndice];
   if (sel && typeof sel.click === 'function') sel.click();
@@ -2524,6 +2559,10 @@ function cabeceraPanel(titulo, extra = '') {
 
 const botonVolver = () => `<button class="ghost" type="button" data-accion="back">${t('back')}<kbd>Esc</kbd></button>`;
 
+const botonHub = () => (vieneDelHub
+  ? `<div class="hub-barra"><a class="hub-volver" href="${HUB_URL}"><span aria-hidden="true">←</span>${t('backToHub')}</a></div>`
+  : '');
+
 function mostrarPortada() {
   audio.pararMusica(1.0);
   app.juego = null;
@@ -2550,7 +2589,7 @@ function mostrarPortada() {
       <canvas id="demo" aria-label="${t('preview')}"></canvas>
       <p class="nota" id="demo-nota"></p>
     </aside>
-  </div>`);
+  </div>${botonHub()}`);
   hudMenu('v1');
   pantalla('home');
   pintarLienzoVacio();
