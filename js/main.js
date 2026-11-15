@@ -118,16 +118,15 @@ const BASE_PATH = (typeof location !== 'undefined' && location.protocol === 'fil
 
 const HUB_URL = 'https://classic.jaime-gaming.com/?from=minesweeper';
 const CLAVE_ORIGEN = 'minesweeper.from';
-const ORIGENES_HUB = ['hub', 'classic'];
 
 function llegaDelHub() {
   let origen = '';
   try {
-    origen = (new URLSearchParams(location.search).get('from') || '').trim().toLowerCase();
+    origen = new URLSearchParams(location.search).get('from') || '';
   } catch (err) {
     origen = '';
   }
-  if (ORIGENES_HUB.includes(origen)) {
+  if (origen === 'hub') {
     try {
       sessionStorage.setItem(CLAVE_ORIGEN, 'hub');
     } catch (err) {

@@ -527,7 +527,12 @@ try {
   if (portada().includes('hub-volver')) throw new Error('un origen que no es el hub pinta el botón');
   hub = arrancarDeNuevo('/');
   if (portada().includes('hub-volver')) throw new Error('una pestaña nueva recuerda el hub');
-  hub = arrancarDeNuevo('/campa%C3%B1a?utm=x&from=HUB');
+  for (const otro of ['/?from=classic', '/?from=HUB', '/?from=hub2', '/?from=', '/?desde=hub']) {
+    hub = arrancarDeNuevo(otro);
+    if (portada().includes('hub-volver')) throw new Error(`${otro} pinta el botón sin ser ?from=hub`);
+    if (sessionStorageStub.getItem('minesweeper.from') !== null) throw new Error(`${otro} dejó recuerdo del hub`);
+  }
+  hub = arrancarDeNuevo('/campa%C3%B1a?utm=x&from=hub');
   if (hub.app.pantalla !== 'campaign') throw new Error('?from=hub rompió la ruta profunda');
   hub.accion('back');
   frames(3);
