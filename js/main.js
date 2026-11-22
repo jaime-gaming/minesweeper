@@ -1504,26 +1504,19 @@ function empezarPartida(modo, nivel = null, datos = {}) {
   app.juego = new Game(cfg, eventosJuego);
   app.modHard = puedeMods && guardado.modificadores.hard;
   app.modsActivos = puedeMods && modsActivos;
+  // Animación de entrada para TODOS los modos y zonas (skipable con ESPACIO).
+  // Se muestra la cuadrícula sorteándose como backrooms antes de jugar.
   if (!datos || !datos.saltarIntro) {
-    if (app.modsActivos) {
-      mostrarIntroMod();
-      return;
-    }
-    if (app.modHard) {
-      audio.musica('hardMod', 0, 1);
-      app.fondoRojoActivo = true;
-    } else {
-      app.modHard = false;
-      app.fondoRojoActivo = false;
-    }
+    mostrarIntroPartida(modo, nivel);
+    return;
+  }
+  // saltarIntro: ir directo al tablero
+  if (app.modHard) {
+    audio.musica('hardMod', 0, 1);
+    app.fondoRojoActivo = true;
   } else {
-    if (app.modHard) {
-      audio.musica('hardMod', 0, 1);
-      app.fondoRojoActivo = true;
-    } else {
-      app.modHard = false;
-      app.fondoRojoActivo = false;
-    }
+    app.modHard = false;
+    app.fondoRojoActivo = false;
   }
   casillaArmada = null;
   app.record = false;
@@ -2000,13 +1993,83 @@ function dibujarPuerta(ctx, w, h, segundos) {
   }
 }
 
-function mostrarIntroMod() {
+// Animación de entrada: cuadrícula del campo sorteándose como backrooms.
+// Se revela progresivamente celda por celda con números y minas.
+// Se puede saltar manteniendo ESPACIO pulsado.
+function dibujarGeneracionCampo(ctx, w, h, t) {
+  // Fondo negro absoluto
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, w, h);
+
+  // Cuadrícula de campo de minas que se genera progresivamente
+  const ciclo = Math.floor(t / 13 * 100);
+  const cols = Math.max(4, Math.floor(w / 34));
+  const rows = Math.max(3, Math.floor(h / 28));
+  const cellW = w / cols;
+  const cellH = h / rows;
+  const totalCeldas = cols * rows;
+  const reveladas = Math.min(totalCeldas, Math.floor((ciclo / 100) * totalCeldas * 1.3));
+
+  ctx.fillStyle = '#111';
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 1;
+
+  for (let y = 0; y < rows; y += 1) {
+    for (let x = 0; x < cols; x += 1) {
+      const idx = y * cols + x;
+      const px = x * cellW;
+      const py = y * cellH;
+
+      if (idx < reveladas) {
+        // Celda revelada
+        const esMina = (x * 7 + y * 13 + Math.floor(t * 50)) % 17 === 0;
+        if (esMina) {
+          ctx.fillStyle = '#3a0000';
+          ctx.fillRect(px + 1, py + 1, cellW - 2, cellH - 2);
+          ctx.fillStyle = '#ff2b2b';
+          ctx.beginPath();
+          ctx.arc(px + cellW / 2, py + cellH / 2, cellW * 0.22, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          const adj = (x * 3 + y * 5 + Math.floor(t * 30)) % 9;
+          ctx.fillStyle = '#fff';
+          ctx.fillRect(px + 1, py + 1, cellW - 2, cellH - 2);
+          if (adj > 0) {
+            ctx.fillStyle = '#000';
+            ctx.font = `${Math.max(10, cellW * 0.55)}px ui-monospace, monospace`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(String(adj), px + cellW / 2, py + cellH / 2 + cellW * 0.08);
+          }
+        }
+      } else {
+        // Celda oculta (generándose)
+        const brillo = Math.sin(t * 10 + x + y) * 0.4 + 0.6;
+        ctx.fillStyle = `rgba(30, 30, 30, ${0.5 + brillo * 0.3})`;
+        ctx.fillRect(px + 1, py + 1, cellW - 2, cellH - 2);
+        ctx.strokeRect(px + 1, py + 1, cellW - 2, cellH - 2);
+      }
+    }
+  }
+
+  // Barrido de generación (línea que avanza de izquierda a derecha)
+  const barraX = (ciclo % 100) / 100 * w;
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+  ctx.fillRect(barraX, 0, 2, h);
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+  ctx.fillRect(barraX - 4, 0, 8, h * 0.15);
+}
+
+function mostrarIntroPartida(modo, nivel) {
   audio.unlock();
   app.juego = null;
   app.introT = 0;
   app.introDuracion = 13000; // 0 → 13 s, cuajado con IntroMod.ogg
+  app.introModo = modo;
+  app.introNivel = nivel;
   const html = '<div class="panel intro">' +
     '<canvas id="introCanvas" class="intro-canvas" aria-hidden="true"></canvas>' +
+    '<p class="intro-skip">' + t('introSkip') + '</p>' +
     '</div>';
   ponerOverlay(html);
   pantalla('intro');
@@ -2022,7 +2085,7 @@ function mostrarIntroMod() {
 
 function finalizarIntro() {
   if (app.introCtx) app.introCtx = null;
-  empezarPartida('modifiers', null, { saltarIntro: true });
+  empezarPartida(app.introModo, app.introNivel, { saltarIntro: true });
 }
 
 
@@ -2594,12 +2657,12 @@ function bucle(t) {
     actualizarMarcador();
   }
 
-  // Intro del modo Modificadores: animación de puerta 0 → 13 s (pantalla completa).
+  // Intro: animación de generación de campo tipo backrooms (skipable con ESPACIO).
   if (app.pantalla === 'intro' && app.introCtx) {
     const cv = document.getElementById('introCanvas');
     if (cv) {
       app.introT += dt;
-      dibujarPuerta(app.introCtx, cv.width, cv.height, app.introT / 1000);
+      dibujarGeneracionCampo(app.introCtx, cv.width, cv.height, app.introT / 1000);
       if (app.introT >= app.introDuracion) {
         app.introCtx = null;
         finalizarIntro();

@@ -209,7 +209,10 @@ try {
   }
 
   api.ejecutar('play:intermediate');
-  frames(5);
+  frames(3);
+  // Saltar la intro de entrada (equivalente a mantener ESPACIO pulsado)
+  api.empezarPartida('intermediate', null, { saltarIntro: true });
+  frames(3);
   console.log('pantalla tras jugar:', api.app.pantalla);
   if (api.app.pantalla !== 'playing') throw new Error('no entró en la partida');
   const juego = api.app.juego;
@@ -284,7 +287,10 @@ try {
   console.log('el tablero aparece con las letras boom ok');
 
   api.accion('restart');
-  frames(5);
+  frames(3);
+  // Saltar la intro del restart (equivalente a mantener ESPACIO)
+  api.empezarPartida(api.app.modo, null, { saltarIntro: true });
+  frames(3);
   if (documentStub.querySelector('#app').classList.contains('tv-muerte')) {
     throw new Error('el efecto de televisor se quedó tras reiniciar');
   }
@@ -346,7 +352,10 @@ try {
   console.log('ruta de la historia:', historyStub.last);
   if (!String(historyStub.last).includes('nivel-01')) throw new Error('la ruta no refleja el nivel');
   api.ejecutar('descend');
-  frames(5);
+  frames(3);
+  // Saltar la intro de la campaña
+  api.empezarPartida('campaign', 0, { saltarIntro: true });
+  frames(3);
   if (api.app.pantalla !== 'playing') throw new Error('descend no bajó al tablero');
   const cam = api.app.juego;
   console.log('nivel 1:', cam.columnas, 'x', cam.filas, 'minas:', cam.cfg.minas);
@@ -397,7 +406,7 @@ try {
   if (!mapa.includes('→')) throw new Error('la fila de tu posición no lleva la flecha');
   console.log('mapa: posición marcada, bloqueadas en dash ok');
 
-  api.empezarPartida('campaign', 29);
+  api.empezarPartida('campaign', 29, { saltarIntro: true });
   frames(3);
   const corazon = api.app.juego;
   api.accion('confirm', false, { x: 0, y: 0, puntero: true });
@@ -547,7 +556,9 @@ try {
   frames(3);
   if (api.app.pantalla !== 'story' || api.app.historiaLinea !== 1) throw new Error('dialogNext no avanzó la línea de diálogo');
   api.ejecutar('descend');
-  frames(5);
+  frames(3);
+  api.empezarPartida('campaign', 0, { saltarIntro: true });
+  frames(3);
   if (api.app.pantalla !== 'playing') throw new Error('descend tras diálogo no entró en la partida');
   api.ejecutar('toMenu');
   frames(3);
@@ -566,7 +577,7 @@ try {
   const saveMod = JSON.parse(localStorageStub.getItem('minesweeper.v1'));
   if (!saveMod.modificadores || !saveMod.modificadores.minasExtra) throw new Error('toggle de modificador no persistió');
 
-  // Previsualizar beginner y empezar partida con mods activos → abre intro
+  // Con mods activos → previsualizar y empezar → abre intro, saltar para jugar
   api.ejecutar('previewDifficulty:beginner');
   frames(3);
   if (api.app.pantalla !== 'preview') throw new Error('previsualización no se abrió');
@@ -574,20 +585,34 @@ try {
   frames(3);
   if (api.app.pantalla !== 'intro') throw new Error('con mods activos debería abrir la intro');
   if (!api.app.introCtx) throw new Error('la intro no inicializó el canvas');
+  api.empezarPartida('beginner', null, { saltarIntro: true });
+  frames(3);
+  if (api.app.pantalla !== 'playing') throw new Error('con mods debería ir a la partida');
+  const jm = api.app.juego;
+  if (!jm || !jm.mods || !jm.mods.minasExtra) throw new Error('mods no llegaron correctamente al motor');
+  api.accion('confirm', false, { x: 0, y: 0, puntero: true });
+  frames(5);
+  if (jm.estado !== 'jugando' && jm.estado !== 'ganado') throw new Error('la partida de modificadores no avanzó');
 
-  // Desactivar mods y empezar partida directa → playing
+  // Sin mods → volver al menú, desactivar, empezar → abre intro, saltar para jugar
+  api.ejecutar('toMenu');
+  frames(3);
   api.ejecutar('toggleMod:minasExtra');
   frames(2);
   api.ejecutar('previewDifficulty:beginner');
   frames(3);
+  if (api.app.pantalla !== 'preview') throw new Error('previsualización no se abrió');
   api.ejecutar('play:beginner');
   frames(3);
-  if (api.app.pantalla !== 'playing') throw new Error('sin mods debería ir directo a la partida');
-  const jm = api.app.juego;
-  if (!jm || jm.mods && jm.mods.minasExtra) throw new Error('mods no deberían estar activos');
+  if (api.app.pantalla !== 'intro') throw new Error('sin mods también debería abrir la intro');
+  api.empezarPartida('beginner', null, { saltarIntro: true });
+  frames(3);
+  if (api.app.pantalla !== 'playing') throw new Error('sin mods debería ir a la partida');
+  const jm2 = api.app.juego;
+  if (!jm2 || jm2.mods && jm2.mods.minasExtra) throw new Error('mods no deberían estar activos');
   api.accion('confirm', false, { x: 0, y: 0, puntero: true });
   frames(5);
-  if (jm.estado !== 'jugando' && jm.estado !== 'ganado') throw new Error('la partida no avanzó');
+  if (jm2.estado !== 'jugando' && jm2.estado !== 'ganado') throw new Error('la partida no avanzó');
 
   console.log('v2: historia por diálogos y modo modificadores ok');
 
