@@ -1261,16 +1261,59 @@ function pasarLineaHistoria() {
   renderHistoria();
 }
 
+function filasModificadoresPreview(dificultadId) {
+  const modsActivos = Object.keys(guardado.modificadores).some((k) => guardado.modificadores[k]);
+  const esDeadly = dificultadId === 'deadly';
+
+  if (esDeadly) return '';
+
+  const MODS = [
+    { clave: 'minasExtra', nombre: t('modMinesExtra'), tag: t('modMinesExtraTag') },
+    { clave: 'reloj', nombre: t('modReloj'), tag: t('modRelojTag') },
+    { clave: 'sinBandera', nombre: t('modSinBandera'), tag: t('modSinBanderaTag') },
+    { clave: 'panico', nombre: t('modPanico'), tag: t('modPanicoTag') },
+    { clave: 'hard', nombre: t('modHard'), tag: t('modHardTag') },
+  ];
+  const filasMod = MODS.map((m, i) => {
+    const act = guardado.modificadores[m.clave];
+    return `<button type="button" class="row mod-row ${act ? 'sel' : ''}" data-accion="toggleMod:${m.clave}">
+      <span class="row-idx">${dosDigitos(i + 1)}</span>
+      <span class="row-name">
+        ${m.nombre}<br>
+        <small>${m.tag}</small>
+      </span>
+      <span class="row-right">${act ? '●' : '○'}</span>
+    </button>`;
+  }).join('');
+  const nActivas = Object.keys(guardado.modificadores).filter((k) => guardado.modificadores[k]).length;
+
+  return `<details class="mods-section" open>
+    <summary class="mods-summary">
+      <span class="mods-arrow">▾</span>
+      <span class="mods-titulo">${t('modifiers')}</span>
+      <span class="mods-estado">${modsActivos ? '●' : '○'}</span>
+    </summary>
+    <nav class="filas mod-filas" aria-label="${t('modifiers')}">${filasMod}</nav>
+    <button type="button" class="row mod-start principal" data-accion="play:modifiers">
+      <span class="row-idx">06</span>
+      <span class="row-name">${t('start')}</span>
+      <span class="row-right">${modsActivos ? '▶' : '◯'}</span>
+    </button>
+    <p class="nota mod-detalle">
+      ${modsActivos ? t('modActivas', { n: nActivas }) : t('modNinguno')}
+    </p>
+  </details>`;
+}
+
 function mostrarDificultades() {
   app.juego = null;
   const filas = DIFICULTADES.map((d, i) => {
     const best = guardado.best[d.id];
-    const clave = d.id === 'beginner' ? 'Beginner' : d.id === 'intermediate' ? 'Intermediate' : 'Expert';
     return filaHTML({
-      accion: `play:${d.id}`,
+      accion: `previewDifficulty:${d.id}`,
       idx: i,
-      nombre: t(`diff${clave}`),
-      detalle: t(`diff${clave}Tag`),
+      nombre: t(`diff${d.id.charAt(0).toUpperCase()}${d.id.slice(1)}`),
+      detalle: t(`diff${d.id.charAt(0).toUpperCase()}${d.id.slice(1)}Tag`),
       derecha: best > 0 ? formatoTiempo(best) : '—',
     });
   });
@@ -1281,13 +1324,84 @@ function mostrarDificultades() {
     detalle: detalleCustom(),
     derecha: t('custom').toLowerCase(),
   }));
+
+  let bloqueMods = '';
+  if (true) {
+    const nActivas = Object.keys(guardado.modificadores).filter((k) => guardado.modificadores[k]).length;
+    const modsActivos = nActivas > 0;
+    const filasMod = [
+      { clave: 'minasExtra', nombre: t('modMinesExtra'), tag: t('modMinesExtraTag') },
+      { clave: 'reloj', nombre: t('modReloj'), tag: t('modRelojTag') },
+      { clave: 'sinBandera', nombre: t('modSinBandera'), tag: t('modSinBanderaTag') },
+      { clave: 'panico', nombre: t('modPanico'), tag: t('modPanicoTag') },
+      { clave: 'hard', nombre: t('modHard'), tag: t('modHardTag') },
+    ].map((m, i) => {
+      const act = guardado.modificadores[m.clave];
+      return `<button type="button" class="row mod-row ${act ? 'sel' : ''}" data-accion="toggleMod:${m.clave}">
+        <span class="row-idx">${dosDigitos(i + 1)}</span>
+        <span class="row-name">
+          ${m.nombre}<br>
+          <small>${m.tag}</small>
+        </span>
+        <span class="row-right">${act ? '●' : '○'}</span>
+      </button>`;
+    }).join('');
+    bloqueMods = `<details class="mods-section" open>
+      <summary class="mods-summary">
+        <span class="mods-arrow">▾</span>
+        <span class="mods-titulo">${t('modifiers')}</span>
+        <span class="mods-estado">${modsActivos ? '●' : '○'}</span>
+      </summary>
+      <nav class="filas mod-filas" aria-label="${t('modifiers')}">${filasMod}</nav>
+      <p class="nota mod-detalle">
+        ${modsActivos ? t('modActivas', { n: nActivas }) : t('modNinguno')}
+      </p>
+    </details>`;
+  }
   ponerOverlay(`<div class="panel">
     ${cabeceraPanel(t('difficulty'), botonVolver())}
     <nav class="filas" aria-label="${t('difficulty')}">${filas.join('')}</nav>
+    ${bloqueMods}
   </div>`);
   pantalla('modes');
   hudMenu(t('difficulty'));
   enfocarPrimero();
+}
+
+function mostrarPreviewDificultad(id) {
+  const d = dificultadPorId(id);
+  if (!d) { mostrarDificultades(); return; }
+  const idioma = getLanguage();
+  const best = guardado.best[id];
+  const esDeadly = id === 'deadly';
+  const modsActivos = Object.keys(guardado.modificadores).filter((k) => guardado.modificadores[k]);
+  const puedeMods = !esDeadly;
+
+  ponerOverlay(`<div class="panel preview">
+    ${cabeceraPanel(t('difficulty'), botonVolver())}
+    <div class="escena-bloque">
+      <canvas id="escenaPreview" class="escena-canvas" width="360" height="240" aria-label="escena"></canvas>
+    </div>
+    <div class="preview-info">
+      <p class="kicker">${t('difficulty')}</p>
+      <h2 class="preview-titulo">${t(`diff${id.charAt(0).toUpperCase()}${id.slice(1)}`)}</h2>
+      <p class="preview-detalle">${t(`diff${id.charAt(0).toUpperCase()}${id.slice(1)}Tag`)}</p>
+      ${best > 0 ? `<p class="preview-best">${t('best', { time: formatoTiempo(best) })}</p>` : ''}
+      <p class="preview-medidas">${d.columnas} × ${d.filas} · ${d.minas} ${unitMinas(d.minas)}</p>
+    </div>
+    ${puedeMods ? filasModificadoresPreview(id) : ''}
+    <div class="acciones">
+      <button class="principal" type="button" data-accion="play:${id}">
+        <span>${t('start')}</span><kbd>↵</kbd>
+      </button>
+      <button type="button" data-accion="back"><span>${t('back')}</span><kbd>Esc</kbd></button>
+    </div>
+  </div>`);
+  pantalla('preview');
+  hudMenu(t('difficulty'));
+  enfocarPrimero();
+  const cv = document.getElementById('escenaPreview');
+  if (cv) dibujarEscena(cv, 'campo');
 }
 
 function filaPasoHTML({ idx, nombre, campo, delta, valor }) {
@@ -1371,18 +1485,25 @@ function empezarPartida(modo, nivel = null, datos = {}) {
     mostrarCampaña();
     return;
   }
-  if (modo === 'modifiers') {
+  // Modificadores aplicables a cualquier modo (excepto campaign y deadly).
+  const modsActivos = Object.keys(guardado.modificadores).some((k) => guardado.modificadores[k]);
+  const esDeadly = modo === 'deadly';
+  const puedeMods = modo !== 'campaign' && !esDeadly;
+  const modsParaPartida = puedeMods && modsActivos ? { ...guardado.modificadores } : null;
+
+  if (puedeMods && modsParaPartida) {
     const c = { ...guardado.custom };
-    const mods = { ...guardado.modificadores };
-    let minas = c.minas;
+    const mods = modsParaPartida;
+    let minas = cfg.minas;
     if (mods.minasExtra) minas = Math.floor(minas * 1.4);
     minas = Math.max(1, Math.min(minas, c.filas * c.columnas - 1));
     const segundos = Math.max(30, Math.floor((c.filas * c.columnas) / 3));
-    cfg = { filas: c.filas, columnas: c.columnas, minas, mods, relojSegundos: mods.reloj ? segundos : 0 };
+    cfg = { ...cfg, filas: c.filas, columnas: c.columnas, minas, mods, relojSegundos: mods.reloj ? segundos : 0 };
   }
+
   app.juego = new Game(cfg, eventosJuego);
-  app.modHard = modo === 'modifiers' && guardado.modificadores.hard;
-  app.modsActivos = Object.keys(guardado.modificadores).some((k) => guardado.modificadores[k]);
+  app.modHard = puedeMods && guardado.modificadores.hard;
+  app.modsActivos = puedeMods && modsActivos;
   if (!datos || !datos.saltarIntro) {
     if (app.modsActivos) {
       mostrarIntroMod();
@@ -1390,18 +1511,18 @@ function empezarPartida(modo, nivel = null, datos = {}) {
     }
     if (app.modHard) {
       audio.musica('hardMod', 0, 1);
-      prepararFondoRojo();
+      app.fondoRojoActivo = true;
     } else {
       app.modHard = false;
-      limpiarFondoRojo();
+      app.fondoRojoActivo = false;
     }
   } else {
     if (app.modHard) {
       audio.musica('hardMod', 0, 1);
-      prepararFondoRojo();
+      app.fondoRojoActivo = true;
     } else {
       app.modHard = false;
-      limpiarFondoRojo();
+      app.fondoRojoActivo = false;
     }
   }
   casillaArmada = null;
@@ -2066,13 +2187,24 @@ function ejecutar(nombre) {
       guardado.modificadores[clave] = !guardado.modificadores[clave];
       guardar();
       audio.play('ui');
-      mostrarModificadores();
+      if (app.pantalla === 'preview') {
+        const id = app.pantallaPrevia || 'beginner';
+        mostrarPreviewDificultad(id);
+      } else {
+        mostrarDificultades();
+      }
     }
     return;
   }
   if (nombre.startsWith('selectMod:')) {
     const clave = nombre.slice('selectMod:'.length);
     seleccionarMod(clave);
+    return;
+  }
+  if (nombre.startsWith('previewDifficulty:')) {
+    const id = nombre.slice('previewDifficulty:'.length);
+    app.pantallaPrevia = id;
+    mostrarPreviewDificultad(id);
     return;
   }
   if (nombre.startsWith('play:')) {
@@ -2098,7 +2230,7 @@ function ejecutar(nombre) {
   switch (nombre) {
     case 'play': mostrarDificultades(); return;
     case 'campaign': mostrarCampaña(); return;
-    case 'playModifiers': mostrarModificadores(); return;
+    case 'playModifiers': mostrarDificultades(); return;
     case 'modifiersStart': {
       if (guardado.modificadores.hard) mostrarIntroMod();
       else empezarPartida('modifiers');
@@ -2549,6 +2681,7 @@ const REPINTAR = {
   story: () => mostrarHistoria(app.historia === null ? 0 : app.historia),
   modifiers: mostrarModificadores,
   modes: mostrarDificultades,
+  preview: () => mostrarPreviewDificultad(app.pantallaPrevia || 'beginner'),
   custom: () => mostrarPersonalizada(),
   profile: mostrarPerfil,
   settings: mostrarAjustes,
