@@ -11,12 +11,13 @@ const COLOR_NUMERO = (n) => COLORES_NUMERO[clamp(n, 1, 8)] || ACENTO;
 export class Game {
   constructor(cfg, onEvent = () => {}) {
     this.cfg = { ...cfg };
+    this.mods = cfg.mods || null;
     this.tablero = new Tablero(this.cfg);
     this.onEvent = typeof onEvent === 'function' ? onEvent : () => {};
 
     this.estado = 'antes';
     this.pausado = false;
-    this.tiempoMs = 0;
+    this.tiempoMs = this.mods?.reloj ? Math.max(1, Math.floor(Number(this.mods.relojSegundos) || 0)) * 1000 : 0;
     this.reloj = 0;
 
     this.cursor = {
@@ -71,6 +72,7 @@ export class Game {
       if (this.flashes.length > 900) this.flashes = this.flashes.slice(-500);
       if (origen === 'acorde') this.emit('chord', { size: resultado.reveladas.length });
       this.emit('reveal', { size: resultado.reveladas.length });
+      if (this.mods && this.mods.panico) this.shake = Math.max(this.shake, 8);
     }
     if (resultado.explosion >= 0) {
       this.estado = 'perdido';
@@ -110,6 +112,7 @@ export class Game {
   alternarBanderaEn(x, y) {
     if (this.pausado || this.terminada) return;
     if (!this.dentro(x, y)) return;
+    if (this.mods && this.mods.sinBandera) return;
     const resultado = this.tablero.alternarBandera(this.indice(x, y));
     if (resultado === 'bandera') this.emit('flag', { on: true });
     else if (resultado === 'sin-bandera') this.emit('unflag', {});
@@ -130,8 +133,24 @@ export class Game {
   update(dt) {
     const paso = clamp(Number(dt) || 0, 0, 100);
     this.reloj += paso;
-    if (this.estado === 'jugando' && !this.pausado) this.tiempoMs += paso;
-    else if (this.estado === 'antes' && !this.pausado && this.tablero.sembradas) this.tiempoMs += paso;
+    let avanza = false;
+    if (this.estado === 'jugando' && !this.pausado) avanza = true;
+    else if (this.estado === 'antes' && !this.pausado && this.tablero.sembradas) avanza = true;
+    if (avanza) {
+      if (this.mods && this.mods.reloj) {
+        this.tiempoMs = Math.max(0, this.tiempoMs - paso);
+        if (this.tiempoMs <= 0 && this.estado !== 'perdido') {
+          this.estado = 'perdido';
+          this.explosionT = this.reloj;
+          this.shake = 16;
+          this.tablero.revelarTodo();
+          this.emit('boom', { indice: this.indice(this.cursor.x, this.cursor.y) });
+          return;
+        }
+      } else {
+        this.tiempoMs += paso;
+      }
+    }
     this.shake = Math.max(0, this.shake - paso * 0.05);
     if (this.flashes.length) {
       const limite = this.reloj - 450;

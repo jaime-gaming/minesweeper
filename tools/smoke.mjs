@@ -539,6 +539,39 @@ try {
   if (!portada().includes('hub-volver')) throw new Error('?from=hub en una ruta profunda no llega a la portada');
   console.log('desde el hub: otros orígenes, pestaña nueva y rutas profundas ok');
 
+  // --- v2: historia por diálogos ---
+  api.ejecutar('playCampaign:0');
+  frames(3);
+  if (api.app.pantalla !== 'story') throw new Error('playCampaign no abrió la historia');
+  api.ejecutar('dialogNext');
+  frames(3);
+  if (api.app.pantalla !== 'story' || api.app.historiaLinea !== 1) throw new Error('dialogNext no avanzó la línea de diálogo');
+  api.ejecutar('descend');
+  frames(5);
+  if (api.app.pantalla !== 'playing') throw new Error('descend tras diálogo no entró en la partida');
+  api.ejecutar('toMenu');
+  frames(3);
+  if (api.app.pantalla !== 'campaign') throw new Error('toMenu desde la partida no devolvió al mapa');
+
+  // --- v2: modo Modificadores ---
+  api.ejecutar('playModifiers');
+  frames(3);
+  if (api.app.pantalla !== 'modifiers') throw new Error('modificadores no se abrió');
+  const modHTML = documentStub.querySelector('#overlay').innerHTML;
+  if (!modHTML.includes('minas extra') && !modHTML.includes('extra mines')) throw new Error('modificadores no lista minas extra');
+  api.ejecutar('toggleMod:minasExtra');
+  frames(2);
+  const saveMod = JSON.parse(localStorageStub.getItem('minesweeper.v1'));
+  if (!saveMod.modificadores || !saveMod.modificadores.minasExtra) throw new Error('toggle de modificador no persistió');
+  api.ejecutar('modifiersStart');
+  frames(3);
+  const jm = api.app.juego;
+  if (!jm || !jm.mods || !jm.mods.minasExtra) throw new Error('mods no llegaron al motor de la partida');
+  api.accion('confirm', false, { x: 0, y: 0, puntero: true });
+  frames(5);
+  if (jm.estado !== 'jugando' && jm.estado !== 'ganado') throw new Error('la partida de modificadores no avanzó');
+  console.log('v2: historia por diálogos y modo modificadores ok');
+
   console.log('ops de lienzo validadas:', opsCanvas);
   console.log('OK humo completo');
   process.exit(0);

@@ -1752,3 +1752,81 @@ button.foco {
     animation: none;
   }
 }
+
+/* --- Historia: escena y diálogo (campaña v2) --- */
+
+.historia .escena-bloque {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(10px, 2vw, 18px);
+  padding: clamp(8px, 2vh, 14px) 0;
+}
+
+.escena-canvas {
+  width: clamp(220px, 34vw, 420px);
+  height: auto;
+  max-height: clamp(150px, 26vh, 260px);
+  background: #000;
+  border: 1px solid var(--line);
+  box-shadow: 0 0 0 1px #000;
+  image-rendering: pixelated;
+}
+
+@media (max-width: 760px) {
+  .historia .escena-bloque {
+    flex-direction: column;
+  }
+
+  .escena-canvas {
+    width: clamp(200px, 70vw, 320px);
+    max-height: 200px;
+  }
+}
+
+.dialogo {
+  border: 1px solid var(--line);
+  background: #050505;
+  padding: clamp(12px, 3vh, 18px) clamp(14px, 4vw, 22px);
+  gap: 10px;
+  display: flex;
+  flex-direction: column;
+}
+
+.dialogo-quien {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.dialogo-texto {
+  margin: 0;
+  font-size: clamp(15px, 2.8vw, 18px);
+  line-height: 1.75;
+  color: var(--fg);
+  max-width: 42ch;
+}
+
+.dialogo-avance {
+  margin: 6px 0 0;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.2em;
+  color: var(--muted);
+}
+
+/* --- Modo Modificadores --- */
+
+.mod-estado {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
+.mod-estado.activa { color: var(--accent); }
+.mod-estado.inactiva { color: var(--dim); }
+
+.row.sel .mod-estado.activa,
+.row.sel .mod-estado.inactiva { color: #000; }

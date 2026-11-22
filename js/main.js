@@ -11,6 +11,7 @@ import { audio } from './audio.js?v=9';
 import { attachInput, registrarConversorPunto } from './input.js?v=1';
 import { t, getLanguage, setLanguage, unitMinas, routeSlug, routeWords } from './i18n.js?v=20';
 import { NIVELES, ACTOS, configNivel, nivelCampana, actoDe } from './campaign.js?v=7';
+import { dibujarEscena } from './scenes.js?v=1';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -42,6 +43,7 @@ function nuevoRegistro() {
     volumen: 100,
     custom: { filas: 9, columnas: 16, minas: 40 },
     campaign: { unlocked: 1, best: {} },
+    modificadores: { minasExtra: false, reloj: false, sinBandera: false, panico: false },
   };
 }
 
@@ -84,6 +86,10 @@ function leerGuardado() {
       if (Number.isInteger(i) && i >= 0 && i < NIVELES.length && Number.isFinite(valor) && valor > 0) {
         datos.campaign.best[i] = valor;
       }
+    }
+    const mods = bruto.modificadores && typeof bruto.modificadores === 'object' ? bruto.modificadores : {};
+    for (const clave of Object.keys(datos.modificadores)) {
+      if (typeof mods[clave] === 'boolean') datos.modificadores[clave] = mods[clave];
     }
   }
   return datos;
@@ -351,6 +357,11 @@ function pasoBarrido(dt) {
 
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
+function panDe(j, x) {
+  if (!j || j.columnas <= 1 || x == null) return 0;
+  return (x - (j.columnas - 1) / 2) / ((j.columnas - 1) / 2);
+}
+
 const DURACION_RUIDO = 800;
 const ruidoFx = { t: 0, pintado: 0, activo: false, persistente: false, lienzoBase: null, img: null, ctxBase: null, ctxLienzo: null };
 
@@ -554,6 +565,7 @@ const PISTAS = {
   settings: 'hintSettings',
   campaign: 'hintCampaign',
   story: 'hintStory',
+  modifiers: 'hintModifiers',
 };
 
 function actualizarPista() {
@@ -567,9 +579,13 @@ function actualizarPista() {
 
 function gestionarMusicaPantalla(nombre) {
   if (nombre === 'playing' || nombre === 'paused') {
-    if (app.juego && !app.juego.terminada) audio.musica('ambience', 200, 1.4);
+    if (app.juego && !app.juego.terminada) {
+      if (app.modo === 'modifiers') audio.musicaProc('modifiers');
+      else audio.musica('ambience', 200, 1.4);
+    }
     return;
   }
+  audio.pararMusica();
   audio.pararAmbiente();
 }
 
@@ -611,6 +627,11 @@ function actualizarMarcador() {
     meta = t('campaignHud', { n: dosDigitos((app.nivel || 0) + 1), name: nombreNivel(app.nivel || 0) });
     const bestNivel = guardado.campaign.best[app.nivel] || 0;
     bestTxt = bestNivel > 0 ? `${t('record')} ${formatoTiempo(bestNivel)}` : t('noRecord');
+  } else if (app.modo === 'modifiers') {
+    meta = t('modifiers');
+    const activos = Object.keys(guardado.modificadores).filter((k) => guardado.modificadores[k]);
+    if (activos.length) meta += ` · ${t(activos.length === 1 ? 'modActiva' : 'modActivas', { n: activos.length })}`;
+    bestTxt = '';
   } else {
     meta = nombreDificultad(app.modo);
     const bestMs = esDificultadFija(app.modo) ? guardado.best[app.modo] : 0;
@@ -619,6 +640,10 @@ function actualizarMarcador() {
       : t('diffCustom');
   }
   escribirHud(meta, String(j.minasRestantes), formatoTiempo(j.tiempoMs), bestTxt);
+  if (el.timer) {
+    const cuentaAtras = app.modo === 'modifiers' && guardado.modificadores.reloj && j.tiempoMs < 10000;
+    el.timer.style.color = cuentaAtras ? '#ff2b2b' : '';
+  }
 }
 
 let huecoFin = 0;
@@ -816,11 +841,12 @@ function mostrarPortada() {
   app.juego = null;
   app.contado = false;
   const hechos = campañaHechos();
-  const filas = [
-    filaHTML({ accion: 'play', idx: 0, nombre: t('play'), detalle: t('playTag'), derecha: '↵' }),
-    filaHTML({ accion: 'campaign', idx: 1, nombre: t('campaign'), detalle: t('campaignTag'), derecha: `${dosDigitos(hechos)}/30` }),
-    filaHTML({ accion: 'profile', idx: 2, nombre: t('profile'), detalle: t('profileTag') }),
-  ].join('');
+    const filas = [
+      filaHTML({ accion: 'play', idx: 0, nombre: t('play'), detalle: t('playTag'), derecha: '↵' }),
+      filaHTML({ accion: 'campaign', idx: 1, nombre: t('campaign'), detalle: t('campaignTag'), derecha: `${dosDigitos(hechos)}/30` }),
+      filaHTML({ accion: 'playModifiers', idx: 2, nombre: t('modifiers'), detalle: t('modTagline'), derecha: '↵' }),
+      filaHTML({ accion: 'profile', idx: 3, nombre: t('profile'), detalle: t('profileTag') }),
+    ].join('');
   ponerOverlay(`<div class="panel inicio portada">
     <div class="inicio-texto">
       <header class="inicio-cabeza">
@@ -1153,24 +1179,59 @@ function mostrarHistoria(indice) {
     return;
   }
   app.historia = indice;
-  const nombre = getLanguage() === 'en' ? nivel.nombreEn : nivel.nombreEs;
-  const texto = getLanguage() === 'en' ? nivel.historiaEn : nivel.historiaEs;
+  app.historiaLinea = 0;
+  renderHistoria();
+}
+
+function renderHistoria() {
+  const indice = app.historia;
+  const linea = Math.max(0, Math.floor(Number(app.historiaLinea) || 0));
+  const nivel = nivelCampana(indice);
+  if (!nivel) return;
+  const idioma = getLanguage();
+  const dialogo = nivel.dialogo || [];
+  const beat = dialogo[linea];
+  const completo = linea >= dialogo.length;
+  const nombre = idioma === 'en' ? nivel.nombreEn : nivel.nombreEs;
   const acto = actoDe(indice);
-  const nombreActoTxt = getLanguage() === 'en' ? acto.nombreEn : acto.nombreEs;
+  const nombreActoTxt = idioma === 'en' ? acto.nombreEn : acto.nombreEs;
+  const quienTxt = beat ? t(`quien${beat.quien[0].toUpperCase()}${beat.quien.slice(1)}`) : '';
+  const texto = beat ? (idioma === 'en' ? beat.en : beat.es) : '';
   const completado = (guardado.campaign.best[indice] || 0) > 0;
   ponerOverlay(`<div class="panel historia">
     <p class="kicker">${t('actLabel', { n: acto.id, name: nombreActoTxt })} · ${t('levelCell', { n: indice + 1 })}</p>
     <h2 class="historia-titulo">${nombre}</h2>
-    <p class="historia-dossier">${t('storyDossier')}</p>
-    <p class="historia-texto">${texto}</p>
+    <div class="escena-bloque">
+      <canvas id="escena" class="escena-canvas" width="360" height="240" aria-label="escena"></canvas>
+    </div>
+    ${beat ? `<div class="dialogo">
+      <p class="dialogo-quien">${quienTxt}</p>
+      <p class="dialogo-texto">${texto}</p>
+    </div>
+    <p class="dialogo-avance">${dosDigitos(linea + 1)} / ${dosDigitos(dialogo.length)}</p>` : ''}
     <div class="acciones">
-      <button class="principal" type="button" data-accion="descend"><span>${completado ? t('descendAgain') : t('descend')}</span><kbd>↵</kbd></button>
+      ${completo
+        ? `<button class="principal" type="button" data-accion="descend"><span>${completado ? t('descendAgain') : t('descend')}</span><kbd>↵</kbd></button>`
+        : `<button class="principal" type="button" data-accion="dialogNext"><span>${t('dialogoSiguiente')}</span><kbd>↵</kbd></button>`}
       <button type="button" data-accion="back"><span>${t('back')}</span><kbd>Esc</kbd></button>
     </div>
   </div>`);
   pantalla('story');
   hudMenu(t('campaignHud', { n: dosDigitos(indice + 1), name: nombre }));
   enfocarPrimero();
+  const cv = document.getElementById('escena');
+  if (cv) dibujarEscena(cv, nivel.escena || 'campo');
+}
+
+function pasarLineaHistoria() {
+  const indice = app.historia;
+  const nivel = nivelCampana(indice);
+  if (!nivel) return;
+  const total = (nivel.dialogo || []).length;
+  if ((app.historiaLinea || 0) + 1 >= total) return;
+  app.historiaLinea += 1;
+  audio.play('ui');
+  renderHistoria();
 }
 
 function mostrarDificultades() {
@@ -1278,10 +1339,19 @@ function empezarPartida(modo, nivel = null) {
   app.demo = null;
   app.modo = modo;
   app.nivel = modo === 'campaign' ? nivel : null;
-  const cfg = modo === 'campaign' ? configNivel(nivel) : configDeModo(modo);
+  let cfg = modo === 'campaign' ? configNivel(nivel) : configDeModo(modo);
   if (!cfg) {
     mostrarCampaña();
     return;
+  }
+  if (modo === 'modifiers') {
+    const c = { ...guardado.custom };
+    const mods = { ...guardado.modificadores };
+    let minas = c.minas;
+    if (mods.minasExtra) minas = Math.floor(minas * 1.4);
+    minas = Math.max(1, Math.min(minas, c.filas * c.columnas - 1));
+    const segundos = Math.max(30, Math.floor((c.filas * c.columnas) / 3));
+    cfg = { filas: c.filas, columnas: c.columnas, minas, mods, relojSegundos: mods.reloj ? segundos : 0 };
   }
   app.juego = new Game(cfg, eventosJuego);
   casillaArmada = null;
@@ -1369,17 +1439,17 @@ function eventosJuego(tipo, datos) {
   const j = app.juego;
   switch (tipo) {
     case 'reveal':
-      audio.play('reveal', { size: datos && datos.size });
+      audio.play('reveal', { size: datos && datos.size, pan: panDe(j, (datos && datos.x != null ? datos.x : (j.hover ? j.hover.x : j.cursor.x))) });
       el.senal.classList.remove('visible');
       break;
     case 'chord':
-      audio.play('chord');
+      audio.play('chord', { pan: panDe(j, datos && datos.x != null ? datos.x : j.cursor.x) });
       break;
     case 'flag':
-      audio.play('flag');
+      audio.play('flag', { pan: panDe(j, datos && datos.x != null ? datos.x : j.cursor.x) });
       break;
     case 'unflag':
-      audio.play('unflag');
+      audio.play('unflag', { pan: panDe(j, datos && datos.x != null ? datos.x : j.cursor.x) });
       break;
     case 'boom': {
       contabilizarFin(false);
@@ -1566,6 +1636,33 @@ function datoCifra(valor, etiqueta, cuenta, formato) {
   return `<div class="dato-cifra">${inner}<span>${etiqueta}</span></div>`;
 }
 
+function mostrarModificadores() {
+  app.juego = null;
+  const mods = guardado.modificadores;
+  const c = guardado.custom;
+  const filas = [
+    filaHTML({ accion: 'toggleMod:minasExtra', idx: 0, nombre: t('modMinesExtra'), detalle: t('modMinesExtraTag'), derecha: mods.minasExtra ? '●' : '○' }),
+    filaHTML({ accion: 'toggleMod:reloj', idx: 1, nombre: t('modReloj'), detalle: t('modRelojTag'), derecha: mods.reloj ? '●' : '○' }),
+    filaHTML({ accion: 'toggleMod:sinBandera', idx: 2, nombre: t('modSinBandera'), detalle: t('modSinBanderaTag'), derecha: mods.sinBandera ? '●' : '○' }),
+    filaHTML({ accion: 'toggleMod:panico', idx: 3, nombre: t('modPanico'), detalle: t('modPanicoTag'), derecha: mods.panico ? '●' : '○' }),
+  ];
+  filas.push(filaHTML({
+    accion: 'modifiersStart',
+    idx: 4,
+    nombre: t('start'),
+    detalle: `${c.filas} × ${c.columnas} · ${c.minas} ${unitMinas(c.minas)}`,
+    derecha: '↵',
+  }));
+  ponerOverlay(`<div class="panel">
+    ${cabeceraPanel(t('modifiers'), botonVolver())}
+    <p class="nota">${t('modTagline')}</p>
+    <nav class="filas" aria-label="${t('modifiers')}">${filas.join('')}</nav>
+  </div>`);
+  pantalla('modifiers');
+  hudMenu(t('modifiers'));
+  enfocarPrimero();
+}
+
 function mostrarPerfil() {
   app.juego = null;
   const s = guardado.stats;
@@ -1721,6 +1818,16 @@ function mostrarAjustes() {
 function ejecutar(nombre) {
   audio.unlock();
   if (!nombre) return;
+  if (nombre.startsWith('toggleMod:')) {
+    const clave = nombre.slice('toggleMod:'.length);
+    if (clave in guardado.modificadores) {
+      guardado.modificadores[clave] = !guardado.modificadores[clave];
+      guardar();
+      audio.play('ui');
+      mostrarModificadores();
+    }
+    return;
+  }
   if (nombre.startsWith('play:')) {
     empezarPartida(nombre.slice(5));
     return;
@@ -1744,6 +1851,8 @@ function ejecutar(nombre) {
   switch (nombre) {
     case 'play': mostrarDificultades(); return;
     case 'campaign': mostrarCampaña(); return;
+    case 'playModifiers': mostrarModificadores(); return;
+    case 'modifiersStart': empezarPartida('modifiers'); return;
     case 'lockedNode': audio.play('locked'); return;
     case 'mapDescend': {
       const i = app.mapaSel;
@@ -1754,6 +1863,7 @@ function ejecutar(nombre) {
       }
       return;
     }
+    case 'dialogNext': pasarLineaHistoria(); return;
     case 'descend':
       if (app.historia !== null && app.historia !== undefined) empezarPartida('campaign', app.historia);
       return;
@@ -1829,6 +1939,7 @@ function volverAtras() {
     case 'modes': mostrarPortada(); return;
     case 'custom': mostrarDificultades(); return;
     case 'campaign': mostrarPortada(); return;
+    case 'modifiers': mostrarPortada(); return;
     case 'story': mostrarCampaña(); return;
     case 'profile':
     case 'settings':
@@ -2137,6 +2248,7 @@ const REPINTAR = {
   home: mostrarPortada,
   campaign: mostrarCampaña,
   story: () => mostrarHistoria(app.historia === null ? 0 : app.historia),
+  modifiers: mostrarModificadores,
   modes: mostrarDificultades,
   custom: () => mostrarPersonalizada(),
   profile: mostrarPerfil,

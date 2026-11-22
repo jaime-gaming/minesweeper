@@ -1,6 +1,6 @@
 (function () {
 'use strict';
-const modulos = { board: {}, presets: {}, audio: {}, input: {}, engine: {}, i18n: {}, campaign: {}, main: {} };
+const modulos = { board: {}, presets: {}, audio: {}, input: {}, engine: {}, i18n: {}, campaign: {}, scenes: {}, main: {} };
 
 (function (modulo) {
 'use strict';
@@ -307,14 +307,18 @@ function esDificultadFija(id) {
 
 (function (modulo) {
 'use strict';
-
 let ctx = null;
 let master = null;
 let musicGain = null;
+let pan = null;
 let noiseBuf = null;
 let roto = false;
 let nivelMusica = 1;
 const GANANCIA_MUSICA = 1.3;
+
+// Música procedural (modo Modificadores). No depende de archivos MP3.
+let proc = null;
+const ESCALA_MOD = [73.42, 82.41, 87.31, 98.0, 110, 116.54, 130.81, 146.83];
 
 function build() {
   if (ctx) return ctx;
@@ -331,8 +335,11 @@ function build() {
     master.gain.value = audio.enabled ? 0.15 : 0;
     musicGain = ctx.createGain();
     musicGain.gain.value = GANANCIA_MUSICA * nivelMusica;
+    pan = ctx.createStereoPanner();
+    pan.pan.value = 0;
 
     musicGain.connect(master);
+    pan.connect(master);
     if (typeof ctx.createDynamicsCompressor === 'function') {
       const compresor = ctx.createDynamicsCompressor();
       compresor.threshold.value = -20;
@@ -356,6 +363,7 @@ function build() {
     roto = true;
     ctx = null;
     master = null;
+    pan = null;
     return null;
   }
 }
@@ -375,12 +383,16 @@ function tono(freq, dur, opts = {}) {
   osc.frequency.setValueAtTime(freq, t0);
   if (opts.fin > 0) osc.frequency.exponentialRampToValueAtTime(opts.fin, t0 + dur);
 
+  if (Number.isFinite(opts.pan) && pan) {
+    pan.pan.setValueAtTime(Math.max(-1, Math.min(1, opts.pan)), t0);
+  }
+
   gan.gain.setValueAtTime(0.0001, t0);
   gan.gain.exponentialRampToValueAtTime(volumen, t0 + ataque);
   gan.gain.setValueAtTime(volumen, t0 + dur - salida);
   gan.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
 
-  osc.connect(gan).connect(master);
+  osc.connect(gan).connect(pan);
   osc.start(t0);
   osc.stop(t0 + dur + 0.02);
 }
@@ -400,28 +412,33 @@ function ruido(dur, opts = {}) {
   filtro.type = 'lowpass';
   filtro.frequency.setValueAtTime(opts.desde || 2400, t0);
   filtro.frequency.exponentialRampToValueAtTime(opts.hasta || 120, t0 + dur);
+
+  if (Number.isFinite(opts.pan) && pan) {
+    pan.pan.setValueAtTime(Math.max(-1, Math.min(1, opts.pan)), t0);
+  }
+
   gan.gain.setValueAtTime(0.0001, t0);
   gan.gain.exponentialRampToValueAtTime(volumen, t0 + ataque);
   gan.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
 
-  src.connect(filtro).connect(gan).connect(master);
+  src.connect(filtro).connect(gan).connect(pan);
   src.start(t0);
   src.stop(t0 + dur + 0.02);
 }
 
-function boomSintetico() {
+function boomSintetico(panValor = 0) {
 
-    ruido(1.7, { desde: 1050, hasta: 52, vol: 0.5, ataque: 0.002 });
+  ruido(1.7, { desde: 1050, hasta: 52, vol: 0.5, ataque: 0.002, pan: panValor });
 
-    tono(57, 1.25, { tipo: 'sine', vol: 0.42, fin: 29, release: 0.6 });
+  tono(57, 1.25, { tipo: 'sine', vol: 0.42, fin: 29, release: 0.6, pan: panValor });
 
-    tono(150, 0.2, { tipo: 'sawtooth', vol: 0.28, fin: 58 });
-    tono(320, 0.09, { tipo: 'square', vol: 0.12, fin: 180, delay: 0.012 });
+  tono(150, 0.2, { tipo: 'sawtooth', vol: 0.28, fin: 58, pan: panValor });
+  tono(320, 0.09, { tipo: 'square', vol: 0.12, fin: 180, delay: 0.012, pan: panValor });
 
-    ruido(0.42, { desde: 3400, hasta: 640, vol: 0.17, delay: 0.085, ataque: 0.004 });
+  ruido(0.42, { desde: 3400, hasta: 640, vol: 0.17, delay: 0.085, ataque: 0.004, pan: panValor });
 
-    ruido(1.15, { desde: 320, hasta: 58, vol: 0.2, delay: 0.27 });
-    tono(41, 0.9, { tipo: 'triangle', vol: 0.15, fin: 26, delay: 0.22, release: 0.5 });
+  ruido(1.15, { desde: 320, hasta: 58, vol: 0.2, delay: 0.27, pan: panValor });
+  tono(41, 0.9, { tipo: 'triangle', vol: 0.15, fin: 26, delay: 0.22, release: 0.5, pan: panValor });
 }
 
 const MUSICA = {
@@ -500,6 +517,65 @@ function detenerMusicaActual(fade = 0.35) {
   }
 }
 
+function iniciarProcedural(nombre) {
+  if (nombre !== 'modifiers') return;
+  detenerProcedural();
+  const c = build();
+  if (!c) return;
+  const gan = c.createGain();
+  gan.gain.setValueAtTime(0.0001, c.currentTime);
+  gan.gain.exponentialRampToValueAtTime(0.03, c.currentTime + 1.5);
+  gan.connect(musicGain);
+
+  const drone = c.createOscillator();
+  drone.type = 'sine';
+  drone.frequency.setValueAtTime(73.42, c.currentTime);
+  drone.connect(gan);
+  drone.start();
+
+  proc = { c, gan, osciladores: [drone], activo: true, t: c.currentTime };
+  procTick();
+}
+
+function procTick() {
+  if (!proc || !proc.activo) return;
+  const c = proc.c;
+  const t0 = c.currentTime + 0.06;
+  const freq = ESCALA_MOD[Math.floor(Math.random() * ESCALA_MOD.length)];
+  const osc = c.createOscillator();
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(freq, t0);
+  const ganN = c.createGain();
+  ganN.gain.setValueAtTime(0.0001, t0);
+  ganN.gain.exponentialRampToValueAtTime(0.045, t0 + 0.15);
+  ganN.gain.exponentialRampToValueAtTime(0.0001, t0 + 2.4);
+  osc.connect(ganN).connect(musicGain);
+  osc.start(t0);
+  osc.stop(t0 + 2.7);
+  proc.osciladores.push(osc);
+
+  const ahora = c.currentTime;
+  if (ahora - proc.t > 5) {
+    proc.t = ahora;
+    proc.gan.gain.setTargetAtTime(Math.random() * 0.04 + 0.015, ahora, 0.6);
+  }
+
+  proc.temporizador = setTimeout(procTick, 2000 + Math.random() * 1500);
+}
+
+function detenerProcedural() {
+  if (!proc) return;
+  proc.activo = false;
+  if (proc.temporizador) clearTimeout(proc.temporizador);
+  for (const osc of proc.osciladores) {
+    try { osc.stop(); } catch (err) {  }
+  }
+  if (proc.gan) {
+    try { proc.gan.gain.setTargetAtTime(0.0001, proc.c.currentTime, 0.4); } catch (err) {  }
+  }
+  proc = null;
+}
+
 let precargaHecha = false;
 function precargarTodo() {
   if (precargaHecha) return;
@@ -512,50 +588,51 @@ function precargarTodo() {
 
 const SONIDOS = {
   start() {
-    tono(260, 0.085, { tipo: 'triangle', vol: 0.2, fin: 430 });
-    tono(620, 0.08, { tipo: 'sine', vol: 0.1, delay: 0.045, fin: 760 });
+    tono(260, 0.085, { tipo: 'triangle', vol: 0.2, pan: 0, fin: 430 });
+    tono(620, 0.08, { tipo: 'sine', vol: 0.1, delay: 0.045, pan: 0, fin: 760 });
   },
 
-  reveal({ size = 1 } = {}) {
+  reveal({ size = 1, pan = 0 } = {}) {
     const n = Math.min(8, Math.max(1, size | 0));
     const base = 340 + n * 28;
-    tono(base, 0.035, { tipo: 'square', vol: 0.085 });
-    if (n >= 4) tono(base * 1.5, 0.03, { tipo: 'sine', vol: 0.06, delay: 0.03 });
+    tono(base, 0.035, { tipo: 'square', vol: 0.085, pan });
+    if (n >= 4) tono(base * 1.5, 0.03, { tipo: 'sine', vol: 0.06, delay: 0.03, pan });
   },
-  chord() {
-    tono(430, 0.03, { tipo: 'square', vol: 0.075 });
-    tono(560, 0.035, { tipo: 'square', vol: 0.08, delay: 0.035 });
+  chord({ pan = 0 } = {}) {
+    tono(430, 0.03, { tipo: 'square', vol: 0.075, pan });
+    tono(560, 0.035, { tipo: 'square', vol: 0.08, delay: 0.035, pan });
   },
-  flag() {
-    tono(720, 0.04, { tipo: 'square', vol: 0.12 });
-    tono(1080, 0.03, { tipo: 'sine', vol: 0.07, delay: 0.025 });
+  flag({ pan = 0 } = {}) {
+    tono(720, 0.04, { tipo: 'square', vol: 0.12, pan });
+    tono(1080, 0.03, { tipo: 'sine', vol: 0.07, delay: 0.025, pan });
   },
-  unflag() {
-    tono(540, 0.035, { tipo: 'square', vol: 0.09, fin: 430 });
+  unflag({ pan = 0 } = {}) {
+    tono(540, 0.035, { tipo: 'square', vol: 0.09, fin: 430, pan });
   },
-  boom() {
+  boom({ pan = 0 } = {}) {
     const c = ctx;
     const buf = fxListos.get('boom');
     if (c && buf) {
       try {
+        if (pan) pan.pan.setValueAtTime(Math.max(-1, Math.min(1, pan)), c.currentTime + 0.001);
         const src = c.createBufferSource();
         const gan = c.createGain();
         gan.gain.value = 1.55;
         src.buffer = buf;
-        src.connect(gan).connect(master);
+        src.connect(gan).connect(pan);
         src.start(c.currentTime + 0.001);
         return;
       } catch (err) {
-        
+
       }
     }
-    boomSintetico();
+    boomSintetico(pan);
   },
   ui() {
-    tono(460, 0.028, { tipo: 'square', vol: 0.07 });
+    tono(460, 0.028, { tipo: 'square', vol: 0.07, pan: 0 });
   },
   locked() {
-    tono(120, 0.075, { tipo: 'triangle', vol: 0.12, fin: 95 });
+    tono(120, 0.075, { tipo: 'triangle', vol: 0.12, fin: 95, pan: 0 });
   },
 };
 
@@ -567,7 +644,7 @@ const audio = {
       const c = build();
       if (c && c.state === 'suspended') c.resume().catch(() => {});
     } catch (err) {
-      
+
     }
     precargarTodo();
   },
@@ -601,10 +678,25 @@ const audio = {
     }
   },
 
+  pan(valor) {
+    if (!pan) return;
+    const v = Math.max(-1, Math.min(1, Number(valor) || 0));
+    pan.pan.cancelScheduledValues(ctx.currentTime);
+    pan.pan.setValueAtTime(v, ctx.currentTime);
+    return v;
+  },
+
   precargar: precargarTodo,
 
   musica(nombre, retardoMs = 0, fundido = 1.2) {
-    if (!this.enabled || !MUSICA[nombre]) return;
+    if (!this.enabled) return;
+    if (nombre === 'modifiers') {
+      detenerProcedural();
+      iniciarProcedural('modifiers');
+      return;
+    }
+    if (!MUSICA[nombre]) return;
+    detenerProcedural();
     if (actual && actual.nombre === nombre) return;
     if (solicitada === nombre) return;
     const c = build();
@@ -637,8 +729,14 @@ const audio = {
     });
   },
 
+  musicaProc(nombre) {
+    if (!this.enabled) return;
+    iniciarProcedural(nombre);
+  },
+
   pararMusica(fade = 0.9) {
     detenerMusicaActual(fade);
+    detenerProcedural();
   },
 
   pararAmbiente(fade = 0.8) {
@@ -652,9 +750,15 @@ const audio = {
     try {
       if (!build()) return;
       const fn = SONIDOS[nombre];
-      if (fn) fn(datos || {});
+      if (fn) {
+        const d = datos || {};
+        if (pan && Number.isFinite(d.pan)) {
+          pan.pan.setValueAtTime(Math.max(-1, Math.min(1, d.pan)), ctx.currentTime);
+        }
+        fn(d);
+      }
     } catch (err) {
-      
+
     }
   },
 };
@@ -837,12 +941,13 @@ const COLOR_NUMERO = (n) => COLORES_NUMERO[clamp(n, 1, 8)] || ACENTO;
 class Game {
   constructor(cfg, onEvent = () => {}) {
     this.cfg = { ...cfg };
+    this.mods = cfg.mods || null;
     this.tablero = new Tablero(this.cfg);
     this.onEvent = typeof onEvent === 'function' ? onEvent : () => {};
 
     this.estado = 'antes';
     this.pausado = false;
-    this.tiempoMs = 0;
+    this.tiempoMs = this.mods?.reloj ? Math.max(1, Math.floor(Number(this.mods.relojSegundos) || 0)) * 1000 : 0;
     this.reloj = 0;
 
     this.cursor = {
@@ -897,6 +1002,7 @@ class Game {
       if (this.flashes.length > 900) this.flashes = this.flashes.slice(-500);
       if (origen === 'acorde') this.emit('chord', { size: resultado.reveladas.length });
       this.emit('reveal', { size: resultado.reveladas.length });
+      if (this.mods && this.mods.panico) this.shake = Math.max(this.shake, 8);
     }
     if (resultado.explosion >= 0) {
       this.estado = 'perdido';
@@ -936,6 +1042,7 @@ class Game {
   alternarBanderaEn(x, y) {
     if (this.pausado || this.terminada) return;
     if (!this.dentro(x, y)) return;
+    if (this.mods && this.mods.sinBandera) return;
     const resultado = this.tablero.alternarBandera(this.indice(x, y));
     if (resultado === 'bandera') this.emit('flag', { on: true });
     else if (resultado === 'sin-bandera') this.emit('unflag', {});
@@ -956,8 +1063,24 @@ class Game {
   update(dt) {
     const paso = clamp(Number(dt) || 0, 0, 100);
     this.reloj += paso;
-    if (this.estado === 'jugando' && !this.pausado) this.tiempoMs += paso;
-    else if (this.estado === 'antes' && !this.pausado && this.tablero.sembradas) this.tiempoMs += paso;
+    let avanza = false;
+    if (this.estado === 'jugando' && !this.pausado) avanza = true;
+    else if (this.estado === 'antes' && !this.pausado && this.tablero.sembradas) avanza = true;
+    if (avanza) {
+      if (this.mods && this.mods.reloj) {
+        this.tiempoMs = Math.max(0, this.tiempoMs - paso);
+        if (this.tiempoMs <= 0 && this.estado !== 'perdido') {
+          this.estado = 'perdido';
+          this.explosionT = this.reloj;
+          this.shake = 16;
+          this.tablero.revelarTodo();
+          this.emit('boom', { indice: this.indice(this.cursor.x, this.cursor.y) });
+          return;
+        }
+      } else {
+        this.tiempoMs += paso;
+      }
+    }
     this.shake = Math.max(0, this.shake - paso * 0.05);
     if (this.flashes.length) {
       const limite = this.reloj - 450;
@@ -1395,6 +1518,25 @@ const STRINGS = {
     routeIntermediate: 'intermedio',
     routeExpert: 'experto',
     routeCustom: 'personalizada',
+
+    modifiers: 'modificadores',
+    modTagline: 'elige cómo arder el campo',
+    modMinesExtra: 'minas extra',
+    modMinesExtraTag: 'más minas repartidas por el campo',
+    modReloj: 'reloj cuenta atrás',
+    modRelojTag: 'el tiempo se agota antes de despejar',
+    modSinBandera: 'sin banderas',
+    modSinBanderaTag: 'no se pueden marcar minas',
+    modPanico: 'pánico',
+    modPanicoTag: 'el tablero tiembla al destapar',
+    modActiva: '1 activa',
+    modActivas: '{n} activas',
+    hintModifiers: 'pulsa una fila para alternar · Enter juega',
+    dialogoSiguiente: 'siguiente',
+    quienComando: 'Comando',
+    quienSargento: 'Sargento',
+    quienTelegrafista: 'Telegrafista',
+    quienRecluta: 'Recluta',
   },
   en: {
     documentTitle: 'minesweeper.',
@@ -1547,6 +1689,25 @@ const STRINGS = {
     routeIntermediate: 'intermediate',
     routeExpert: 'expert',
     routeCustom: 'custom',
+
+    modifiers: 'modifiers',
+    modTagline: 'choose how the field burns',
+    modMinesExtra: 'extra mines',
+    modMinesExtraTag: 'more mines spread across the field',
+    modReloj: 'countdown clock',
+    modRelojTag: 'time runs out before clearing',
+    modSinBandera: 'no flags',
+    modSinBanderaTag: 'mines cannot be marked',
+    modPanico: 'panic',
+    modPanicoTag: 'the board shakes on reveal',
+    modActiva: '1 active',
+    modActivas: '{n} active',
+    hintModifiers: 'tap a row to toggle · Enter plays',
+    dialogoSiguiente: 'next',
+    quienComando: 'Command',
+    quienSargento: 'Sergeant',
+    quienTelegrafista: 'Radio',
+    quienRecluta: 'Conscript',
   },
 };
 
@@ -1619,7 +1780,6 @@ function routeWords() {
 
 (function (modulo) {
 'use strict';
-
 const ACTOS = [
   { id: 1, inicio: 0, nombreEs: 'alistamiento', nombreEn: 'enlistment', subEs: 'la carta y el juramento', subEn: 'the letter and the oath' },
   { id: 2, inicio: 6, nombreEs: 'el frente', nombreEn: 'the front', subEs: 'la zona minada', subEn: 'the mined zone' },
@@ -1629,97 +1789,217 @@ const ACTOS = [
 
 const NIVELES = [
 
-  { act: 1, nombreEs: 'la carta', nombreEn: 'the letter', filas: 6, columnas: 6, minas: 6,
+  { act: 1, nombreEs: 'la carta', nombreEn: 'the letter', filas: 6, columnas: 6, minas: 6, escena: 'carta',
+    dialogo: [
+      { quien: 'comando', es: 'Su nombre está en la carta. El expediente también.', en: 'Your name is on the letter. The file number too.' },
+      { quien: 'recluta', es: 'No recuerdo haberme ofrecido.', en: "I don't remember volunteering." },
+    ],
     historiaEs: 'La carta llega un martes. Tu nombre, un número de expediente y una hora. La guerra te ha elegido.',
     historiaEn: 'The letter arrives on a Tuesday. Your name, a file number and an hour. The war has picked you.' },
-  { act: 1, nombreEs: 'el cuartel', nombreEn: 'the barracks', filas: 7, columnas: 7, minas: 9,
+  { act: 1, nombreEs: 'el cuartel', nombreEn: 'the barracks', filas: 7, columnas: 7, minas: 9, escena: 'cuartel',
+    dialogo: [
+      { quien: 'sargento', es: 'Firme. Firmará su nombre mil veces.', en: 'At ease. You will sign your name a thousand times.' },
+      { quien: 'sargento', es: 'Como si eso le hiciera dueño del fusil.', en: "As if that made the rifle yours." },
+    ],
     historiaEs: 'El cuartel huele a lejía y a miedo nuevo. Firmas tu nombre mil veces, como si eso te hiciera dueño del fusil.',
     historiaEn: 'The barracks smells of bleach and fresh fear. You sign your name a thousand times, as if that made the rifle yours.' },
-  { act: 1, nombreEs: 'la prueba', nombreEn: 'the test', filas: 8, columnas: 8, minas: 10,
+  { act: 1, nombreEs: 'la prueba', nombreEn: 'the test', filas: 8, columnas: 8, minas: 10, escena: 'campo',
+    dialogo: [
+      { quien: 'sargento', es: 'Cien hombres en fila. Diez minutos.', en: 'A hundred men in a row. Ten minutes.' },
+      { quien: 'sargento', es: 'Aprenda otra manera de mirar el suelo.', en: 'Learn another way of looking at the ground.' },
+    ],
     historiaEs: 'La prueba: cien hombres en fila y diez minutos para aprender otra manera de mirar el suelo.',
     historiaEn: 'The test: a hundred men in a row and ten minutes to learn another way of looking at the ground.' },
-  { act: 1, nombreEs: 'el juramento', nombreEn: 'the oath', filas: 8, columnas: 8, minas: 14,
+  { act: 1, nombreEs: 'el juramento', nombreEn: 'the oath', filas: 8, columnas: 8, minas: 14, escena: 'carta',
+    dialogo: [
+      { quien: 'comando', es: 'Juren sobre un campo de verdad.', en: 'Swear over a real field.' },
+      { quien: 'comando', es: 'Prometan volver. O que al menos los cuenten.', en: 'Promise to return. Or at least to be counted.' },
+    ],
     historiaEs: 'Juráis sobre un campo de verdad. Prometéis volver, o que al menos lo cuenten.',
     historiaEn: 'You swear over a real field. You promise to return, or at least to be counted.' },
-  { act: 1, nombreEs: 'el polígono', nombreEn: 'the range', filas: 9, columnas: 9, minas: 12,
+  { act: 1, nombreEs: 'el polígono', nombreEn: 'the range', filas: 9, columnas: 9, minas: 12, escena: 'campo',
+    dialogo: [
+      { quien: 'sargento', es: 'En el polígono todo es de verdad.', en: 'Here everything is real.' },
+      { quien: 'sargento', es: 'La saliva. El temblor. Las banderas.', en: 'The spit. The trembling. The flags.' },
+    ],
     historiaEs: 'En el polígono todo es de verdad: la saliva, el temblor, las banderas.',
     historiaEn: 'At the range everything is real: the spit, the trembling, the flags.' },
-  { act: 1, nombreEs: 'el ascenso', nombreEn: 'the commission', filas: 9, columnas: 9, minas: 16,
+  { act: 1, nombreEs: 'el ascenso', nombreEn: 'the commission', filas: 9, columnas: 9, minas: 16, escena: 'tren',
+    dialogo: [
+      { quien: 'comando', es: 'Ascenso por cumplir un trámite.', en: 'Commissioned for completing a formality.' },
+      { quien: 'comando', es: 'El tren parte al amanecer.', en: 'The train leaves at dawn.' },
+    ],
     historiaEs: 'Te ascienden a alférez por cumplir un trámite. El tren parte al amanecer.',
     historiaEn: 'You are commissioned for completing a formality. The train leaves at dawn.' },
 
-  { act: 2, nombreEs: 'el convoy', nombreEn: 'the convoy', filas: 10, columnas: 10, minas: 18,
+  { act: 2, nombreEs: 'el convoy', nombreEn: 'the convoy', filas: 10, columnas: 10, minas: 18, escena: 'tren',
+    dialogo: [
+      { quien: 'telegrafista', es: 'Tres días de tren.', en: 'Three days by train.' },
+      { quien: 'telegrafista', es: 'El puente está cortado. El enemigo vuela los puentes.', en: 'The bridge is cut. The enemy blows the bridges.' },
+    ],
     historiaEs: 'Tres días de tren y un puente cortado. El enemigo vuela los puentes.',
     historiaEn: 'Three days of train and a cut bridge. The enemy blows the bridges.' },
-  { act: 2, nombreEs: 'la zona', nombreEn: 'the zone', filas: 10, columnas: 10, minas: 22,
+  { act: 2, nombreEs: 'la zona', nombreEn: 'the zone', filas: 10, columnas: 10, minas: 22, escena: 'campo',
+    dialogo: [
+      { quien: 'sargento', es: 'Zona de operaciones.', en: 'Operations zone.' },
+      { quien: 'sargento', es: 'El cartel dice NO PISAR; debajo, alguien escribió todos los nombres.', en: 'The sign says DO NOT STEP. Underneath, someone wrote every name.' },
+    ],
     historiaEs: 'Zona de operaciones. El cartel dice NO PISAR; debajo, alguien escribió todos los nombres.',
     historiaEn: 'Operations zone. The sign says DO NOT STEP; underneath, someone wrote every name.' },
-  { act: 2, nombreEs: 'los mapas', nombreEn: 'the maps', filas: 12, columnas: 12, minas: 26,
+  { act: 2, nombreEs: 'los mapas', nombreEn: 'the maps', filas: 12, columnas: 12, minas: 26, escena: 'brujula',
+    dialogo: [
+      { quien: 'telegrafista', es: 'Estos mapas pertenecen a otra guerra.', en: 'These maps belong to another war.' },
+      { quien: 'telegrafista', es: 'Minas sin marcar. Memoria de quien no pudo dibujarlas.', en: 'Unmarked mines. The memory of those who could not draw them.' },
+    ],
     historiaEs: 'Los mapas pertenecen a otra guerra: minas sin marcar, memoria de quien no pudo dibujarlas.',
     historiaEn: 'The maps belong to another war: unmarked mines, the memory of those who could not draw them.' },
-  { act: 2, nombreEs: 'el sargento', nombreEn: 'the sergeant', filas: 12, columnas: 12, minas: 31,
+  { act: 2, nombreEs: 'el sargento', nombreEn: 'the sergeant', filas: 12, columnas: 12, minas: 31, escena: 'cuartel',
+    dialogo: [
+      { quien: 'sargento', es: 'Le mira como a un trapo viejo.', en: 'He looks at you like an old rag.' },
+      { quien: 'sargento', es: 'Aquí se pisa con la cabeza, no con los pies.', en: 'Here you step with your head, not your feet.' },
+    ],
     historiaEs: 'El sargento te mira como a un trapo viejo. Aquí se pisa con la cabeza, no con los pies.',
     historiaEn: 'The sergeant looks at you like an old rag. Here you step with your head, not your feet.' },
-  { act: 2, nombreEs: 'el primer paso', nombreEn: 'the first step', filas: 14, columnas: 14, minas: 34,
+  { act: 2, nombreEs: 'el primer paso', nombreEn: 'the first step', filas: 14, columnas: 14, minas: 34, escena: 'campo',
+    dialogo: [
+      { quien: 'recluta', es: 'Primer paso fuera de la trinchera.', en: 'First step out of the trench.' },
+      { quien: 'recluta', es: 'El silencio pesa más que el acero.', en: 'Silence weighs more than steel.' },
+    ],
     historiaEs: 'Das el primer paso fuera de la trinchera. El silencio pesa más que el acero.',
     historiaEn: 'You take the first step out of the trench. Silence weighs more than steel.' },
-  { act: 2, nombreEs: 'la guardia', nombreEn: 'the watch', filas: 14, columnas: 14, minas: 40,
+  { act: 2, nombreEs: 'la guardia', nombreEn: 'the watch', filas: 14, columnas: 14, minas: 40, escena: 'campamento',
+    dialogo: [
+      { quien: 'telegrafista', es: 'Noche de guardia.', en: 'The night watch.' },
+      { quien: 'telegrafista', es: 'Minas nuevas bajo la luna; alguien las siembra cada noche.', en: 'New mines under the moon; someone lays them every night.' },
+    ],
     historiaEs: 'La noche de guardia. Minas nuevas bajo la luna; alguien las siembra cada noche.',
     historiaEn: 'The night watch. New mines under the moon; someone lays them every night.' },
 
-  { act: 3, nombreEs: 'el puente', nombreEn: 'the bridge', filas: 14, columnas: 14, minas: 44,
+  { act: 3, nombreEs: 'el puente', nombreEn: 'the bridge', filas: 14, columnas: 14, minas: 44, escena: 'puente',
+    dialogo: [
+      { quien: 'comando', es: 'Operación Puente. Crucen al otro lado.', en: 'Operation Bridge. Cross to the other side.' },
+      { quien: 'comando', es: 'Dos campos, un vado y una radio muerta.', en: 'Two fields, a ford and a dead radio.' },
+    ],
     historiaEs: 'Operación Puente: cruzar al otro lado. Dos campos, un vado y una radio muerta.',
     historiaEn: 'Operation Bridge: cross to the other side. Two fields, a ford and a dead radio.' },
-  { act: 3, nombreEs: 'la brecha', nombreEn: 'the breach', filas: 16, columnas: 16, minas: 40,
+  { act: 3, nombreEs: 'la brecha', nombreEn: 'the breach', filas: 16, columnas: 16, minas: 40, escena: 'puente',
+    dialogo: [
+      { quien: 'sargento', es: 'La brecha es una raya de luz en la hierba.', en: 'The breach is a line of light in the grass.' },
+      { quien: 'sargento', es: 'Más allá, el campo enemigo.', en: 'Beyond it, the enemy field.' },
+    ],
     historiaEs: 'La brecha es una raya de luz en la hierba. Más allá, el campo enemigo.',
     historiaEn: 'The breach is a line of light in the grass. Beyond it, the enemy field.' },
-  { act: 3, nombreEs: 'el silencio', nombreEn: 'the silence', filas: 16, columnas: 16, minas: 48,
+  { act: 3, nombreEs: 'el silencio', nombreEn: 'the silence', filas: 16, columnas: 16, minas: 48, escena: 'campo',
+    dialogo: [
+      { quien: 'comando', es: 'Seis minutos de silencio.', en: 'Six minutes of silence.' },
+      { quien: 'comando', es: 'Antes de que la artillería hable. Nadie traga.', en: 'Before the guns speak. Nobody swallows.' },
+    ],
     historiaEs: 'Seis minutos de silencio antes de que la artillería hable. Nadie traga.',
     historiaEn: 'Six minutes of silence before the guns speak. Nobody swallows.' },
-  { act: 3, nombreEs: 'el asalto', nombreEn: 'the assault', filas: 16, columnas: 16, minas: 55,
+  { act: 3, nombreEs: 'el asalto', nombreEn: 'the assault', filas: 16, columnas: 16, minas: 55, escena: 'campo',
+    dialogo: [
+      { quien: 'sargento', es: 'El asalto.', en: 'The assault.' },
+      { quien: 'sargento', es: 'Banderas, polvo y el mundo reducido a un metro cuadrado.', en: 'Flags, dust and the world reduced to one square metre.' },
+    ],
     historiaEs: 'El asalto. Banderas, polvo y el mundo reducido a un metro cuadrado.',
     historiaEn: 'The assault. Flags, dust and the world reduced to one square metre.' },
-  { act: 3, nombreEs: 'la retirada', nombreEn: 'the retreat', filas: 16, columnas: 16, minas: 61,
+  { act: 3, nombreEs: 'la retirada', nombreEn: 'the retreat', filas: 16, columnas: 16, minas: 61, escena: 'campo',
+    dialogo: [
+      { quien: 'comando', es: 'Retirada.', en: 'Retreat.' },
+      { quien: 'comando', es: 'Un compañero se ha quedado dentro del campo. La guerra no espera.', en: 'A comrade stayed inside the field. War does not wait.' },
+    ],
     historiaEs: 'Retirada. Un compañero se ha quedado dentro del campo. La guerra no espera.',
     historiaEn: 'Retreat. A comrade stayed inside the field. War does not wait.' },
-  { act: 3, nombreEs: 'el recuento', nombreEn: 'the count', filas: 16, columnas: 16, minas: 66,
+  { act: 3, nombreEs: 'el recuento', nombreEn: 'the count', filas: 16, columnas: 16, minas: 66, escena: 'archivo',
+    dialogo: [
+      { quien: 'comando', es: 'De cuarenta volvemos nueve.', en: 'Of forty, nine return.' },
+      { quien: 'comando', es: 'El parte dice «éxito».', en: "The report says 'success'." },
+    ],
     historiaEs: 'El recuento: de cuarenta volvemos nueve. El parte dice «éxito».',
     historiaEn: "The count: of forty, nine return. The report says 'success'." },
 
-  { act: 4, nombreEs: 'el corredor', nombreEn: 'the corridor', filas: 16, columnas: 16, minas: 69,
+  { act: 4, nombreEs: 'el corredor', nombreEn: 'the corridor', filas: 16, columnas: 16, minas: 69, escena: 'campo',
+    dialogo: [
+      { quien: 'telegrafista', es: 'El corredor. La única ruta hasta el depósito enemigo.', en: 'The corridor: the only route to the enemy depot.' },
+      { quien: 'telegrafista', es: 'Un kilómetro de hierba y muerte.', en: 'A kilometre of grass and death.' },
+    ],
     historiaEs: 'El corredor: la única ruta hasta el depósito enemigo. Un kilómetro de hierba y muerte.',
     historiaEn: 'The corridor: the only route to the enemy depot. A kilometre of grass and death.' },
-  { act: 4, nombreEs: 'el búnker', nombreEn: 'the bunker', filas: 18, columnas: 18, minas: 72,
+  { act: 4, nombreEs: 'el búnker', nombreEn: 'the bunker', filas: 18, columnas: 18, minas: 72, escena: 'bunker',
+    dialogo: [
+      { quien: 'comando', es: 'Bajo el búnker, su sala de mandos.', en: 'Beneath the bunker, their command room.' },
+      { quien: 'comando', es: 'Minada por dentro. Deliberadamente.', en: 'Mined from the inside. Deliberately.' },
+    ],
     historiaEs: 'Bajo el búnker, su sala de mandos. Minada por dentro. Deliberadamente.',
     historiaEn: 'Beneath the bunker, their command room. Mined from the inside. Deliberately.' },
-  { act: 4, nombreEs: 'el documento', nombreEn: 'the document', filas: 16, columnas: 20, minas: 70,
+  { act: 4, nombreEs: 'el documento', nombreEn: 'the document', filas: 16, columnas: 20, minas: 70, escena: 'carta',
+    dialogo: [
+      { quien: 'comando', es: 'Un documento: sus órdenes.', en: 'A document: your orders.' },
+      { quien: 'comando', es: 'Firmadas con su nombre. Por una mano que no es la suya.', en: 'Signed with your name by a hand that is not yours.' },
+    ],
     historiaEs: 'Un documento: tus órdenes, firmadas con tu nombre por una mano que no es la tuya.',
     historiaEn: 'A document: your orders, signed with your name by a hand that is not yours.' },
-  { act: 4, nombreEs: 'la traición', nombreEn: 'the betrayal', filas: 20, columnas: 20, minas: 78,
+  { act: 4, nombreEs: 'la traición', nombreEn: 'the betrayal', filas: 20, columnas: 20, minas: 78, escena: 'sello',
+    dialogo: [
+      { quien: 'comando', es: 'Nadie la envió.', en: 'Nobody sent you.' },
+      { quien: 'comando', es: 'Un castigo disfrazado de papeleo. Pero ya está aquí.', en: 'A punishment dressed as paperwork. But you are here now.' },
+    ],
     historiaEs: 'Nadie te envió. Esto era un castigo disfrazado de papeleo. Pero ya estás aquí.',
     historiaEn: 'Nobody sent you. This was a punishment dressed as paperwork. But you are here now.' },
-  { act: 4, nombreEs: 'el último campo', nombreEn: 'the last field', filas: 18, columnas: 22, minas: 76,
+  { act: 4, nombreEs: 'el último campo', nombreEn: 'the last field', filas: 16, columnas: 22, minas: 70, escena: 'radio',
+    dialogo: [
+      { quien: 'telegrafista', es: 'Su clave por última vez.', en: 'Your callsign for the last time.' },
+      { quien: 'telegrafista', es: 'Que el silencio le sea propicio.', en: 'May the silence be kind to you.' },
+    ],
     historiaEs: 'El telegrafista escucha tu clave por última vez. Que el silencio te sea propicio.',
     historiaEn: 'The radio operator hears your callsign for the last time. May the silence be kind to you.' },
-  { act: 4, nombreEs: 'el desierto', nombreEn: 'the desert', filas: 22, columnas: 22, minas: 84,
+  { act: 4, nombreEs: 'el desierto', nombreEn: 'the desert', filas: 22, columnas: 22, minas: 84, escena: 'sol',
+    dialogo: [
+      { quien: 'sargento', es: 'El calor rebota en la arena.', en: 'The heat bounces off the sand.' },
+      { quien: 'sargento', es: 'Cada paso es una conjetura.', en: 'Every step is a guess.' },
+    ],
     historiaEs: 'El calor rebota en la arena; cada paso es una conjetura.',
     historiaEn: 'The heat bounces off the sand; every step is a guess.' },
-  { act: 4, nombreEs: 'la ciudad', nombreEn: 'the city', filas: 20, columnas: 24, minas: 88,
+  { act: 4, nombreEs: 'la ciudad', nombreEn: 'the city', filas: 20, columnas: 24, minas: 88, escena: 'ciudad',
+    dialogo: [
+      { quien: 'recluta', es: 'La ciudad tomada.', en: 'The city taken.' },
+      { quien: 'recluta', es: 'Mercado nuevo. Pólvora y pan fresco. Nadie la reconoce.', en: 'A new market, gunpowder and fresh bread. Nobody recognises you.' },
+    ],
     historiaEs: 'La ciudad tomada. Mercado nuevo, olor a pólvora y pan fresco. Nadie te reconoce.',
     historiaEn: 'The city taken. A new market, the smell of gunpowder and fresh bread. Nobody recognises you.' },
-  { act: 4, nombreEs: 'el almacén', nombreEn: 'the warehouse', filas: 22, columnas: 24, minas: 96,
+  { act: 4, nombreEs: 'el almacén', nombreEn: 'the warehouse', filas: 22, columnas: 24, minas: 96, escena: 'archivo',
+    dialogo: [
+      { quien: 'comando', es: 'Su expediente, quemado por orden del mando.', en: 'Your file, burned by order of the command.' },
+      { quien: 'comando', es: 'Usted sabe caminar.', en: 'You know how to walk.' },
+    ],
     historiaEs: 'El almacén. Tu expediente, quemado por orden del mando. Tú sabes caminar.',
     historiaEn: 'The warehouse. Your file, burned by order of the command. You know how to walk.' },
-  { act: 4, nombreEs: 'el expediente', nombreEn: 'the file', filas: 24, columnas: 24, minas: 104,
+  { act: 4, nombreEs: 'el expediente', nombreEn: 'the file', filas: 24, columnas: 24, minas: 104, escena: 'archivo',
+    dialogo: [
+      { quien: 'comando', es: 'El expediente sobre la mesa.', en: 'The file on the table.' },
+      { quien: 'comando', es: 'El nombre tachado. El sello roto. Te deben el nombre.', en: 'The name struck through, the seal broken. They owe you your name.' },
+    ],
     historiaEs: 'El expediente sobre la mesa. El nombre tachado, el sello roto. Te deben el nombre.',
     historiaEn: 'The file on the table. The name struck through, the seal broken. They owe you your name.' },
-  { act: 4, nombreEs: 'la vuelta', nombreEn: 'the way back', filas: 26, columnas: 24, minas: 112,
+  { act: 4, nombreEs: 'la vuelta', nombreEn: 'the way back', filas: 26, columnas: 24, minas: 112, escena: 'tren',
+    dialogo: [
+      { quien: 'telegrafista', es: 'El tren de vuelta.', en: 'The train home.' },
+      { quien: 'telegrafista', es: 'Los campos se alejan por la ventanilla. Nadie dice nada.', en: 'The fields slide past the window. Nobody says a word.' },
+    ],
     historiaEs: 'El tren de vuelta. Los campos se alejan por la ventanilla. Nadie dice nada.',
     historiaEn: 'The train home. The fields slide past the window. Nobody says a word.' },
-  { act: 4, nombreEs: 'la puerta', nombreEn: 'the doorway', filas: 26, columnas: 28, minas: 124,
+  { act: 4, nombreEs: 'la puerta', nombreEn: 'the doorway', filas: 26, columnas: 28, minas: 124, escena: 'puerta',
+    dialogo: [
+      { quien: 'comando', es: 'La puerta de casa.', en: 'The doorway of home.' },
+      { quien: 'comando', es: 'Dos golpes. Nadie responde. La abre usted.', en: 'Two knocks. Nobody answers. You open it yourself.' },
+    ],
     historiaEs: 'La puerta de casa. Dos golpes. Nadie responde. La abres tú.',
     historiaEn: 'The doorway of home. Two knocks. Nobody answers. You open it yourself.' },
-  { act: 4, nombreEs: 'el final del campo', nombreEn: 'the end of the field', filas: 24, columnas: 30, minas: 132,
+  { act: 4, nombreEs: 'el final del campo', nombreEn: 'the end of the field', filas: 24, columnas: 30, minas: 132, escena: 'campo',
+    dialogo: [
+      { quien: 'comando', es: 'Limpie el último campo.', en: 'Clear the last field.' },
+      { quien: 'comando', es: 'No volverá a pisar otro. El campo termina; usted, no.', en: 'You will never tread on another. The field ends; you don\'t.' },
+    ],
     historiaEs: 'Limpias el último campo porque no volverás a pisar otro. El campo termina; tú, no.',
     historiaEn: "You clear the last field because you will never tread on another. The field ends; you don't." },
 ];
@@ -1756,12 +2036,351 @@ function configNivel(indice) {
 
 (function (modulo) {
 'use strict';
+'use strict';
+
+// Ilustraciones de escena para el modo campaña. Tinta militar sobre negro:
+// bloques planos, blanco duro y rojo reserva, sin dependencias externas.
+// Cada función dibuja dentro del área (0, 0) → (w, h) en píxeles CSS.
+
+const TINTA = '#f2f2f2';
+const TINTA_LEVE = '#7a7a7a';
+const ROJO = '#ff2b2b';
+
+function recta(ctx, x, y, w, h, color = TINTA) {
+  ctx.fillStyle = color;
+  ctx.fillRect(x, y, w, h);
+}
+
+function linea(ctx, x1, y1, x2, y2, color = TINTA, grosor = 1) {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = grosor;
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+}
+
+function marco(ctx, x, y, w, h, color = TINTA, grosor = 1) {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = grosor;
+  ctx.strokeRect(x, y, w, h);
+}
+
+function mina(ctx, cx, cy, u, color = ROJO) {
+  const u2 = Math.max(1, Math.round(u / 16));
+  ctx.fillStyle = color;
+  recta(ctx, cx - 3 * u2, cy - 3 * u2, 6 * u2, 6 * u2);
+  recta(ctx, cx - 4 * u2, cy - 2 * u2, 8 * u2, 4 * u2);
+  recta(ctx, cx - 2 * u2, cy - 4 * u2, 4 * u2, 8 * u2);
+  recta(ctx, cx - u2, cy - 6 * u2, 2 * u2, 2 * u2);
+  recta(ctx, cx - u2, cy + 4 * u2, 2 * u2, 2 * u2);
+  recta(ctx, cx - 6 * u2, cy - u2, 2 * u2, 2 * u2);
+  recta(ctx, cx + 4 * u2, cy - u2, 2 * u2, 2 * u2);
+  recta(ctx, cx - 5 * u2, cy - 5 * u2, u2 + (u2 >> 1), u2 + (u2 >> 1));
+  recta(ctx, cx + 4 * u2 - (u2 >> 1), cy - 5 * u2, u2 + (u2 >> 1), u2 + (u2 >> 1));
+  recta(ctx, cx - 5 * u2, cy + 4 * u2 - (u2 >> 1), u2 + (u2 >> 1), u2 + (u2 >> 1));
+  recta(ctx, cx + 4 * u2 - (u2 >> 1), cy + 4 * u2 - (u2 >> 1), u2 + (u2 >> 1), u2 + (u2 >> 1));
+}
+
+function texto(ctx, s, x, y, size, color = TINTA, fuente = 'ui-monospace, monospace') {
+  ctx.fillStyle = color;
+  ctx.font = `700 ${size}px ${fuente}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(s, x, y);
+}
+
+function escenaCampo(ctx, w, h) {
+  const filas = 5;
+  const columnas = 6;
+  const lado = Math.min(w / (columnas + 1), h / (filas + 1)) * 0.72;
+  const ox = (w - columnas * lado) / 2;
+  const oy = (h - filas * lado) / 2;
+  recta(ctx, 0, 0, w, h, '#000');
+  for (let y = 0; y < filas; y += 1) {
+    for (let x = 0; x < columnas; x += 1) {
+      recta(ctx, ox + x * lado, oy + y * lado, lado * 0.78, lado * 0.78, '#111');
+      linea(ctx, ox + x * lado, oy + y * lado, ox + (x + 1) * lado, oy + (y + 1) * lado, TINTA_LEVE, 0.6);
+    }
+  }
+  mina(ctx, ox + 2.5 * lado, oy + 2 * lado, lado * 0.6);
+}
+
+function escenaCarta(ctx, w, h) {
+  recta(ctx, 0, 0, w, h, '#000');
+  const x = w * 0.22;
+  const y = h * 0.26;
+  const an = w * 0.56;
+  const al = h * 0.48;
+  recta(ctx, x, y, an, al, TINTA);
+  recta(ctx, x + an * 0.55, y, an * 0.45, al * 0.34, '#111'); // solapa
+  recta(ctx, x + an * 0.1, y + al * 0.42, an * 0.3, al * 0.05, TINTA_LEVE);
+  recta(ctx, x + an * 0.1, y + al * 0.52, an * 0.3, al * 0.05, TINTA_LEVE);
+  const s = Math.min(an, al) * 0.14;
+  recta(ctx, x + an - s * 1.6, y + al - s * 1.6, s, s, ROJO);
+  recta(ctx, x + an - s * 1.4, y + al - s * 1.4, s * 0.6, s * 0.6, TINTA);
+  texto(ctx, '«»', w / 2, h * 0.82, h * 0.07, TINTA_LEVE);
+}
+
+function escenaCuartel(ctx, w, h) {
+  recta(ctx, 0, 0, w, h, '#000');
+  const x = w * 0.28;
+  const y = h * 0.34;
+  const an = w * 0.44;
+  const al = h * 0.42;
+  recta(ctx, x, y, an, al, '#111');
+  marco(ctx, x, y, an, al, TINTA, 1.4);
+  recta(ctx, x + an * 0.38, y + al * 0.62, an * 0.24, al * 0.36, TINTA); // puerta
+  recta(ctx, x + an * 0.12, y + al * 0.16, an * 0.16, an * 0.16, TINTA); // ventana
+  recta(ctx, x + an * 0.72, y + al * 0.16, an * 0.16, an * 0.16, TINTA);
+  recta(ctx, x + an * 0.42, y - h * 0.06, an * 0.16, h * 0.06, ROJO); // bandera
+  linea(ctx, x + an * 0.5, y - h * 0.06, x + an * 0.5, y, ROJO, 1.2);
+}
+
+function escenaPuente(ctx, w, h) {
+  recta(ctx, 0, 0, w, h, '#000');
+  const aguaY = h * 0.56;
+  for (let i = 0; i < 5; i += 1) {
+    linea(ctx, w * 0.12 + i * w * 0.16, aguaY + 8, w * 0.2 + i * w * 0.16, aguaY - 6, TINTA_LEVE, 0.8);
+  }
+  recta(ctx, w * 0.15, h * 0.42, w * 0.7, h * 0.16, '#111');
+  marco(ctx, w * 0.15, h * 0.42, w * 0.7, h * 0.16, TINTA, 1.4);
+  for (let i = 0; i < 5; i += 1) {
+    const px = w * 0.18 + i * w * 0.135;
+    linea(ctx, px, h * 0.42, px, h * 0.58, TINTA, 0.9);
+  }
+  texto(ctx, '—', w / 2, aguaY + h * 0.04, h * 0.1, TINTA_LEVE);
+}
+
+function escenaTren(ctx, w, h) {
+  recta(ctx, 0, 0, w, h, '#000');
+  const y = h * 0.52;
+  const locoAn = w * 0.22;
+  const locoAl = h * 0.18;
+  recta(ctx, w * 0.12, y, locoAn, locoAl, TINTA);
+  recta(ctx, w * 0.12 + locoAn * 0.55, y - h * 0.05, locoAn * 0.3, locoAl * 0.55, '#111'); // cabina
+  recta(ctx, w * 0.18, y + locoAl * 0.72, w * 0.03, h * 0.06, '#000'); // rueda
+  recta(ctx, w * 0.27, y + locoAl * 0.72, w * 0.03, h * 0.06, '#000');
+  recta(ctx, w * 0.36, y, locoAn * 0.75, locoAl, TINTA); // vagon
+  recta(ctx, w * 0.36 + locoAn * 0.62, y, locoAn * 0.13, locoAl, '#111');
+  recta(ctx, w * 0.46, y + locoAl * 0.72, w * 0.03, h * 0.06, '#000');
+  recta(ctx, w * 0.55, y + locoAl * 0.72, w * 0.03, h * 0.06, '#000');
+  for (let i = 0; i < 3; i += 1) {
+    linea(ctx, w * 0.1 + i * w * 0.05, y - h * 0.12 - i * h * 0.04, w * 0.05 + i * w * 0.03, y - h * 0.04, TINTA_LEVE, 1);
+  }
+  texto(ctx, 'chuu chuu', w / 2, h * 0.78, h * 0.06, TINTA_LEVE);
+}
+
+function escenaCampamento(ctx, w, h) {
+  recta(ctx, 0, 0, w, h, '#000');
+  const fogataY = h * 0.66;
+  recta(ctx, w * 0.42, fogataY, w * 0.04, h * 0.05, TINTA_LEVE);
+  recta(ctx, w * 0.44, fogataY - h * 0.035, w * 0.02, h * 0.035, ROJO);
+  recta(ctx, w * 0.46, fogataY - h * 0.028, w * 0.02, h * 0.028, '#ffd60a');
+  const tienday = h * 0.42;
+  const tiendaAl = h * 0.24;
+  const tiendaAn = w * 0.16;
+  for (const cx of [w * 0.3, w * 0.62]) {
+    ctx.beginPath();
+    ctx.moveTo(cx, tienday + tiendaAl);
+    ctx.lineTo(cx - tiendaAn / 2, tienday);
+    ctx.lineTo(cx + tiendaAn / 2, tienday);
+    ctx.closePath();
+    ctx.fillStyle = '#111';
+    ctx.fill();
+    ctx.strokeStyle = TINTA;
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    recta(ctx, cx - tiendaAn * 0.12, tienday, tiendaAn * 0.24, tiendaAl * 0.18, TINTA);
+  }
+}
+
+function escenaBrujula(ctx, w, h) {
+  recta(ctx, 0, 0, w, h, '#000');
+  const cx = w / 2;
+  const cy = h * 0.42;
+  const r = Math.min(w, h) * 0.22;
+  linea(ctx, cx - r, cy, cx + r, cy, TINTA_LEVE, 0.8);
+  linea(ctx, cx, cy - r, cx, cy + r, TINTA_LEVE, 0.8);
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.strokeStyle = TINTA;
+  ctx.lineWidth = 1.4;
+  ctx.stroke();
+  linea(ctx, cx, cy - r * 0.62, cx, cy - r * 0.92, TINTA, 2);
+  linea(ctx, cx, cy + r * 0.62, cx, cy + r * 0.92, TINTA, 1);
+  linea(ctx, cx - r * 0.62, cy, cx - r * 0.92, cy, TINTA, 1);
+  linea(ctx, cx + r * 0.62, cy, cx + r * 0.92, cy, TINTA, 1);
+  texto(ctx, 'N', cx, cy - r * 1.18, h * 0.09, TINTA);
+  texto(ctx, 'S', cx, cy + r * 1.18, h * 0.09, TINTA);
+  texto(ctx, 'E', cx + r * 1.18, cy, h * 0.09, TINTA);
+  texto(ctx, 'O', cx - r * 1.18, cy, h * 0.09, TINTA);
+}
+
+function escenaArchivo(ctx, w, h) {
+  recta(ctx, 0, 0, w, h, '#000');
+  const y = h * 0.42;
+  for (let i = 0; i < 5; i += 1) {
+    recta(ctx, w * 0.18 + i * w * 0.05, y + i * h * 0.035, w * 0.22, h * 0.14, '#111');
+    marco(ctx, w * 0.18 + i * w * 0.05, y + i * h * 0.035, w * 0.22, h * 0.14, TINTA, 0.8);
+    recta(ctx, w * 0.2 + i * w * 0.05, y + i * h * 0.035 + h * 0.045, w * 0.05, h * 0.02, TINTA_LEVE);
+  }
+  const s = Math.min(w, h) * 0.12;
+  recta(ctx, w * 0.72 - s / 2, h * 0.78 - s / 2, s, s, ROJO);
+  recta(ctx, w * 0.72 - s / 2 + s * 0.2, h * 0.78 - s / 2 + s * 0.2, s * 0.6, s * 0.6, TINTA);
+  texto(ctx, 'NP', w * 0.72, h * 0.78, h * 0.07, TINTA);
+}
+
+function escenaSello(ctx, w, h) {
+  recta(ctx, 0, 0, w, h, '#000');
+  const cx = w / 2;
+  const cy = h * 0.44;
+  const r = Math.min(w, h) * 0.3;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.strokeStyle = ROJO;
+  ctx.lineWidth = 2.4;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(cx, cy, r * 0.82, 0, Math.PI * 2);
+  ctx.strokeStyle = ROJO;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  linea(ctx, cx - r * 0.55, cy - r * 0.3, cx + r * 0.55, cy + r * 0.3, ROJO, 1.4);
+  linea(ctx, cx + r * 0.55, cy - r * 0.3, cx - r * 0.55, cy + r * 0.3, ROJO, 1.4);
+  texto(ctx, 'NO', cx, cy - h * 0.06, h * 0.11, ROJO);
+  texto(ctx, 'PISAR', cx, cy + h * 0.09, h * 0.09, ROJO);
+}
+
+function escenaRadio(ctx, w, h) {
+  recta(ctx, 0, 0, w, h, '#000');
+  const x = w * 0.3;
+  const y = h * 0.4;
+  const an = w * 0.4;
+  const al = h * 0.24;
+  recta(ctx, x, y, an, al, '#111');
+  marco(ctx, x, y, an, al, TINTA, 1.2);
+  recta(ctx, x + an * 0.14, y + al * 0.3, an * 0.08, al * 0.35, TINTA_LEVE);
+  recta(ctx, x + an * 0.28, y + al * 0.3, an * 0.08, al * 0.35, TINTA_LEVE);
+  recta(ctx, x + an * 0.64, y + al * 0.34, an * 0.05, al * 0.28, ROJO); // indicador
+  linea(ctx, x + an * 0.78, y - h * 0.02, x + an * 0.82, y - h * 0.16, TINTA, 1.4);
+  linea(ctx, x + an * 0.8, y - h * 0.16, x + an * 0.92, y - h * 0.24, TINTA, 1.4);
+  linea(ctx, x + an * 0.82, y - h * 0.02, x + an * 0.86, y - h * 0.16, TINTA, 1.4);
+  texto(ctx, '─ ▩ ─', w / 2, h * 0.72, h * 0.06, TINTA_LEVE);
+}
+
+function escenaSol(ctx, w, h) {
+  recta(ctx, 0, 0, w, h, '#000');
+  const cx = w * 0.72;
+  const cy = h * 0.3;
+  const r = Math.min(w, h) * 0.09;
+  recta(ctx, cx - r, cy - r, r * 2, r * 2, ROJO);
+  for (let i = 0; i < 8; i += 1) {
+    const a = (i / 8) * Math.PI * 2;
+    linea(ctx, cx + Math.cos(a) * r * 1.35, cy + Math.sin(a) * r * 1.35, cx + Math.cos(a) * r * 1.95, cy + Math.sin(a) * r * 1.95, ROJO, 1.6);
+  }
+  for (let i = 0; i < 3; i += 1) {
+    const ry = h * 0.72 + i * h * 0.07;
+    ctx.beginPath();
+    ctx.arc(w / 2, ry, w * 0.45 - i * w * 0.12, 0, Math.PI);
+    ctx.strokeStyle = TINTA_LEVE;
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+  }
+}
+
+function escenaCiudad(ctx, w, h) {
+  recta(ctx, 0, 0, w, h, '#000');
+  const base = h * 0.78;
+  const alturas = [0.34, 0.52, 0.44, 0.68, 0.4, 0.6, 0.3];
+  const an = w / alturas.length;
+  alturas.forEach((alt, i) => {
+    recta(ctx, i * an + 2, base - h * alt, an - 4, h * alt, '#111');
+    marco(ctx, i * an + 2, base - h * alt, an - 4, h * alt, TINTA, 0.8);
+    recta(ctx, i * an + an * 0.22, base - h * alt * 0.35, an * 0.12, an * 0.12, '#0a0a0a');
+    recta(ctx, i * an + an * 0.66, base - h * alt * 0.62, an * 0.12, an * 0.12, '#0a0a0a');
+  });
+  recta(ctx, 0, base, w, h * 0.04, TINTA_LEVE);
+}
+
+function escenaBunker(ctx, w, h) {
+  recta(ctx, 0, 0, w, h, '#000');
+  const x = w * 0.3;
+  const y = h * 0.38;
+  const an = w * 0.4;
+  const al = h * 0.4;
+  recta(ctx, x, y, an, al, '#0a0a0a');
+  marco(ctx, x, y, an, al, TINTA, 1.6);
+  recta(ctx, x + an * 0.34, y + al * 0.55, an * 0.32, al * 0.22, '#000'); // ranura puerta
+  recta(ctx, x + an * 0.1, y + al * 0.14, an * 0.07, an * 0.07, TINTA_LEVE); // rejilla
+  recta(ctx, x + an * 0.22, y + al * 0.14, an * 0.07, an * 0.07, TINTA_LEVE);
+  recta(ctx, x + an * 0.71, y + al * 0.14, an * 0.07, an * 0.07, TINTA_LEVE);
+  recta(ctx, x + an * 0.83, y + al * 0.14, an * 0.07, an * 0.07, TINTA_LEVE);
+  linea(ctx, x + an * 0.5, y - h * 0.05, x + an * 0.5, y + al + h * 0.08, ROJO, 1.6); // antena
+}
+
+function escenaPuerta(ctx, w, h) {
+  recta(ctx, 0, 0, w, h, '#000');
+  const cx = w / 2;
+  const base = h * 0.8;
+  const dAn = w * 0.22;
+  const dAl = h * 0.5;
+  recta(ctx, cx - dAn / 2, base - dAl, dAn, dAl, '#111');
+  marco(ctx, cx - dAn / 2, base - dAl, dAn, dAl, TINTA, 1.4);
+  recta(ctx, cx - dAn * 0.06, base - dAl * 0.42, dAn * 0.12, dAl * 0.06, TINTA); // marco superior
+  recta(ctx, cx - dAn * 0.09, base - dAl * 0.32, dAn * 0.18, dAl * 0.04, ROJO); // aldaba
+  recta(ctx, cx - dAn * 0.02, base - dAl * 0.3, dAn * 0.04, dAl * 0.04, '#000');
+  recta(ctx, cx - dAn * 0.07, base - dAl * 0.12, dAn * 0.14, dAl * 0.03, ROJO); // fechadura
+  recta(ctx, 0, base, w, h * 0.05, TINTA_LEVE);
+  texto(ctx, '··', cx, base - dAl * 0.72, h * 0.08, TINTA_LEVE);
+}
+
+const ESCENAS = {
+  campo: escenaCampo,
+  carta: escenaCarta,
+  cuartel: escenaCuartel,
+  puente: escenaPuente,
+  tren: escenaTren,
+  campamento: escenaCampamento,
+  brujula: escenaBrujula,
+  archivo: escenaArchivo,
+  sello: escenaSello,
+  radio: escenaRadio,
+  sol: escenaSol,
+  ciudad: escenaCiudad,
+  bunker: escenaBunker,
+  puerta: escenaPuerta,
+};
+
+function dibujarEscena(lienzo, clave) {
+  const ctx = lienzo.getContext('2d');
+  if (!ctx) return;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const ancho = Math.round((lienzo.clientWidth || 360) * dpr);
+  const alto = Math.round((lienzo.clientHeight || 240) * dpr);
+  if (lienzo.width !== ancho) lienzo.width = ancho;
+  if (lienzo.height !== alto) lienzo.height = alto;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const w = ancho / dpr;
+  const h = alto / dpr;
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, w, h);
+  const fn = ESCENAS[clave] || ESCENAS.campo;
+  fn(ctx, w, h);
+}
+
+  Object.assign(modulo, { dibujarEscena });
+})(modulos['scenes']);
+
+(function (modulo) {
+'use strict';
 const { Game } = modulos['engine'];
 const { DIFICULTADES, DIFICULTAD_POR_DEFECTO, normalizarPersonalizada, dificultadPorId, esDificultadFija, limitesMinas } = modulos['presets'];
 const { audio } = modulos['audio'];
 const { attachInput, registrarConversorPunto } = modulos['input'];
 const { t, getLanguage, setLanguage, unitMinas, routeSlug, routeWords } = modulos['i18n'];
 const { NIVELES, ACTOS, configNivel, nivelCampana, actoDe } = modulos['campaign'];
+const { dibujarEscena } = modulos['scenes'];
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -1793,6 +2412,7 @@ function nuevoRegistro() {
     volumen: 100,
     custom: { filas: 9, columnas: 16, minas: 40 },
     campaign: { unlocked: 1, best: {} },
+    modificadores: { minasExtra: false, reloj: false, sinBandera: false, panico: false },
   };
 }
 
@@ -1835,6 +2455,10 @@ function leerGuardado() {
       if (Number.isInteger(i) && i >= 0 && i < NIVELES.length && Number.isFinite(valor) && valor > 0) {
         datos.campaign.best[i] = valor;
       }
+    }
+    const mods = bruto.modificadores && typeof bruto.modificadores === 'object' ? bruto.modificadores : {};
+    for (const clave of Object.keys(datos.modificadores)) {
+      if (typeof mods[clave] === 'boolean') datos.modificadores[clave] = mods[clave];
     }
   }
   return datos;
@@ -2102,6 +2726,11 @@ function pasoBarrido(dt) {
 
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
+function panDe(j, x) {
+  if (!j || j.columnas <= 1 || x == null) return 0;
+  return (x - (j.columnas - 1) / 2) / ((j.columnas - 1) / 2);
+}
+
 const DURACION_RUIDO = 800;
 const ruidoFx = { t: 0, pintado: 0, activo: false, persistente: false, lienzoBase: null, img: null, ctxBase: null, ctxLienzo: null };
 
@@ -2305,6 +2934,7 @@ const PISTAS = {
   settings: 'hintSettings',
   campaign: 'hintCampaign',
   story: 'hintStory',
+  modifiers: 'hintModifiers',
 };
 
 function actualizarPista() {
@@ -2318,9 +2948,13 @@ function actualizarPista() {
 
 function gestionarMusicaPantalla(nombre) {
   if (nombre === 'playing' || nombre === 'paused') {
-    if (app.juego && !app.juego.terminada) audio.musica('ambience', 200, 1.4);
+    if (app.juego && !app.juego.terminada) {
+      if (app.modo === 'modifiers') audio.musicaProc('modifiers');
+      else audio.musica('ambience', 200, 1.4);
+    }
     return;
   }
+  audio.pararMusica();
   audio.pararAmbiente();
 }
 
@@ -2362,6 +2996,11 @@ function actualizarMarcador() {
     meta = t('campaignHud', { n: dosDigitos((app.nivel || 0) + 1), name: nombreNivel(app.nivel || 0) });
     const bestNivel = guardado.campaign.best[app.nivel] || 0;
     bestTxt = bestNivel > 0 ? `${t('record')} ${formatoTiempo(bestNivel)}` : t('noRecord');
+  } else if (app.modo === 'modifiers') {
+    meta = t('modifiers');
+    const activos = Object.keys(guardado.modificadores).filter((k) => guardado.modificadores[k]);
+    if (activos.length) meta += ` · ${t(activos.length === 1 ? 'modActiva' : 'modActivas', { n: activos.length })}`;
+    bestTxt = '';
   } else {
     meta = nombreDificultad(app.modo);
     const bestMs = esDificultadFija(app.modo) ? guardado.best[app.modo] : 0;
@@ -2370,6 +3009,10 @@ function actualizarMarcador() {
       : t('diffCustom');
   }
   escribirHud(meta, String(j.minasRestantes), formatoTiempo(j.tiempoMs), bestTxt);
+  if (el.timer) {
+    const cuentaAtras = app.modo === 'modifiers' && guardado.modificadores.reloj && j.tiempoMs < 10000;
+    el.timer.style.color = cuentaAtras ? '#ff2b2b' : '';
+  }
 }
 
 let huecoFin = 0;
@@ -2567,11 +3210,12 @@ function mostrarPortada() {
   app.juego = null;
   app.contado = false;
   const hechos = campañaHechos();
-  const filas = [
-    filaHTML({ accion: 'play', idx: 0, nombre: t('play'), detalle: t('playTag'), derecha: '↵' }),
-    filaHTML({ accion: 'campaign', idx: 1, nombre: t('campaign'), detalle: t('campaignTag'), derecha: `${dosDigitos(hechos)}/30` }),
-    filaHTML({ accion: 'profile', idx: 2, nombre: t('profile'), detalle: t('profileTag') }),
-  ].join('');
+    const filas = [
+      filaHTML({ accion: 'play', idx: 0, nombre: t('play'), detalle: t('playTag'), derecha: '↵' }),
+      filaHTML({ accion: 'campaign', idx: 1, nombre: t('campaign'), detalle: t('campaignTag'), derecha: `${dosDigitos(hechos)}/30` }),
+      filaHTML({ accion: 'playModifiers', idx: 2, nombre: t('modifiers'), detalle: t('modTagline'), derecha: '↵' }),
+      filaHTML({ accion: 'profile', idx: 3, nombre: t('profile'), detalle: t('profileTag') }),
+    ].join('');
   ponerOverlay(`<div class="panel inicio portada">
     <div class="inicio-texto">
       <header class="inicio-cabeza">
@@ -2904,24 +3548,59 @@ function mostrarHistoria(indice) {
     return;
   }
   app.historia = indice;
-  const nombre = getLanguage() === 'en' ? nivel.nombreEn : nivel.nombreEs;
-  const texto = getLanguage() === 'en' ? nivel.historiaEn : nivel.historiaEs;
+  app.historiaLinea = 0;
+  renderHistoria();
+}
+
+function renderHistoria() {
+  const indice = app.historia;
+  const linea = Math.max(0, Math.floor(Number(app.historiaLinea) || 0));
+  const nivel = nivelCampana(indice);
+  if (!nivel) return;
+  const idioma = getLanguage();
+  const dialogo = nivel.dialogo || [];
+  const beat = dialogo[linea];
+  const completo = linea >= dialogo.length;
+  const nombre = idioma === 'en' ? nivel.nombreEn : nivel.nombreEs;
   const acto = actoDe(indice);
-  const nombreActoTxt = getLanguage() === 'en' ? acto.nombreEn : acto.nombreEs;
+  const nombreActoTxt = idioma === 'en' ? acto.nombreEn : acto.nombreEs;
+  const quienTxt = beat ? t(`quien${beat.quien[0].toUpperCase()}${beat.quien.slice(1)}`) : '';
+  const texto = beat ? (idioma === 'en' ? beat.en : beat.es) : '';
   const completado = (guardado.campaign.best[indice] || 0) > 0;
   ponerOverlay(`<div class="panel historia">
     <p class="kicker">${t('actLabel', { n: acto.id, name: nombreActoTxt })} · ${t('levelCell', { n: indice + 1 })}</p>
     <h2 class="historia-titulo">${nombre}</h2>
-    <p class="historia-dossier">${t('storyDossier')}</p>
-    <p class="historia-texto">${texto}</p>
+    <div class="escena-bloque">
+      <canvas id="escena" class="escena-canvas" width="360" height="240" aria-label="escena"></canvas>
+    </div>
+    ${beat ? `<div class="dialogo">
+      <p class="dialogo-quien">${quienTxt}</p>
+      <p class="dialogo-texto">${texto}</p>
+    </div>
+    <p class="dialogo-avance">${dosDigitos(linea + 1)} / ${dosDigitos(dialogo.length)}</p>` : ''}
     <div class="acciones">
-      <button class="principal" type="button" data-accion="descend"><span>${completado ? t('descendAgain') : t('descend')}</span><kbd>↵</kbd></button>
+      ${completo
+        ? `<button class="principal" type="button" data-accion="descend"><span>${completado ? t('descendAgain') : t('descend')}</span><kbd>↵</kbd></button>`
+        : `<button class="principal" type="button" data-accion="dialogNext"><span>${t('dialogoSiguiente')}</span><kbd>↵</kbd></button>`}
       <button type="button" data-accion="back"><span>${t('back')}</span><kbd>Esc</kbd></button>
     </div>
   </div>`);
   pantalla('story');
   hudMenu(t('campaignHud', { n: dosDigitos(indice + 1), name: nombre }));
   enfocarPrimero();
+  const cv = document.getElementById('escena');
+  if (cv) dibujarEscena(cv, nivel.escena || 'campo');
+}
+
+function pasarLineaHistoria() {
+  const indice = app.historia;
+  const nivel = nivelCampana(indice);
+  if (!nivel) return;
+  const total = (nivel.dialogo || []).length;
+  if ((app.historiaLinea || 0) + 1 >= total) return;
+  app.historiaLinea += 1;
+  audio.play('ui');
+  renderHistoria();
 }
 
 function mostrarDificultades() {
@@ -3029,10 +3708,19 @@ function empezarPartida(modo, nivel = null) {
   app.demo = null;
   app.modo = modo;
   app.nivel = modo === 'campaign' ? nivel : null;
-  const cfg = modo === 'campaign' ? configNivel(nivel) : configDeModo(modo);
+  let cfg = modo === 'campaign' ? configNivel(nivel) : configDeModo(modo);
   if (!cfg) {
     mostrarCampaña();
     return;
+  }
+  if (modo === 'modifiers') {
+    const c = { ...guardado.custom };
+    const mods = { ...guardado.modificadores };
+    let minas = c.minas;
+    if (mods.minasExtra) minas = Math.floor(minas * 1.4);
+    minas = Math.max(1, Math.min(minas, c.filas * c.columnas - 1));
+    const segundos = Math.max(30, Math.floor((c.filas * c.columnas) / 3));
+    cfg = { filas: c.filas, columnas: c.columnas, minas, mods, relojSegundos: mods.reloj ? segundos : 0 };
   }
   app.juego = new Game(cfg, eventosJuego);
   casillaArmada = null;
@@ -3120,17 +3808,17 @@ function eventosJuego(tipo, datos) {
   const j = app.juego;
   switch (tipo) {
     case 'reveal':
-      audio.play('reveal', { size: datos && datos.size });
+      audio.play('reveal', { size: datos && datos.size, pan: panDe(j, (datos && datos.x != null ? datos.x : (j.hover ? j.hover.x : j.cursor.x))) });
       el.senal.classList.remove('visible');
       break;
     case 'chord':
-      audio.play('chord');
+      audio.play('chord', { pan: panDe(j, datos && datos.x != null ? datos.x : j.cursor.x) });
       break;
     case 'flag':
-      audio.play('flag');
+      audio.play('flag', { pan: panDe(j, datos && datos.x != null ? datos.x : j.cursor.x) });
       break;
     case 'unflag':
-      audio.play('unflag');
+      audio.play('unflag', { pan: panDe(j, datos && datos.x != null ? datos.x : j.cursor.x) });
       break;
     case 'boom': {
       contabilizarFin(false);
@@ -3317,6 +4005,33 @@ function datoCifra(valor, etiqueta, cuenta, formato) {
   return `<div class="dato-cifra">${inner}<span>${etiqueta}</span></div>`;
 }
 
+function mostrarModificadores() {
+  app.juego = null;
+  const mods = guardado.modificadores;
+  const c = guardado.custom;
+  const filas = [
+    filaHTML({ accion: 'toggleMod:minasExtra', idx: 0, nombre: t('modMinesExtra'), detalle: t('modMinesExtraTag'), derecha: mods.minasExtra ? '●' : '○' }),
+    filaHTML({ accion: 'toggleMod:reloj', idx: 1, nombre: t('modReloj'), detalle: t('modRelojTag'), derecha: mods.reloj ? '●' : '○' }),
+    filaHTML({ accion: 'toggleMod:sinBandera', idx: 2, nombre: t('modSinBandera'), detalle: t('modSinBanderaTag'), derecha: mods.sinBandera ? '●' : '○' }),
+    filaHTML({ accion: 'toggleMod:panico', idx: 3, nombre: t('modPanico'), detalle: t('modPanicoTag'), derecha: mods.panico ? '●' : '○' }),
+  ];
+  filas.push(filaHTML({
+    accion: 'modifiersStart',
+    idx: 4,
+    nombre: t('start'),
+    detalle: `${c.filas} × ${c.columnas} · ${c.minas} ${unitMinas(c.minas)}`,
+    derecha: '↵',
+  }));
+  ponerOverlay(`<div class="panel">
+    ${cabeceraPanel(t('modifiers'), botonVolver())}
+    <p class="nota">${t('modTagline')}</p>
+    <nav class="filas" aria-label="${t('modifiers')}">${filas.join('')}</nav>
+  </div>`);
+  pantalla('modifiers');
+  hudMenu(t('modifiers'));
+  enfocarPrimero();
+}
+
 function mostrarPerfil() {
   app.juego = null;
   const s = guardado.stats;
@@ -3472,6 +4187,16 @@ function mostrarAjustes() {
 function ejecutar(nombre) {
   audio.unlock();
   if (!nombre) return;
+  if (nombre.startsWith('toggleMod:')) {
+    const clave = nombre.slice('toggleMod:'.length);
+    if (clave in guardado.modificadores) {
+      guardado.modificadores[clave] = !guardado.modificadores[clave];
+      guardar();
+      audio.play('ui');
+      mostrarModificadores();
+    }
+    return;
+  }
   if (nombre.startsWith('play:')) {
     empezarPartida(nombre.slice(5));
     return;
@@ -3495,6 +4220,8 @@ function ejecutar(nombre) {
   switch (nombre) {
     case 'play': mostrarDificultades(); return;
     case 'campaign': mostrarCampaña(); return;
+    case 'playModifiers': mostrarModificadores(); return;
+    case 'modifiersStart': empezarPartida('modifiers'); return;
     case 'lockedNode': audio.play('locked'); return;
     case 'mapDescend': {
       const i = app.mapaSel;
@@ -3505,6 +4232,7 @@ function ejecutar(nombre) {
       }
       return;
     }
+    case 'dialogNext': pasarLineaHistoria(); return;
     case 'descend':
       if (app.historia !== null && app.historia !== undefined) empezarPartida('campaign', app.historia);
       return;
@@ -3580,6 +4308,7 @@ function volverAtras() {
     case 'modes': mostrarPortada(); return;
     case 'custom': mostrarDificultades(); return;
     case 'campaign': mostrarPortada(); return;
+    case 'modifiers': mostrarPortada(); return;
     case 'story': mostrarCampaña(); return;
     case 'profile':
     case 'settings':
@@ -3888,6 +4617,7 @@ const REPINTAR = {
   home: mostrarPortada,
   campaign: mostrarCampaña,
   story: () => mostrarHistoria(app.historia === null ? 0 : app.historia),
+  modifiers: mostrarModificadores,
   modes: mostrarDificultades,
   custom: () => mostrarPersonalizada(),
   profile: mostrarPerfil,
