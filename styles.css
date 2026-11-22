@@ -1797,6 +1797,34 @@ button.foco {
 
 /* --- Historia: escena y diálogo (campaña v2) --- */
 
+.historia .cabecera {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(6px, 1.5vh, 10px);
+  margin-bottom: clamp(12px, 3vh, 18px);
+}
+
+.historia .kicker {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.historia .historia-titulo {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: clamp(20px, 4vw, 28px);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--fg);
+  text-align: center;
+  max-width: 48ch;
+}
+
 .historia .escena-bloque {
   display: flex;
   align-items: center;
@@ -1810,8 +1838,8 @@ button.foco {
   height: auto;
   max-height: clamp(150px, 26vh, 260px);
   background: #000;
-  border: 1px solid var(--line);
-  box-shadow: 0 0 0 1px #000;
+  border: 2px solid var(--line);
+  box-shadow: 0 0 24px rgba(0,0,0,0.6);
   image-rendering: pixelated;
 }
 
@@ -1829,35 +1857,39 @@ button.foco {
 .dialogo {
   border: 1px solid var(--line);
   background: #050505;
-  padding: clamp(12px, 3vh, 18px) clamp(14px, 4vw, 22px);
+  padding: clamp(14px, 3.5vh, 20px) clamp(16px, 4vw, 24px);
   gap: 10px;
   display: flex;
   flex-direction: column;
+  max-width: 46ch;
+  margin: 0 auto clamp(10px, 2.5vh, 14px);
 }
 
 .dialogo-quien {
   margin: 0;
   font-family: var(--mono);
   font-size: 9px;
-  letter-spacing: 0.28em;
+  letter-spacing: 0.35em;
   text-transform: uppercase;
   color: var(--accent);
 }
 
 .dialogo-texto {
   margin: 0;
-  font-size: clamp(15px, 2.8vw, 18px);
-  line-height: 1.75;
+  font-size: clamp(16px, 3vw, 20px);
+  line-height: 1.8;
   color: var(--fg);
   max-width: 42ch;
+  white-space: pre-wrap;
 }
 
 .dialogo-avance {
-  margin: 6px 0 0;
+  margin: 8px 0 0;
   font-family: var(--mono);
   font-size: 9.5px;
   letter-spacing: 0.2em;
   color: var(--muted);
+  text-align: right;
 }
 
 /* --- Modo Modificadores (estilo snake) --- */

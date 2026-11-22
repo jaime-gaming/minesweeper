@@ -2555,6 +2555,10 @@ const app = {
   modo: DIFICULTAD_POR_DEFECTO,
   nivel: null,
   historia: null,
+  historiaLinea: 0,
+  historiaEscribiendo: false,
+  historiaTextoMostrado: '',
+  historiaTiempoEscribir: 0,
   record: false,
   flagMode: false,
   demo: null,
@@ -3648,11 +3652,16 @@ function renderHistoria() {
   const acto = actoDe(indice);
   const nombreActoTxt = idioma === 'en' ? acto.nombreEn : acto.nombreEs;
   const quienTxt = beat ? t(`quien${beat.quien[0].toUpperCase()}${beat.quien.slice(1)}`) : '';
-  const texto = beat ? (idioma === 'en' ? beat.en : beat.es) : '';
+  const textoCompleto = beat ? (idioma === 'en' ? beat.en : beat.es) : '';
+  // Texto mostrado: si se está escribiendo, usar el parcial; si no, el completo.
+  const texto = app.historiaEscribiendo ? app.historiaTextoMostrado : textoCompleto;
   const completado = (guardado.campaign.best[indice] || 0) > 0;
+  const escribir = beat && !app.historiaEscribiendo && !completo;
   ponerOverlay(`<div class="panel historia">
-    <p class="kicker">${t('actLabel', { n: acto.id, name: nombreActoTxt })} · ${t('levelCell', { n: indice + 1 })}</p>
-    <h2 class="historia-titulo">${nombre}</h2>
+    <div class="cabecera">
+      <p class="kicker">${t('actLabel', { n: acto.id, name: nombreActoTxt })} · ${t('levelCell', { n: indice + 1 })}</p>
+      <h2 class="historia-titulo">${nombre}</h2>
+    </div>
     <div class="escena-bloque">
       <canvas id="escena" class="escena-canvas" width="360" height="240" aria-label="escena"></canvas>
     </div>
@@ -3664,7 +3673,7 @@ function renderHistoria() {
     <div class="acciones">
       ${completo
         ? `<button class="principal" type="button" data-accion="descend"><span>${completado ? t('descendAgain') : t('descend')}</span><kbd>↵</kbd></button>`
-        : `<button class="principal" type="button" data-accion="dialogNext"><span>${t('dialogoSiguiente')}</span><kbd>↵</kbd></button>`}
+        : `<button class="principal" type="button" data-accion="dialogNext"${escribir ? ' disabled' : ''}><span>${t('dialogoSiguiente')}</span><kbd>↵</kbd></button>`}
       <button type="button" data-accion="back"><span>${t('back')}</span><kbd>Esc</kbd></button>
     </div>
   </div>`);
@@ -3673,6 +3682,12 @@ function renderHistoria() {
   enfocarPrimero();
   const cv = document.getElementById('escena');
   if (cv) dibujarEscena(cv, nivel.escena || 'campo');
+  // Iniciar escritura de este diálogo si corresponde.
+  if (escribir) {
+    app.historiaEscribiendo = true;
+    app.historiaTextoMostrado = '';
+    app.historiaTiempoEscribir = 0;
+  }
 }
 
 function pasarLineaHistoria() {
@@ -3682,6 +3697,9 @@ function pasarLineaHistoria() {
   const total = (nivel.dialogo || []).length;
   if ((app.historiaLinea || 0) >= total) return;
   app.historiaLinea += 1;
+  app.historiaEscribiendo = false;
+  app.historiaTextoMostrado = '';
+  app.historiaTiempoEscribir = 0;
   audio.unlock();
   audio.play('ui');
   renderHistoria();
@@ -4925,6 +4943,27 @@ function bucle(t) {
       }
       renderDemo();
     }
+  }
+
+  // Escritura progresiva del diálogo (efecto máquina de escribir).
+  if (app.pantalla === 'story' && app.historiaEscribiendo) {
+    app.historiaTiempoEscribir += dt;
+    const nivel = nivelCampana(app.historia);
+    const idioma = getLanguage();
+    const linea = Math.max(0, Math.floor(Number(app.historiaLinea) || 0));
+    const dialogo = nivel.dialogo || [];
+    const beat = dialogo[linea];
+    const textoCompleto = beat ? (idioma === 'en' ? beat.en : beat.es) : '';
+    const velocidad = 28; // ms por carácter
+    const chars = Math.floor(app.historiaTiempoEscribir / velocidad);
+    if (chars >= textoCompleto.length) {
+      app.historiaTextoMostrado = textoCompleto;
+      app.historiaEscribiendo = false;
+      app.historiaTiempoEscribir = 0;
+    } else {
+      app.historiaTextoMostrado = textoCompleto.slice(0, chars);
+    }
+    renderHistoria();
   }
 }
 
