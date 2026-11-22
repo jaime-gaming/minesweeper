@@ -142,8 +142,8 @@ const MUSICA = {
   ambience: { url: 'audio/Ambience.mp3', bucle: true, vol: 0.32 },
   win: { url: 'audio/Win.mp3', bucle: false, vol: 1 },
   death: { url: 'audio/Death.mp3', bucle: false, vol: 1 },
-  introMod: { url: 'audio/IntroMod.mp3', bucle: false, vol: 1 },
-  hardMod: { url: 'audio/HardMod.mp3', bucle: true, vol: 0.5 },
+  introMod: { url: 'audio/IntroMod.ogg', bucle: false, vol: 1 },
+  hardMod: { url: 'audio/HardMod.ogg', bucle: true, vol: 0.5 },
 };
 
 const EFECTOS = {
