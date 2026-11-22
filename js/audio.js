@@ -2,6 +2,8 @@ let ctx = null;
 let master = null;
 let musicGain = null;
 let pan = null;
+let analyser = null;
+let dataArray = null;
 let noiseBuf = null;
 let roto = false;
 let nivelMusica = 1;
@@ -28,8 +30,12 @@ function build() {
     musicGain.gain.value = GANANCIA_MUSICA * nivelMusica;
     pan = ctx.createStereoPanner();
     pan.pan.value = 0;
+    analyser = ctx.createAnalyser();
+    analyser.fftSize = 2048;
+    dataArray = new Uint8Array(analyser.frequencyBinCount);
 
-    musicGain.connect(master);
+    musicGain.connect(analyser);
+    analyser.connect(master);
     pan.connect(master);
     if (typeof ctx.createDynamicsCompressor === 'function') {
       const compresor = ctx.createDynamicsCompressor();
@@ -136,6 +142,8 @@ const MUSICA = {
   ambience: { url: 'audio/Ambience.mp3', bucle: true, vol: 0.32 },
   win: { url: 'audio/Win.mp3', bucle: false, vol: 1 },
   death: { url: 'audio/Death.mp3', bucle: false, vol: 1 },
+  introMod: { url: 'audio/IntroMod.mp3', bucle: false, vol: 1 },
+  hardMod: { url: 'audio/HardMod.mp3', bucle: true, vol: 0.5 },
 };
 
 const EFECTOS = {
@@ -375,6 +383,61 @@ export const audio = {
     pan.pan.cancelScheduledValues(ctx.currentTime);
     pan.pan.setValueAtTime(v, ctx.currentTime);
     return v;
+  },
+
+  obtenerFrecuencias() {
+    if (!analyser || !dataArray) return null;
+    analyser.getByteFrequencyData(dataArray);
+    return dataArray;
+  },
+
+  // Dibuja un fondo rojo que late con la música (modo Hard).
+  // ctx: contexto 2d de un canvas a pantalla completa.
+  dibujarFondoRojo(ctx, ancho, alto) {
+    if (!ctx) return;
+    const datos = this.obtenerFrecuencias();
+    if (!datos) {
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, ancho, alto);
+      return;
+    }
+
+    // Bass (primeros bins) y energía general para el latido.
+    let bass = 0;
+    let energia = 0;
+    const cuenta = datos.length;
+    for (let i = 0; i < cuenta; i += 1) {
+      const v = datos[i];
+      energia += v;
+      if (i < cuenta * 0.25) bass += v;
+    }
+    const bajo = bass / Math.max(1, cuenta * 0.25) / 255;
+    const medio = energia / Math.max(1, cuenta) / 255;
+    const latido = Math.max(bajo, medio * 0.6);
+
+    // Fondo rojo oscuro con opacidad según la música.
+    const opacidad = 0.15 + latido * 0.55;
+    ctx.fillStyle = `rgba(120, 0, 0, ${Math.min(0.85, opacidad)})`;
+    ctx.fillRect(0, 0, ancho, alto);
+
+    // Barras de ecualizador rojo en la parte inferior.
+    const barras = 48;
+    const anchoBarra = ancho / barras;
+    const altoMax = alto * 0.45;
+    const yBase = alto - alto * 0.08;
+    ctx.fillStyle = '#ff2b2b';
+    for (let i = 0; i < barras; i += 1) {
+      const idx = Math.floor((i / barras) * cuenta);
+      const h = (datos[idx] / 255) * altoMax;
+      ctx.fillRect(i * anchoBarra + 2, yBase - h, anchoBarra - 4, h);
+    }
+
+    // Vignette roja que late en los bordes.
+    const gradiente = ctx.createRadialGradient(ancho / 2, alto / 2, alto * 0.2, ancho / 2, alto / 2, alto);
+    gradiente.addColorStop(0, `rgba(255, 43, 43, ${latido * 0.35})`);
+    gradiente.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = gradiente;
+    ctx.fillRect(0, 0, ancho, alto);
   },
 
   precargar: precargarTodo,

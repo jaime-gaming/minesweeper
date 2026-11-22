@@ -1753,6 +1753,48 @@ button.foco {
   }
 }
 
+/* --- Intro Modificadores: portal --- */
+
+.intro-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #000;
+}
+
+.intro .panel {
+  position: relative;
+  z-index: 50;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  box-shadow: none;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  align-items: center;
+  justify-content: center;
+}
+
+.intro-nota {
+  position: fixed;
+  bottom: max(60px, env(safe-area-inset-bottom) + 40px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 55;
+  margin: 0;
+  font-family: var(--mono);
+  font-size: clamp(12px, 2.2vw, 16px);
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: #ff2b2b;
+  text-align: center;
+  mix-blend-mode: difference;
+}
+
 /* --- Historia: escena y diálogo (campaña v2) --- */
 
 .historia .escena-bloque {

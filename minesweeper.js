@@ -311,6 +311,8 @@ let ctx = null;
 let master = null;
 let musicGain = null;
 let pan = null;
+let analyser = null;
+let dataArray = null;
 let noiseBuf = null;
 let roto = false;
 let nivelMusica = 1;
@@ -337,8 +339,12 @@ function build() {
     musicGain.gain.value = GANANCIA_MUSICA * nivelMusica;
     pan = ctx.createStereoPanner();
     pan.pan.value = 0;
+    analyser = ctx.createAnalyser();
+    analyser.fftSize = 2048;
+    dataArray = new Uint8Array(analyser.frequencyBinCount);
 
-    musicGain.connect(master);
+    musicGain.connect(analyser);
+    analyser.connect(master);
     pan.connect(master);
     if (typeof ctx.createDynamicsCompressor === 'function') {
       const compresor = ctx.createDynamicsCompressor();
@@ -445,6 +451,8 @@ const MUSICA = {
   ambience: { url: 'audio/Ambience.mp3', bucle: true, vol: 0.32 },
   win: { url: 'audio/Win.mp3', bucle: false, vol: 1 },
   death: { url: 'audio/Death.mp3', bucle: false, vol: 1 },
+  introMod: { url: 'audio/IntroMod.mp3', bucle: false, vol: 1 },
+  hardMod: { url: 'audio/HardMod.mp3', bucle: true, vol: 0.5 },
 };
 
 const EFECTOS = {
@@ -684,6 +692,61 @@ const audio = {
     pan.pan.cancelScheduledValues(ctx.currentTime);
     pan.pan.setValueAtTime(v, ctx.currentTime);
     return v;
+  },
+
+  obtenerFrecuencias() {
+    if (!analyser || !dataArray) return null;
+    analyser.getByteFrequencyData(dataArray);
+    return dataArray;
+  },
+
+  // Dibuja un fondo rojo que late con la música (modo Hard).
+  // ctx: contexto 2d de un canvas a pantalla completa.
+  dibujarFondoRojo(ctx, ancho, alto) {
+    if (!ctx) return;
+    const datos = this.obtenerFrecuencias();
+    if (!datos) {
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, ancho, alto);
+      return;
+    }
+
+    // Bass (primeros bins) y energía general para el latido.
+    let bass = 0;
+    let energia = 0;
+    const cuenta = datos.length;
+    for (let i = 0; i < cuenta; i += 1) {
+      const v = datos[i];
+      energia += v;
+      if (i < cuenta * 0.25) bass += v;
+    }
+    const bajo = bass / Math.max(1, cuenta * 0.25) / 255;
+    const medio = energia / Math.max(1, cuenta) / 255;
+    const latido = Math.max(bajo, medio * 0.6);
+
+    // Fondo rojo oscuro con opacidad según la música.
+    const opacidad = 0.15 + latido * 0.55;
+    ctx.fillStyle = `rgba(120, 0, 0, ${Math.min(0.85, opacidad)})`;
+    ctx.fillRect(0, 0, ancho, alto);
+
+    // Barras de ecualizador rojo en la parte inferior.
+    const barras = 48;
+    const anchoBarra = ancho / barras;
+    const altoMax = alto * 0.45;
+    const yBase = alto - alto * 0.08;
+    ctx.fillStyle = '#ff2b2b';
+    for (let i = 0; i < barras; i += 1) {
+      const idx = Math.floor((i / barras) * cuenta);
+      const h = (datos[idx] / 255) * altoMax;
+      ctx.fillRect(i * anchoBarra + 2, yBase - h, anchoBarra - 4, h);
+    }
+
+    // Vignette roja que late en los bordes.
+    const gradiente = ctx.createRadialGradient(ancho / 2, alto / 2, alto * 0.2, ancho / 2, alto / 2, alto);
+    gradiente.addColorStop(0, `rgba(255, 43, 43, ${latido * 0.35})`);
+    gradiente.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = gradiente;
+    ctx.fillRect(0, 0, ancho, alto);
   },
 
   precargar: precargarTodo,
@@ -1529,9 +1592,13 @@ const STRINGS = {
     modSinBanderaTag: 'no se pueden marcar minas',
     modPanico: 'pánico',
     modPanicoTag: 'el tablero tiembla al destapar',
+    modHard: 'modo difícil',
+    modHardTag: 'música Hard y fondo rojo reaccionando',
     modActiva: '1 activa',
     modActivas: '{n} activas',
     hintModifiers: 'pulsa una fila para alternar · Enter juega',
+    introMod: 'introducción',
+    introModNota: 'El portal se abre… aguanta la señal.',
     dialogoSiguiente: 'siguiente',
     quienComando: 'Comando',
     quienSargento: 'Sargento',
@@ -1700,9 +1767,13 @@ const STRINGS = {
     modSinBanderaTag: 'mines cannot be marked',
     modPanico: 'panic',
     modPanicoTag: 'the board shakes on reveal',
+    modHard: 'hard mode',
+    modHardTag: 'Hard music and music-reactive red background',
     modActiva: '1 active',
     modActivas: '{n} active',
     hintModifiers: 'tap a row to toggle · Enter plays',
+    introMod: 'intro',
+    introModNota: 'The portal opens… hold the signal.',
     dialogoSiguiente: 'next',
     quienComando: 'Command',
     quienSargento: 'Sergeant',
@@ -2412,7 +2483,7 @@ function nuevoRegistro() {
     volumen: 100,
     custom: { filas: 9, columnas: 16, minas: 40 },
     campaign: { unlocked: 1, best: {} },
-    modificadores: { minasExtra: false, reloj: false, sinBandera: false, panico: false },
+    modificadores: { minasExtra: false, reloj: false, sinBandera: false, panico: false, hard: false },
   };
 }
 
@@ -2965,6 +3036,8 @@ function pantalla(nombre) {
   el.flagToggle.hidden = !(nombre === 'playing' && esTactil());
   if (nombre !== 'playing') el.senal.classList.remove('visible');
   if (antes !== nombre) taparPantalla();
+  if (antes === 'playing' && nombre !== 'playing') limpiarFondoRojo();
+  if (nombre === 'intro') limpiarFondoRojo();
   gestionarMusicaPantalla(nombre);
   if (nombre === 'dead') activarEfectoTv();
   else {
@@ -3723,6 +3796,14 @@ function empezarPartida(modo, nivel = null) {
     cfg = { filas: c.filas, columnas: c.columnas, minas, mods, relojSegundos: mods.reloj ? segundos : 0 };
   }
   app.juego = new Game(cfg, eventosJuego);
+  app.modHard = modo === 'modifiers' && guardado.modificadores.hard;
+  if (app.modHard) {
+    audio.musica('hardMod', 0, 1);
+    prepararFondoRojo();
+  } else {
+    app.modHard = false;
+    limpiarFondoRojo();
+  }
   casillaArmada = null;
   app.record = false;
   app.contado = false;
@@ -4014,6 +4095,7 @@ function mostrarModificadores() {
     filaHTML({ accion: 'toggleMod:reloj', idx: 1, nombre: t('modReloj'), detalle: t('modRelojTag'), derecha: mods.reloj ? '●' : '○' }),
     filaHTML({ accion: 'toggleMod:sinBandera', idx: 2, nombre: t('modSinBandera'), detalle: t('modSinBanderaTag'), derecha: mods.sinBandera ? '●' : '○' }),
     filaHTML({ accion: 'toggleMod:panico', idx: 3, nombre: t('modPanico'), detalle: t('modPanicoTag'), derecha: mods.panico ? '●' : '○' }),
+    filaHTML({ accion: 'toggleMod:hard', idx: 4, nombre: t('modHard'), detalle: t('modHardTag'), derecha: mods.hard ? '●' : '○' }),
   ];
   filas.push(filaHTML({
     accion: 'modifiersStart',
@@ -4030,6 +4112,102 @@ function mostrarModificadores() {
   pantalla('modifiers');
   hudMenu(t('modifiers'));
   enfocarPrimero();
+}
+
+function prepararFondoRojo() {
+  if (el.fondoRojo) return;
+  const fr = document.createElement('canvas');
+  fr.id = 'fondoRojo';
+  fr.style.position = 'fixed';
+  fr.style.inset = '0';
+  fr.style.zIndex = '5';
+  fr.style.pointerEvents = 'none';
+  fr.style.display = 'block';
+  document.body.appendChild(fr);
+  el.fondoRojo = fr;
+  ajustarFondoRojo();
+}
+
+function limpiarFondoRojo() {
+  if (el.fondoRojo) {
+    el.fondoRojo.remove();
+    el.fondoRojo = null;
+  }
+}
+
+function ajustarFondoRojo() {
+  const fr = el.fondoRojo;
+  if (!fr) return;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  fr.width = Math.round(window.innerWidth * dpr);
+  fr.height = Math.round(window.innerHeight * dpr);
+  fr.style.width = `${window.innerWidth}px`;
+  fr.style.height = `${window.innerHeight}px`;
+}
+
+function dibujarPortal(ctx, w, h, segundos) {
+  const t = segundos;
+  const progreso = (t % 13) / 13;
+  const cx = w / 2;
+  const cy = h / 2;
+
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, w, h);
+
+  // Anillos del portal que giran y se expanden hacia el centro.
+  ctx.strokeStyle = '#ff2b2b';
+  ctx.lineWidth = 2.5;
+  for (let i = 0; i < 7; i += 1) {
+    const radio = Math.max(10, Math.sin(progreso * Math.PI + i * 0.9) * 220 + 60);
+    const angulo = t * 0.45 + i * (Math.PI / 3);
+    ctx.beginPath();
+    ctx.arc(cx, cy, radio, angulo, angulo + Math.PI * 1.6);
+    ctx.stroke();
+  }
+
+  // Núcleo blanco brillante que late.
+  const brillo = Math.abs(Math.sin(t * 2.8)) * 0.6 + 0.4;
+  const brilloGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 40 + brillo * 30);
+  brilloGrad.addColorStop(0, `rgba(255, 255, 255, ${Math.min(1, brillo)})`);
+  brilloGrad.addColorStop(0.4, 'rgba(255, 43, 43, 0.6)');
+  brilloGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = brilloGrad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 40 + brillo * 25, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Rayos que atraviesan el portal.
+  ctx.strokeStyle = `rgba(255, 43, 43, ${0.25 + brillo * 0.35})`;
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < 12; i += 1) {
+    const angulo = (i / 12) * Math.PI * 2 + t * 0.15;
+    const largo = 400 + Math.sin(t + i) * 60;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(angulo) * 30, cy + Math.sin(angulo) * 30);
+    ctx.lineTo(cx + Math.cos(angulo) * largo, cy + Math.sin(angulo) * largo);
+    ctx.stroke();
+  }
+}
+
+function mostrarIntroMod() {
+  app.juego = null;
+  app.introT = 0;
+  app.introDuracion = 13000; // segundos 0 → 13, cuajado con la música
+  ponerOverlay(`<div class=\"panel intro\">\n    <canvas id=\"introCanvas\" class=\"intro-canvas\" aria-hidden=\"true\"></canvas>\n    <p class=\"intro-nota\">${t('introModNota')}</p>\n  </div>`);
+  pantalla('intro');
+  audio.musica('introMod', 0, 1);
+  const cv = document.getElementById('introCanvas');
+  if (cv) {
+    cv.width = window.innerWidth;
+    cv.height = window.innerHeight;
+    app.introCtx = cv.getContext('2d');
+  }
+  enfocarPrimero();
+}
+
+function finalizarIntro() {
+  if (app.introCtx) app.introCtx = null;
+  empezarPartida('modifiers');
 }
 
 function mostrarPerfil() {
@@ -4221,7 +4399,11 @@ function ejecutar(nombre) {
     case 'play': mostrarDificultades(); return;
     case 'campaign': mostrarCampaña(); return;
     case 'playModifiers': mostrarModificadores(); return;
-    case 'modifiersStart': empezarPartida('modifiers'); return;
+    case 'modifiersStart': {
+      if (guardado.modificadores.hard) mostrarIntroMod();
+      else empezarPartida('modifiers');
+      return;
+    }
     case 'lockedNode': audio.play('locked'); return;
     case 'mapDescend': {
       const i = app.mapaSel;
@@ -4579,6 +4761,33 @@ function bucle(t) {
     renderJuego();
     actualizarMarcador();
   }
+
+  // Intro del modo Modificadores (Hard): animación de portal 0 → 13 s.
+  if (app.pantalla === 'intro' && app.introCtx) {
+    const cv = document.getElementById('introCanvas');
+    if (cv) {
+      app.introT += dt;
+      dibujarPortal(app.introCtx, cv.width, cv.height, app.introT / 1000);
+      if (app.introT >= app.introDuracion) {
+        app.introCtx = null;
+        finalizarIntro();
+      }
+    }
+  }
+
+  // Fondo rojo reaccionando a la música en el modo Hard.
+  if (app.pantalla === 'playing' && app.modHard && el.fondoRojo) {
+    const fr = el.fondoRojo;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    fr.width = Math.round(window.innerWidth * dpr);
+    fr.height = Math.round(window.innerHeight * dpr);
+    fr.style.width = `${window.innerWidth}px`;
+    fr.style.height = `${window.innerHeight}px`;
+    const ctx = fr.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    audio.dibujarFondoRojo(ctx, window.innerWidth, window.innerHeight);
+  }
+
   if (app.pantalla === 'home') {
     const demo = app.demo;
     if (demo && document.getElementById('demo')) {
