@@ -43,7 +43,7 @@ function nuevoRegistro() {
     volumen: 100,
     custom: { filas: 9, columnas: 16, minas: 40 },
     campaign: { unlocked: 1, best: {} },
-    modificadores: { minasExtra: false, reloj: false, sinBandera: false, panico: false, hard: false, niebla: false, rush: false, screech: false, glitch: false, eyes: false },
+    modificadores: { minasExtra: false, reloj: false, sinBandera: false, panico: false, hard: false },
   };
 }
 
@@ -1506,12 +1506,6 @@ function eventosJuego(tipo, datos) {
         if (app.juego === j && j.estado === 'ganado') mostrarFinGanada();
       }, 850);
       break;
-    case 'screech':
-      audio.play('screech', { pan: panDe(j, j.cursor.x) });
-      break;
-    case 'eyes':
-      audio.play('eyes', { pan: panDe(j, j.cursor.x) });
-      break;
     default:
       break;
   }
@@ -1674,34 +1668,58 @@ function datoCifra(valor, etiqueta, cuenta, formato) {
   return `<div class="dato-cifra">${inner}<span>${etiqueta}</span></div>`;
 }
 
+function seleccionarMod(clave) {
+  for (const k of Object.keys(guardado.modificadores)) {
+    guardado.modificadores[k] = k === clave;
+  }
+  guardar();
+  audio.play('ui');
+  mostrarModificadores();
+}
+
 function mostrarModificadores() {
   app.juego = null;
   const mods = guardado.modificadores;
   const c = guardado.custom;
-  const activos = Object.keys(mods).filter((k) => mods[k]).length;
-  const filas = [
-    filaHTML({ accion: 'toggleMod:minasExtra', idx: 0, nombre: t('modMinesExtra'), detalle: t('modMinesExtraTag'), derecha: mods.minasExtra ? t('on') : t('off') }),
-    filaHTML({ accion: 'toggleMod:reloj', idx: 1, nombre: t('modReloj'), detalle: t('modRelojTag'), derecha: mods.reloj ? t('on') : t('off') }),
-    filaHTML({ accion: 'toggleMod:sinBandera', idx: 2, nombre: t('modSinBandera'), detalle: t('modSinBanderaTag'), derecha: mods.sinBandera ? t('on') : t('off') }),
-    filaHTML({ accion: 'toggleMod:panico', idx: 3, nombre: t('modPanico'), detalle: t('modPanicoTag'), derecha: mods.panico ? t('on') : t('off') }),
-    filaHTML({ accion: 'toggleMod:hard', idx: 4, nombre: t('modHard'), detalle: t('modHardTag'), derecha: mods.hard ? t('on') : t('off') }),
-    filaHTML({ accion: 'toggleMod:niebla', idx: 5, nombre: t('modNiebla'), detalle: t('modNieblaTag'), derecha: mods.niebla ? t('on') : t('off') }),
-    filaHTML({ accion: 'toggleMod:rush', idx: 6, nombre: t('modRush'), detalle: t('modRushTag'), derecha: mods.rush ? t('on') : t('off') }),
-    filaHTML({ accion: 'toggleMod:screech', idx: 7, nombre: t('modScreech'), detalle: t('modScreechTag'), derecha: mods.screech ? t('on') : t('off') }),
-    filaHTML({ accion: 'toggleMod:glitch', idx: 8, nombre: t('modGlitch'), detalle: t('modGlitchTag'), derecha: mods.glitch ? t('on') : t('off') }),
-    filaHTML({ accion: 'toggleMod:eyes', idx: 9, nombre: t('modEyes'), detalle: t('modEyesTag'), derecha: mods.eyes ? t('on') : t('off') }),
+  const activo = Object.keys(mods).find((k) => mods[k]);
+
+  const MODS = [
+    { clave: 'minasExtra', nombre: t('modMinesExtra'), tag: t('modMinesExtraTag') },
+    { clave: 'reloj', nombre: t('modReloj'), tag: t('modRelojTag') },
+    { clave: 'sinBandera', nombre: t('modSinBandera'), tag: t('modSinBanderaTag') },
+    { clave: 'panico', nombre: t('modPanico'), tag: t('modPanicoTag') },
+    { clave: 'hard', nombre: t('modHard'), tag: t('modHardTag') },
   ];
-  filas.push(filaHTML({
-    accion: 'modifiersStart',
-    idx: 10,
-    nombre: t('start'),
-    detalle: `${c.filas} × ${c.columnas} · ${c.minas} ${unitMinas(c.minas)}`,
-    derecha: activos > 0 ? `${activos} ${t(activos === 1 ? 'modActiva' : 'modActivas').replace('{n}', String(activos))} · ↵` : '↵',
-  }));
+
+  let filas = MODS.map((m, i) => {
+    const sel = m.clave === activo;
+    return `<button type="button" class="row mod-row ${sel ? 'sel' : ''}" data-accion="selectMod:${m.clave}">
+      <span class="row-idx">${dosDigitos(i + 1)}</span>
+      <span class="row-name">
+        ${m.nombre}<br>
+        <small>${m.tag}</small>
+      </span>
+      <span class="row-right">${sel ? '●' : '○'}</span>
+    </button>`;
+  }).join('');
+
+  filas += `<button type="button" class="row mod-start" data-accion="modifiersStart">
+    <span class="row-idx">06</span>
+    <span class="row-name">${t('start')}</span>
+    <span class="row-right">${activo ? '▶' : '◯'}</span>
+  </button>`;
+
   ponerOverlay(`<div class="panel">
     ${cabeceraPanel(t('modifiers'), botonVolver())}
     <p class="nota">${t('modTagline')}</p>
-    <nav class="filas" aria-label="${t('modifiers')}">${filas.join('')}</nav>
+    <nav class="filas mod-filas" aria-label="${t('modifiers')}">
+      ${filas}
+    </nav>
+    <p class="nota mod-detalle">
+      ${activo ? t('modActiva') : t('modNinguno')}
+      ${activo ? ` · ${t(activo)}` : ''}
+      · ${c.filas} × ${c.columnas} · ${c.minas} ${unitMinas(c.minas)}
+    </p>
   </div>`);
   pantalla('modifiers');
   hudMenu(t('modifiers'));
@@ -2032,6 +2050,11 @@ function ejecutar(nombre) {
       audio.play('ui');
       mostrarModificadores();
     }
+    return;
+  }
+  if (nombre.startsWith('selectMod:')) {
+    const clave = nombre.slice('selectMod:'.length);
+    seleccionarMod(clave);
     return;
   }
   if (nombre.startsWith('play:')) {
@@ -2421,12 +2444,12 @@ function bucle(t) {
     actualizarMarcador();
   }
 
-  // Intro del modo Modificadores (Hard): animación de portal 0 → 13 s.
+  // Intro del modo Modificadores: animación de puerta 0 → 13 s (pantalla completa).
   if (app.pantalla === 'intro' && app.introCtx) {
     const cv = document.getElementById('introCanvas');
     if (cv) {
       app.introT += dt;
-      dibujarPortal(app.introCtx, cv.width, cv.height, app.introT / 1000);
+      dibujarPuerta(app.introCtx, cv.width, cv.height, app.introT / 1000);
       if (app.introT >= app.introDuracion) {
         app.introCtx = null;
         finalizarIntro();

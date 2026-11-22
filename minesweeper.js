@@ -642,41 +642,6 @@ const SONIDOS = {
   locked() {
     tono(120, 0.075, { tipo: 'triangle', vol: 0.12, fin: 95, pan: 0 });
   },
-  screech({ pan = 0 } = {}) {
-    const c = ctx;
-    if (!c) return;
-    const t0 = c.currentTime;
-    const gan = c.createGain();
-    gan.gain.setValueAtTime(0.0001, t0);
-    gan.gain.exponentialRampToValueAtTime(0.18, t0 + 0.05);
-    gan.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.35);
-    const filt = c.createBiquadFilter();
-    filt.type = 'highpass';
-    filt.frequency.value = 3000;
-    const osc = c.createOscillator();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(2200, t0);
-    osc.frequency.exponentialRampToValueAtTime(700, t0 + 0.35);
-    osc.connect(filt).connect(gan).connect(pan);
-    osc.start(t0);
-    osc.stop(t0 + 0.4);
-  },
-  eyes({ pan = 0 } = {}) {
-    const c = ctx;
-    if (!c) return;
-    const t0 = c.currentTime;
-    const gan = c.createGain();
-    gan.gain.setValueAtTime(0.0001, t0);
-    gan.gain.linearRampToValueAtTime(0.22, t0 + 0.15);
-    gan.gain.linearRampToValueAtTime(0.0001, t0 + 1.2);
-    const osc = c.createOscillator();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(110, t0);
-    osc.frequency.linearRampToValueAtTime(145, t0 + 1.2);
-    osc.connect(gan).connect(pan);
-    osc.start(t0);
-    osc.stop(t0 + 1.3);
-  },
 };
 
 const audio = {
@@ -1055,17 +1020,12 @@ class Game {
     this.cursorVisible = false;
     this.casillaArmada = null;
     this.hover = null;
-    this.quietoDesde = 0;
 
     this.flashes = [];
     this.shake = 0;
     this.explosionT = -1;
     this.winT = -1;
 
-    this.screechT = 0;
-    this.eyesT = 0;
-    this.glitchT = 0;
-    this.rushT = 0;
   }
 
   emit(type, data) {
@@ -1184,36 +1144,6 @@ class Game {
       } else {
         this.tiempoMs += paso;
       }
-    }
-
-    if (this.mods && this.mods.rush) {
-      this.rushT += paso;
-      this.shake = Math.max(this.shake, 4 + Math.sin(this.reloj * 0.02) * 3);
-    }
-
-    if (this.mods && this.mods.screech) {
-      this.screechT += paso;
-      if (this.screechT > 3000 + Math.random() * 4000) {
-        this.screechT = 0;
-        this.emit('screech');
-      }
-    }
-
-    if (this.mods && this.mods.eyes) {
-      this.eyesT += paso;
-      if (this.hover && this.hover.x === this.cursor.x && this.hover.y === this.cursor.y) {
-        this.quietoDesde += paso;
-      } else {
-        this.quietoDesde = 0;
-      }
-      if (this.quietoDesde > 3000) {
-        this.eyesT = 0;
-        this.emit('eyes');
-      }
-    }
-
-    if (this.mods && this.mods.glitch) {
-      this.glitchT += paso;
     }
 
     this.shake = Math.max(0, this.shake - paso * 0.05);
@@ -1347,54 +1277,6 @@ class Game {
     }
     if (this.cursorVisible && !this.terminada) {
       this._marcas(ctx, px(this.cursor.x), py(this.cursor.y), cell, '#fff');
-    }
-
-    // --- Niebla (The Minefields): solo se ve alrededor del cursor ---
-    if (this.mods && this.mods.niebla && !this.terminada) {
-      const cx = (this.hover || this.cursor).x;
-      const cy = (this.hover || this.cursor).y;
-      const radio = Math.min(columnas, filas) * cell * 0.55;
-      const gradiente = ctx.createRadialGradient(
-        px(cx), py(cy), 0,
-        px(cx), py(cy), radio
-      );
-      gradiente.addColorStop(0, 'rgba(0,0,0,0)');
-      gradiente.addColorStop(0.35, 'rgba(0,0,0,0.35)');
-      gradiente.addColorStop(1, 'rgba(0,0,0,0.92)');
-      ctx.fillStyle = gradiente;
-      ctx.fillRect(0, 0, width, height);
-    }
-
-    // --- Eyes (DOORS): brillo púrpura si el cursor se queda quieto ---
-    if (this.mods && this.mods.eyes && this.quietoDesde > 1500 && !this.terminada) {
-      const progreso = Math.min(1, (this.quietoDesde - 1500) / 1500);
-      const brillo = Math.abs(Math.sin(this.reloj * 0.03)) * 0.5 + 0.5;
-      ctx.fillStyle = `rgba(138, 43, 226, ${0.25 + progreso * 0.35 + brillo * 0.15})`;
-      ctx.fillRect(0, 0, width, height);
-      ctx.strokeStyle = `rgba(138, 43, 226, ${0.4 + progreso * 0.4})`;
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(px(this.cursor.x), py(this.cursor.y), cell * 1.8, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-
-    // --- Glitch (DOORS): distorsión de bandas horizontales ---
-    if (this.mods && this.mods.glitch && !this.terminada && this.glitchT > 0) {
-      const ciclo = (this.glitchT % 2200) / 2200;
-      if (ciclo > 0.85) {
-        const intensidad = Math.sin(this.reloj * 0.05) * 8;
-        for (let b = 0; b < height; b += Math.max(4, Math.round(cell * 0.6))) {
-          if (Math.random() < 0.35) {
-            const dx = (Math.random() - 0.5) * intensidad * 4;
-            ctx.save();
-            ctx.beginPath();
-            ctx.rect(0, b, width, Math.max(2, Math.round(cell * 0.4)));
-            ctx.clip();
-            ctx.drawImage(ctx.canvas, dx, 0);
-            ctx.restore();
-          }
-        }
-      }
     }
 
     ctx.restore();
@@ -1712,20 +1594,11 @@ const STRINGS = {
     modSinBanderaTag: 'no se pueden marcar minas',
     modPanico: 'pánico',
     modPanicoTag: 'el tablero tiembla al destapar',
-    modNiebla: 'niebla',
-    modNieblaTag: 'solo ves alrededor del cursor',
-    modRush: 'rush',
-    modRushTag: 'el tablero tiembla constantemente',
-    modScreech: 'screech',
-    modScreechTag: 'alertas de sonido aleatorias',
-    modGlitch: 'glitch',
-    modGlitchTag: 'la pantalla se distorsiona',
-    modEyes: 'ojos',
-    modEyesTag: 'no dejes quieto el cursor',
     modHard: 'modo difícil',
     modHardTag: 'música Hard y fondo rojo reaccionando',
     modActiva: '1 activa',
     modActivas: '{n} activas',
+    modNinguno: 'ninguno',
     hintModifiers: 'pulsa una fila para alternar · Enter juega',
     introMod: 'introducción',
     introModNota: 'El portal se abre… aguanta la señal.',
@@ -1897,20 +1770,11 @@ const STRINGS = {
     modSinBanderaTag: 'mines cannot be marked',
     modPanico: 'panic',
     modPanicoTag: 'the board shakes on reveal',
-    modNiebla: 'fog',
-    modNieblaTag: 'you only see around the cursor',
-    modRush: 'rush',
-    modRushTag: 'the board shakes constantly',
-    modScreech: 'screech',
-    modScreechTag: 'random sound alerts',
-    modGlitch: 'glitch',
-    modGlitchTag: 'the screen distorts',
-    modEyes: 'eyes',
-    modEyesTag: "don't keep the cursor still",
     modHard: 'hard mode',
     modHardTag: 'Hard music and music-reactive red background',
     modActiva: '1 active',
     modActivas: '{n} active',
+    modNinguno: 'none',
     hintModifiers: 'tap a row to toggle · Enter plays',
     introMod: 'intro',
     introModNota: 'The portal opens… hold the signal.',
@@ -2623,7 +2487,7 @@ function nuevoRegistro() {
     volumen: 100,
     custom: { filas: 9, columnas: 16, minas: 40 },
     campaign: { unlocked: 1, best: {} },
-    modificadores: { minasExtra: false, reloj: false, sinBandera: false, panico: false, hard: false, niebla: false, rush: false, screech: false, glitch: false, eyes: false },
+    modificadores: { minasExtra: false, reloj: false, sinBandera: false, panico: false, hard: false },
   };
 }
 
@@ -4086,12 +3950,6 @@ function eventosJuego(tipo, datos) {
         if (app.juego === j && j.estado === 'ganado') mostrarFinGanada();
       }, 850);
       break;
-    case 'screech':
-      audio.play('screech', { pan: panDe(j, j.cursor.x) });
-      break;
-    case 'eyes':
-      audio.play('eyes', { pan: panDe(j, j.cursor.x) });
-      break;
     default:
       break;
   }
@@ -4254,34 +4112,58 @@ function datoCifra(valor, etiqueta, cuenta, formato) {
   return `<div class="dato-cifra">${inner}<span>${etiqueta}</span></div>`;
 }
 
+function seleccionarMod(clave) {
+  for (const k of Object.keys(guardado.modificadores)) {
+    guardado.modificadores[k] = k === clave;
+  }
+  guardar();
+  audio.play('ui');
+  mostrarModificadores();
+}
+
 function mostrarModificadores() {
   app.juego = null;
   const mods = guardado.modificadores;
   const c = guardado.custom;
-  const activos = Object.keys(mods).filter((k) => mods[k]).length;
-  const filas = [
-    filaHTML({ accion: 'toggleMod:minasExtra', idx: 0, nombre: t('modMinesExtra'), detalle: t('modMinesExtraTag'), derecha: mods.minasExtra ? t('on') : t('off') }),
-    filaHTML({ accion: 'toggleMod:reloj', idx: 1, nombre: t('modReloj'), detalle: t('modRelojTag'), derecha: mods.reloj ? t('on') : t('off') }),
-    filaHTML({ accion: 'toggleMod:sinBandera', idx: 2, nombre: t('modSinBandera'), detalle: t('modSinBanderaTag'), derecha: mods.sinBandera ? t('on') : t('off') }),
-    filaHTML({ accion: 'toggleMod:panico', idx: 3, nombre: t('modPanico'), detalle: t('modPanicoTag'), derecha: mods.panico ? t('on') : t('off') }),
-    filaHTML({ accion: 'toggleMod:hard', idx: 4, nombre: t('modHard'), detalle: t('modHardTag'), derecha: mods.hard ? t('on') : t('off') }),
-    filaHTML({ accion: 'toggleMod:niebla', idx: 5, nombre: t('modNiebla'), detalle: t('modNieblaTag'), derecha: mods.niebla ? t('on') : t('off') }),
-    filaHTML({ accion: 'toggleMod:rush', idx: 6, nombre: t('modRush'), detalle: t('modRushTag'), derecha: mods.rush ? t('on') : t('off') }),
-    filaHTML({ accion: 'toggleMod:screech', idx: 7, nombre: t('modScreech'), detalle: t('modScreechTag'), derecha: mods.screech ? t('on') : t('off') }),
-    filaHTML({ accion: 'toggleMod:glitch', idx: 8, nombre: t('modGlitch'), detalle: t('modGlitchTag'), derecha: mods.glitch ? t('on') : t('off') }),
-    filaHTML({ accion: 'toggleMod:eyes', idx: 9, nombre: t('modEyes'), detalle: t('modEyesTag'), derecha: mods.eyes ? t('on') : t('off') }),
+  const activo = Object.keys(mods).find((k) => mods[k]);
+
+  const MODS = [
+    { clave: 'minasExtra', nombre: t('modMinesExtra'), tag: t('modMinesExtraTag') },
+    { clave: 'reloj', nombre: t('modReloj'), tag: t('modRelojTag') },
+    { clave: 'sinBandera', nombre: t('modSinBandera'), tag: t('modSinBanderaTag') },
+    { clave: 'panico', nombre: t('modPanico'), tag: t('modPanicoTag') },
+    { clave: 'hard', nombre: t('modHard'), tag: t('modHardTag') },
   ];
-  filas.push(filaHTML({
-    accion: 'modifiersStart',
-    idx: 10,
-    nombre: t('start'),
-    detalle: `${c.filas} × ${c.columnas} · ${c.minas} ${unitMinas(c.minas)}`,
-    derecha: activos > 0 ? `${activos} ${t(activos === 1 ? 'modActiva' : 'modActivas').replace('{n}', String(activos))} · ↵` : '↵',
-  }));
+
+  let filas = MODS.map((m, i) => {
+    const sel = m.clave === activo;
+    return `<button type="button" class="row mod-row ${sel ? 'sel' : ''}" data-accion="selectMod:${m.clave}">
+      <span class="row-idx">${dosDigitos(i + 1)}</span>
+      <span class="row-name">
+        ${m.nombre}<br>
+        <small>${m.tag}</small>
+      </span>
+      <span class="row-right">${sel ? '●' : '○'}</span>
+    </button>`;
+  }).join('');
+
+  filas += `<button type="button" class="row mod-start" data-accion="modifiersStart">
+    <span class="row-idx">06</span>
+    <span class="row-name">${t('start')}</span>
+    <span class="row-right">${activo ? '▶' : '◯'}</span>
+  </button>`;
+
   ponerOverlay(`<div class="panel">
     ${cabeceraPanel(t('modifiers'), botonVolver())}
     <p class="nota">${t('modTagline')}</p>
-    <nav class="filas" aria-label="${t('modifiers')}">${filas.join('')}</nav>
+    <nav class="filas mod-filas" aria-label="${t('modifiers')}">
+      ${filas}
+    </nav>
+    <p class="nota mod-detalle">
+      ${activo ? t('modActiva') : t('modNinguno')}
+      ${activo ? ` · ${t(activo)}` : ''}
+      · ${c.filas} × ${c.columnas} · ${c.minas} ${unitMinas(c.minas)}
+    </p>
   </div>`);
   pantalla('modifiers');
   hudMenu(t('modifiers'));
@@ -4612,6 +4494,11 @@ function ejecutar(nombre) {
       audio.play('ui');
       mostrarModificadores();
     }
+    return;
+  }
+  if (nombre.startsWith('selectMod:')) {
+    const clave = nombre.slice('selectMod:'.length);
+    seleccionarMod(clave);
     return;
   }
   if (nombre.startsWith('play:')) {
@@ -5001,12 +4888,12 @@ function bucle(t) {
     actualizarMarcador();
   }
 
-  // Intro del modo Modificadores (Hard): animación de portal 0 → 13 s.
+  // Intro del modo Modificadores: animación de puerta 0 → 13 s (pantalla completa).
   if (app.pantalla === 'intro' && app.introCtx) {
     const cv = document.getElementById('introCanvas');
     if (cv) {
       app.introT += dt;
-      dibujarPortal(app.introCtx, cv.width, cv.height, app.introT / 1000);
+      dibujarPuerta(app.introCtx, cv.width, cv.height, app.introT / 1000);
       if (app.introT >= app.introDuracion) {
         app.introCtx = null;
         finalizarIntro();

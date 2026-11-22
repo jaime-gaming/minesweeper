@@ -333,41 +333,6 @@ const SONIDOS = {
   locked() {
     tono(120, 0.075, { tipo: 'triangle', vol: 0.12, fin: 95, pan: 0 });
   },
-  screech({ pan = 0 } = {}) {
-    const c = ctx;
-    if (!c) return;
-    const t0 = c.currentTime;
-    const gan = c.createGain();
-    gan.gain.setValueAtTime(0.0001, t0);
-    gan.gain.exponentialRampToValueAtTime(0.18, t0 + 0.05);
-    gan.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.35);
-    const filt = c.createBiquadFilter();
-    filt.type = 'highpass';
-    filt.frequency.value = 3000;
-    const osc = c.createOscillator();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(2200, t0);
-    osc.frequency.exponentialRampToValueAtTime(700, t0 + 0.35);
-    osc.connect(filt).connect(gan).connect(pan);
-    osc.start(t0);
-    osc.stop(t0 + 0.4);
-  },
-  eyes({ pan = 0 } = {}) {
-    const c = ctx;
-    if (!c) return;
-    const t0 = c.currentTime;
-    const gan = c.createGain();
-    gan.gain.setValueAtTime(0.0001, t0);
-    gan.gain.linearRampToValueAtTime(0.22, t0 + 0.15);
-    gan.gain.linearRampToValueAtTime(0.0001, t0 + 1.2);
-    const osc = c.createOscillator();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(110, t0);
-    osc.frequency.linearRampToValueAtTime(145, t0 + 1.2);
-    osc.connect(gan).connect(pan);
-    osc.start(t0);
-    osc.stop(t0 + 1.3);
-  },
 };
 
 export const audio = {
