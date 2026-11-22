@@ -27,11 +27,17 @@ export class Game {
     this.cursorVisible = false;
     this.casillaArmada = null;
     this.hover = null;
+    this.quietoDesde = 0;
 
     this.flashes = [];
     this.shake = 0;
     this.explosionT = -1;
     this.winT = -1;
+
+    this.screechT = 0;
+    this.eyesT = 0;
+    this.glitchT = 0;
+    this.rushT = 0;
   }
 
   emit(type, data) {
@@ -151,6 +157,37 @@ export class Game {
         this.tiempoMs += paso;
       }
     }
+
+    if (this.mods && this.mods.rush) {
+      this.rushT += paso;
+      this.shake = Math.max(this.shake, 4 + Math.sin(this.reloj * 0.02) * 3);
+    }
+
+    if (this.mods && this.mods.screech) {
+      this.screechT += paso;
+      if (this.screechT > 3000 + Math.random() * 4000) {
+        this.screechT = 0;
+        this.emit('screech');
+      }
+    }
+
+    if (this.mods && this.mods.eyes) {
+      this.eyesT += paso;
+      if (this.hover && this.hover.x === this.cursor.x && this.hover.y === this.cursor.y) {
+        this.quietoDesde += paso;
+      } else {
+        this.quietoDesde = 0;
+      }
+      if (this.quietoDesde > 3000) {
+        this.eyesT = 0;
+        this.emit('eyes');
+      }
+    }
+
+    if (this.mods && this.mods.glitch) {
+      this.glitchT += paso;
+    }
+
     this.shake = Math.max(0, this.shake - paso * 0.05);
     if (this.flashes.length) {
       const limite = this.reloj - 450;
@@ -282,6 +319,54 @@ export class Game {
     }
     if (this.cursorVisible && !this.terminada) {
       this._marcas(ctx, px(this.cursor.x), py(this.cursor.y), cell, '#fff');
+    }
+
+    // --- Niebla (The Minefields): solo se ve alrededor del cursor ---
+    if (this.mods && this.mods.niebla && !this.terminada) {
+      const cx = (this.hover || this.cursor).x;
+      const cy = (this.hover || this.cursor).y;
+      const radio = Math.min(columnas, filas) * cell * 0.55;
+      const gradiente = ctx.createRadialGradient(
+        px(cx), py(cy), 0,
+        px(cx), py(cy), radio
+      );
+      gradiente.addColorStop(0, 'rgba(0,0,0,0)');
+      gradiente.addColorStop(0.35, 'rgba(0,0,0,0.35)');
+      gradiente.addColorStop(1, 'rgba(0,0,0,0.92)');
+      ctx.fillStyle = gradiente;
+      ctx.fillRect(0, 0, width, height);
+    }
+
+    // --- Eyes (DOORS): brillo púrpura si el cursor se queda quieto ---
+    if (this.mods && this.mods.eyes && this.quietoDesde > 1500 && !this.terminada) {
+      const progreso = Math.min(1, (this.quietoDesde - 1500) / 1500);
+      const brillo = Math.abs(Math.sin(this.reloj * 0.03)) * 0.5 + 0.5;
+      ctx.fillStyle = `rgba(138, 43, 226, ${0.25 + progreso * 0.35 + brillo * 0.15})`;
+      ctx.fillRect(0, 0, width, height);
+      ctx.strokeStyle = `rgba(138, 43, 226, ${0.4 + progreso * 0.4})`;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(px(this.cursor.x), py(this.cursor.y), cell * 1.8, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // --- Glitch (DOORS): distorsión de bandas horizontales ---
+    if (this.mods && this.mods.glitch && !this.terminada && this.glitchT > 0) {
+      const ciclo = (this.glitchT % 2200) / 2200;
+      if (ciclo > 0.85) {
+        const intensidad = Math.sin(this.reloj * 0.05) * 8;
+        for (let b = 0; b < height; b += Math.max(4, Math.round(cell * 0.6))) {
+          if (Math.random() < 0.35) {
+            const dx = (Math.random() - 0.5) * intensidad * 4;
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(0, b, width, Math.max(2, Math.round(cell * 0.4)));
+            ctx.clip();
+            ctx.drawImage(ctx.canvas, dx, 0);
+            ctx.restore();
+          }
+        }
+      }
     }
 
     ctx.restore();

@@ -43,7 +43,7 @@ function nuevoRegistro() {
     volumen: 100,
     custom: { filas: 9, columnas: 16, minas: 40 },
     campaign: { unlocked: 1, best: {} },
-    modificadores: { minasExtra: false, reloj: false, sinBandera: false, panico: false, hard: false },
+    modificadores: { minasExtra: false, reloj: false, sinBandera: false, panico: false, hard: false, niebla: false, rush: false, screech: false, glitch: false, eyes: false },
   };
 }
 
@@ -1344,7 +1344,7 @@ function pintarLienzoVacio() {
   ctx.fillRect(0, 0, vista.width, vista.height);
 }
 
-function empezarPartida(modo, nivel = null) {
+function empezarPartida(modo, nivel = null, datos = {}) {
   app.demo = null;
   app.modo = modo;
   app.nivel = modo === 'campaign' ? nivel : null;
@@ -1364,12 +1364,27 @@ function empezarPartida(modo, nivel = null) {
   }
   app.juego = new Game(cfg, eventosJuego);
   app.modHard = modo === 'modifiers' && guardado.modificadores.hard;
-  if (app.modHard) {
-    audio.musica('hardMod', 0, 1);
-    prepararFondoRojo();
+  app.modsActivos = Object.keys(guardado.modificadores).some((k) => guardado.modificadores[k]);
+  if (!datos || !datos.saltarIntro) {
+    if (app.modsActivos) {
+      mostrarIntroMod();
+      return;
+    }
+    if (app.modHard) {
+      audio.musica('hardMod', 0, 1);
+      prepararFondoRojo();
+    } else {
+      app.modHard = false;
+      limpiarFondoRojo();
+    }
   } else {
-    app.modHard = false;
-    limpiarFondoRojo();
+    if (app.modHard) {
+      audio.musica('hardMod', 0, 1);
+      prepararFondoRojo();
+    } else {
+      app.modHard = false;
+      limpiarFondoRojo();
+    }
   }
   casillaArmada = null;
   app.record = false;
@@ -1490,6 +1505,12 @@ function eventosJuego(tipo, datos) {
       setTimeout(() => {
         if (app.juego === j && j.estado === 'ganado') mostrarFinGanada();
       }, 850);
+      break;
+    case 'screech':
+      audio.play('screech', { pan: panDe(j, j.cursor.x) });
+      break;
+    case 'eyes':
+      audio.play('eyes', { pan: panDe(j, j.cursor.x) });
       break;
     default:
       break;
@@ -1664,10 +1685,15 @@ function mostrarModificadores() {
     filaHTML({ accion: 'toggleMod:sinBandera', idx: 2, nombre: t('modSinBandera'), detalle: t('modSinBanderaTag'), derecha: mods.sinBandera ? t('on') : t('off') }),
     filaHTML({ accion: 'toggleMod:panico', idx: 3, nombre: t('modPanico'), detalle: t('modPanicoTag'), derecha: mods.panico ? t('on') : t('off') }),
     filaHTML({ accion: 'toggleMod:hard', idx: 4, nombre: t('modHard'), detalle: t('modHardTag'), derecha: mods.hard ? t('on') : t('off') }),
+    filaHTML({ accion: 'toggleMod:niebla', idx: 5, nombre: t('modNiebla'), detalle: t('modNieblaTag'), derecha: mods.niebla ? t('on') : t('off') }),
+    filaHTML({ accion: 'toggleMod:rush', idx: 6, nombre: t('modRush'), detalle: t('modRushTag'), derecha: mods.rush ? t('on') : t('off') }),
+    filaHTML({ accion: 'toggleMod:screech', idx: 7, nombre: t('modScreech'), detalle: t('modScreechTag'), derecha: mods.screech ? t('on') : t('off') }),
+    filaHTML({ accion: 'toggleMod:glitch', idx: 8, nombre: t('modGlitch'), detalle: t('modGlitchTag'), derecha: mods.glitch ? t('on') : t('off') }),
+    filaHTML({ accion: 'toggleMod:eyes', idx: 9, nombre: t('modEyes'), detalle: t('modEyesTag'), derecha: mods.eyes ? t('on') : t('off') }),
   ];
   filas.push(filaHTML({
     accion: 'modifiersStart',
-    idx: 5,
+    idx: 10,
     nombre: t('start'),
     detalle: `${c.filas} × ${c.columnas} · ${c.minas} ${unitMinas(c.minas)}`,
     derecha: activos > 0 ? `${activos} ${t(activos === 1 ? 'modActiva' : 'modActivas').replace('{n}', String(activos))} · ↵` : '↵',
@@ -1713,7 +1739,7 @@ function ajustarFondoRojo() {
   fr.style.height = `${window.innerHeight}px`;
 }
 
-function dibujarPortal(ctx, w, h, segundos) {
+function dibujarPuerta(ctx, w, h, segundos) {
   const t = segundos;
   const progreso = (t % 13) / 13;
   const cx = w / 2;
@@ -1722,38 +1748,98 @@ function dibujarPortal(ctx, w, h, segundos) {
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, w, h);
 
-  // Anillos del portal que giran y se expanden hacia el centro.
-  ctx.strokeStyle = '#ff2b2b';
-  ctx.lineWidth = 2.5;
-  for (let i = 0; i < 7; i += 1) {
-    const radio = Math.max(10, Math.sin(progreso * Math.PI + i * 0.9) * 220 + 60);
-    const angulo = t * 0.45 + i * (Math.PI / 3);
+  let escala = 1;
+  let balanceo = 0;
+  let brillo = 0;
+  let glitch = 0;
+
+  if (progreso < 0.30) {
+    escala = 0.55 + progreso * 0.5;
+    balanceo = Math.sin(t * 2.2) * 0.06;
+    brillo = 0.25 + progreso * 0.35;
+  } else if (progreso < 0.69) {
+    escala = 2.0 + (progreso - 0.30) * 1.8;
+    balanceo = Math.sin(t * 3.5) * 0.12;
+    brillo = 0.6 + (progreso - 0.30) * 0.4;
+  } else if (progreso < 0.92) {
+    escala = 8.5 + (progreso - 0.69) * 3.5;
+    balanceo = Math.sin(t * 8) * 0.35;
+    brillo = 1.0;
+  } else {
+    escala = 13.5 + (progreso - 0.92) * 2;
+    balanceo = Math.sin(t * 14) * 0.6;
+    brillo = 1.0;
+    glitch = (progreso - 0.92) * 6;
+  }
+
+  const brilloGrad = ctx.createRadialGradient(
+    cx, cy - h * 0.35 + brillo * 120, 0,
+    cx, cy - h * 0.35 + brillo * 120, w * (0.6 + brillo * 0.9)
+  );
+  brilloGrad.addColorStop(0, `rgba(255, 255, 255, ${Math.min(1, brillo * 0.55)})`);
+  brilloGrad.addColorStop(0.45, `rgba(255, 43, 43, ${brillo * 0.25})`);
+  brilloGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = brilloGrad;
+  ctx.fillRect(0, 0, w, h);
+
+  const puertaAn = w * 0.28 * escala;
+  const puertaAl = h * 0.72 * escala;
+  const puertaX = cx - puertaAn / 2 + Math.sin(balanceo) * w * 0.12;
+  const puertaY = cy - puertaAl / 2;
+
+  ctx.save();
+  ctx.translate(puertaX + puertaAn / 2, puertaY + puertaAl / 2);
+  ctx.rotate(balanceo);
+  ctx.translate(-puertaAn / 2, -puertaAl / 2);
+
+  ctx.fillStyle = '#1a1a1a';
+  ctx.fillRect(0, 0, puertaAn, puertaAl);
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = Math.max(2, Math.round(puertaAn * 0.03));
+  ctx.strokeRect(0, 0, puertaAn, puertaAl);
+
+  ctx.fillStyle = '#222';
+  ctx.fillRect(puertaAn * 0.08, puertaAl * 0.12, puertaAn * 0.42, puertaAl * 0.34);
+  ctx.fillRect(puertaAn * 0.50, puertaAl * 0.12, puertaAn * 0.42, puertaAl * 0.34);
+  ctx.fillRect(puertaAn * 0.08, puertaAl * 0.54, puertaAn * 0.42, puertaAl * 0.34);
+  ctx.fillRect(puertaAn * 0.50, puertaAl * 0.54, puertaAn * 0.42, puertaAl * 0.34);
+
+  ctx.fillStyle = '#8a2be2';
+  ctx.beginPath();
+  ctx.arc(puertaAn * 0.82, puertaAl * 0.5, puertaAn * 0.035, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#5b21b6';
+  ctx.beginPath();
+  ctx.arc(puertaAn * 0.82, puertaAl * 0.5, puertaAn * 0.018, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+
+  ctx.strokeStyle = `rgba(255, 255, 255, ${0.15 + brillo * 0.25})`;
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < 6; i += 1) {
+    const angulo = (i / 6) * Math.PI * 2 + t * 0.1;
+    const largo = 500 + Math.sin(t + i) * 80;
     ctx.beginPath();
-    ctx.arc(cx, cy, radio, angulo, angulo + Math.PI * 1.6);
+    ctx.moveTo(cx + Math.cos(angulo) * 40, cy + Math.sin(angulo) * 40);
+    ctx.lineTo(cx + Math.cos(angulo) * largo, cy + Math.sin(angulo) * largo);
     ctx.stroke();
   }
 
-  // Núcleo blanco brillante que late.
-  const brillo = Math.abs(Math.sin(t * 2.8)) * 0.6 + 0.4;
-  const brilloGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 40 + brillo * 30);
-  brilloGrad.addColorStop(0, `rgba(255, 255, 255, ${Math.min(1, brillo)})`);
-  brilloGrad.addColorStop(0.4, 'rgba(255, 43, 43, 0.6)');
-  brilloGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-  ctx.fillStyle = brilloGrad;
-  ctx.beginPath();
-  ctx.arc(cx, cy, 40 + brillo * 25, 0, Math.PI * 2);
-  ctx.fill();
+  if (glitch > 0.05) {
+    const intensidad = Math.min(1, glitch);
+    ctx.save();
+    ctx.globalAlpha = 0.35 * intensidad;
+    for (let i = 0; i < 12; i += 1) {
+      const y = Math.random() * h;
+      const dh = Math.random() * h * 0.12 + 4;
+      const dx = (Math.random() - 0.5) * w * 0.15 * intensidad;
+      ctx.drawImage(ctx.canvas, dx, y, w, dh, dx, y, w, dh);
+    }
+    ctx.restore();
 
-  // Rayos que atraviesan el portal.
-  ctx.strokeStyle = `rgba(255, 43, 43, ${0.25 + brillo * 0.35})`;
-  ctx.lineWidth = 1.5;
-  for (let i = 0; i < 12; i += 1) {
-    const angulo = (i / 12) * Math.PI * 2 + t * 0.15;
-    const largo = 400 + Math.sin(t + i) * 60;
-    ctx.beginPath();
-    ctx.moveTo(cx + Math.cos(angulo) * 30, cy + Math.sin(angulo) * 30);
-    ctx.lineTo(cx + Math.cos(angulo) * largo, cy + Math.sin(angulo) * largo);
-    ctx.stroke();
+    ctx.fillStyle = `rgba(120, 0, 0, ${0.35 * intensidad})`;
+    ctx.fillRect(0, 0, w, h);
   }
 }
 
@@ -1761,8 +1847,11 @@ function mostrarIntroMod() {
   audio.unlock();
   app.juego = null;
   app.introT = 0;
-  app.introDuracion = 13000; // segundos 0 → 13, cuajado con la música
-  ponerOverlay(`<div class=\"panel intro\">\n    <canvas id=\"introCanvas\" class=\"intro-canvas\" aria-hidden=\"true\"></canvas>\n    <p class=\"intro-nota\">${t('introModNota')}</p>\n  </div>`);
+  app.introDuracion = 13000; // 0 → 13 s, cuajado con IntroMod.ogg
+  const html = '<div class="panel intro">' +
+    '<canvas id="introCanvas" class="intro-canvas" aria-hidden="true"></canvas>' +
+    '</div>';
+  ponerOverlay(html);
   pantalla('intro');
   audio.musica('introMod', 0, 1);
   const cv = document.getElementById('introCanvas');
@@ -1776,8 +1865,9 @@ function mostrarIntroMod() {
 
 function finalizarIntro() {
   if (app.introCtx) app.introCtx = null;
-  empezarPartida('modifiers');
+  empezarPartida('modifiers', null, { saltarIntro: true });
 }
+
 
 function mostrarPerfil() {
   app.juego = null;

@@ -563,13 +563,30 @@ try {
   frames(2);
   const saveMod = JSON.parse(localStorageStub.getItem('minesweeper.v1'));
   if (!saveMod.modificadores || !saveMod.modificadores.minasExtra) throw new Error('toggle de modificador no persistió');
+
+  // Sin mods activos → ir directo a la partida
+  api.ejecutar('toggleMod:minasExtra');
+  frames(2);
   api.ejecutar('modifiersStart');
   frames(3);
+  if (api.app.pantalla !== 'playing') throw new Error('sin mods debería ir directo a la partida');
   const jm = api.app.juego;
-  if (!jm || !jm.mods || !jm.mods.minasExtra) throw new Error('mods no llegaron al motor de la partida');
+  if (!jm || !jm.mods || jm.mods.minasExtra) throw new Error('mods no llegaron correctamente al motor');
   api.accion('confirm', false, { x: 0, y: 0, puntero: true });
   frames(5);
   if (jm.estado !== 'jugando' && jm.estado !== 'ganado') throw new Error('la partida de modificadores no avanzó');
+
+  // Con un mod activo → abrir la intro
+  api.ejecutar('toMenu');
+  frames(3);
+  api.ejecutar('playModifiers');
+  frames(3);
+  api.ejecutar('toggleMod:minasExtra');
+  frames(2);
+  api.ejecutar('modifiersStart');
+  frames(3);
+  if (api.app.pantalla !== 'intro') throw new Error('con mods activos debería abrir la intro');
+  if (!api.app.introCtx) throw new Error('la intro no inicializó el canvas');
   console.log('v2: historia por diálogos y modo modificadores ok');
 
   console.log('ops de lienzo validadas:', opsCanvas);
