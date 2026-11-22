@@ -2556,6 +2556,7 @@ const app = {
   demo: null,
   demoAcum: 0,
   mapaSel: null,
+  modHard: false,
   resetDesde: 'profile',
   hud: { meta: '', score: '', timer: '', best: '' },
 };
@@ -3020,8 +3021,13 @@ function actualizarPista() {
 function gestionarMusicaPantalla(nombre) {
   if (nombre === 'playing' || nombre === 'paused') {
     if (app.juego && !app.juego.terminada) {
-      if (app.modo === 'modifiers') audio.musicaProc('modifiers');
-      else audio.musica('ambience', 200, 1.4);
+      if (app.modo === 'modifiers' && app.modHard) {
+        audio.musica('hardMod', 0, 1);
+      } else if (app.modo === 'modifiers') {
+        audio.musicaProc('modifiers');
+      } else {
+        audio.musica('ambience', 200, 1.4);
+      }
     }
     return;
   }
@@ -3670,8 +3676,9 @@ function pasarLineaHistoria() {
   const nivel = nivelCampana(indice);
   if (!nivel) return;
   const total = (nivel.dialogo || []).length;
-  if ((app.historiaLinea || 0) + 1 >= total) return;
+  if ((app.historiaLinea || 0) >= total) return;
   app.historiaLinea += 1;
+  audio.unlock();
   audio.play('ui');
   renderHistoria();
 }
@@ -4090,19 +4097,20 @@ function mostrarModificadores() {
   app.juego = null;
   const mods = guardado.modificadores;
   const c = guardado.custom;
+  const activos = Object.keys(mods).filter((k) => mods[k]).length;
   const filas = [
-    filaHTML({ accion: 'toggleMod:minasExtra', idx: 0, nombre: t('modMinesExtra'), detalle: t('modMinesExtraTag'), derecha: mods.minasExtra ? '●' : '○' }),
-    filaHTML({ accion: 'toggleMod:reloj', idx: 1, nombre: t('modReloj'), detalle: t('modRelojTag'), derecha: mods.reloj ? '●' : '○' }),
-    filaHTML({ accion: 'toggleMod:sinBandera', idx: 2, nombre: t('modSinBandera'), detalle: t('modSinBanderaTag'), derecha: mods.sinBandera ? '●' : '○' }),
-    filaHTML({ accion: 'toggleMod:panico', idx: 3, nombre: t('modPanico'), detalle: t('modPanicoTag'), derecha: mods.panico ? '●' : '○' }),
-    filaHTML({ accion: 'toggleMod:hard', idx: 4, nombre: t('modHard'), detalle: t('modHardTag'), derecha: mods.hard ? '●' : '○' }),
+    filaHTML({ accion: 'toggleMod:minasExtra', idx: 0, nombre: t('modMinesExtra'), detalle: t('modMinesExtraTag'), derecha: mods.minasExtra ? t('on') : t('off') }),
+    filaHTML({ accion: 'toggleMod:reloj', idx: 1, nombre: t('modReloj'), detalle: t('modRelojTag'), derecha: mods.reloj ? t('on') : t('off') }),
+    filaHTML({ accion: 'toggleMod:sinBandera', idx: 2, nombre: t('modSinBandera'), detalle: t('modSinBanderaTag'), derecha: mods.sinBandera ? t('on') : t('off') }),
+    filaHTML({ accion: 'toggleMod:panico', idx: 3, nombre: t('modPanico'), detalle: t('modPanicoTag'), derecha: mods.panico ? t('on') : t('off') }),
+    filaHTML({ accion: 'toggleMod:hard', idx: 4, nombre: t('modHard'), detalle: t('modHardTag'), derecha: mods.hard ? t('on') : t('off') }),
   ];
   filas.push(filaHTML({
     accion: 'modifiersStart',
-    idx: 4,
+    idx: 5,
     nombre: t('start'),
     detalle: `${c.filas} × ${c.columnas} · ${c.minas} ${unitMinas(c.minas)}`,
-    derecha: '↵',
+    derecha: activos > 0 ? `${activos} ${t(activos === 1 ? 'modActiva' : 'modActivas').replace('{n}', String(activos))} · ↵` : '↵',
   }));
   ponerOverlay(`<div class="panel">
     ${cabeceraPanel(t('modifiers'), botonVolver())}
@@ -4190,6 +4198,7 @@ function dibujarPortal(ctx, w, h, segundos) {
 }
 
 function mostrarIntroMod() {
+  audio.unlock();
   app.juego = null;
   app.introT = 0;
   app.introDuracion = 13000; // segundos 0 → 13, cuajado con la música

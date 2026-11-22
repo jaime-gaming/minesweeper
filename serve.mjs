@@ -15,6 +15,7 @@ const TIPOS = {
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
   '.mp3': 'audio/mpeg',
+  '.ogg': 'audio/ogg',
   '.m4a': 'audio/mp4',
   '.ico': 'image/x-icon',
   '.txt': 'text/plain; charset=utf-8',
