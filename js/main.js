@@ -21,7 +21,7 @@ function avisar(mensaje) {
 
 function comprobarPiezas() {
   const faltan = [];
-  if (!Array.isArray(DIFICULTADES) || DIFICULTADES.length !== 3) faltan.push('dificultades');
+  if (!Array.isArray(DIFICULTADES) || DIFICULTADES.length === 0) faltan.push('dificultades');
   if (typeof Game !== 'function') faltan.push('motor');
   if (typeof attachInput !== 'function') faltan.push('controles');
   if (faltan.length) {
@@ -192,7 +192,7 @@ function formatoTiempo(ms) {
 }
 
 function nombreDificultad(id) {
-  if (esDificultadFija(id)) return t(id === 'beginner' ? 'diffBeginner' : id === 'intermediate' ? 'diffIntermediate' : 'diffExpert');
+  if (esDificultadFija(id)) return t(`diff${id.charAt(0).toUpperCase()}${id.slice(1)}`);
   return t('diffCustom');
 }
 

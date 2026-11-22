@@ -255,8 +255,11 @@ class Tablero {
 
 const DIFICULTADES = [
   { id: 'beginner', filas: 9, columnas: 9, minas: 10 },
+  { id: 'facile', filas: 11, columnas: 11, minas: 20 },
   { id: 'intermediate', filas: 16, columnas: 16, minas: 40 },
+  { id: 'difficile', filas: 18, columnas: 18, minas: 60 },
   { id: 'expert', filas: 16, columnas: 30, minas: 99 },
+  { id: 'deadly', filas: 24, columnas: 24, minas: 140 },
 ];
 
 const DIFICULTAD_POR_DEFECTO = 'beginner';
@@ -1465,6 +1468,12 @@ const STRINGS = {
     diffIntermediateTag: '16 × 16 · 40 minas',
     diffExpert: 'experto',
     diffExpertTag: '30 × 16 · 99 minas',
+    diffFacile: 'fácil',
+    diffFacileTag: '11 × 11 · 20 minas',
+    diffDifficile: 'difícil',
+    diffDifficileTag: '18 × 18 · 60 minas',
+    diffDeadly: '-',
+    diffDeadlyTag: '24 × 24 · 140 minas · sin modificadores',
     diffCustom: 'personalizada',
     diffCustomTag: '{filas} × {columnas} · {minas} {unit}',
     best: 'mejor {time}',
@@ -1641,6 +1650,12 @@ const STRINGS = {
     diffIntermediateTag: '16 × 16 · 40 mines',
     diffExpert: 'expert',
     diffExpertTag: '30 × 16 · 99 mines',
+    diffFacile: 'easy',
+    diffFacileTag: '11 × 11 · 20 mines',
+    diffDifficile: 'hard',
+    diffDifficileTag: '18 × 18 · 60 mines',
+    diffDeadly: '-',
+    diffDeadlyTag: '24 × 24 · 140 mines · no modifiers',
     diffCustom: 'custom',
     diffCustomTag: '{filas} × {columnas} · {minas} {unit}',
     best: 'best {time}',
@@ -2465,7 +2480,7 @@ function avisar(mensaje) {
 
 function comprobarPiezas() {
   const faltan = [];
-  if (!Array.isArray(DIFICULTADES) || DIFICULTADES.length !== 3) faltan.push('dificultades');
+  if (!Array.isArray(DIFICULTADES) || DIFICULTADES.length === 0) faltan.push('dificultades');
   if (typeof Game !== 'function') faltan.push('motor');
   if (typeof attachInput !== 'function') faltan.push('controles');
   if (faltan.length) {
@@ -2636,7 +2651,7 @@ function formatoTiempo(ms) {
 }
 
 function nombreDificultad(id) {
-  if (esDificultadFija(id)) return t(id === 'beginner' ? 'diffBeginner' : id === 'intermediate' ? 'diffIntermediate' : 'diffExpert');
+  if (esDificultadFija(id)) return t(`diff${id.charAt(0).toUpperCase()}${id.slice(1)}`);
   return t('diffCustom');
 }
 

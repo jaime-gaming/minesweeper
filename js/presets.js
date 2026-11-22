@@ -1,8 +1,11 @@
 
 export const DIFICULTADES = [
   { id: 'beginner', filas: 9, columnas: 9, minas: 10 },
+  { id: 'facile', filas: 11, columnas: 11, minas: 20 },
   { id: 'intermediate', filas: 16, columnas: 16, minas: 40 },
+  { id: 'difficile', filas: 18, columnas: 18, minas: 60 },
   { id: 'expert', filas: 16, columnas: 30, minas: 99 },
+  { id: 'deadly', filas: 24, columnas: 24, minas: 140 },
 ];
 
 export const DIFICULTAD_POR_DEFECTO = 'beginner';

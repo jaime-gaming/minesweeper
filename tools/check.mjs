@@ -56,9 +56,10 @@ function tableroConMinas(filas, columnas, minasIdx) {
 
 process.stdout.write('dificultades\n');
 
-prueba('hay exactamente tres dificultades', () => {
-  afirma(DIFICULTADES.length === 3, 'deben ser tres');
-  afirma(esDificultadFija('beginner') && esDificultadFija('intermediate') && esDificultadFija('expert'), 'ids fijos');
+prueba('hay suficientes dificultades (al menos tres)', () => {
+  afirma(DIFICULTADES.length >= 3, 'deben ser al menos tres');
+  afirma(esDificultadFija('beginner') && esDificultadFija('intermediate') && esDificultadFija('expert'), 'ids fijos clásicos');
+  afirma(esDificultadFija('deadly'), 'dificultad deadly presente');
 });
 
 prueba('los tableros fijos son coherentes', () => {
