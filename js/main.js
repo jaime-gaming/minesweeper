@@ -112,9 +112,6 @@ const app = {
   nivel: null,
   historia: null,
   historiaLinea: 0,
-  historiaEscribiendo: false,
-  historiaTextoMostrado: '',
-  historiaTiempoEscribir: 0,
   record: false,
   flagMode: false,
   demo: null,
@@ -1208,11 +1205,8 @@ function renderHistoria() {
   const acto = actoDe(indice);
   const nombreActoTxt = idioma === 'en' ? acto.nombreEn : acto.nombreEs;
   const quienTxt = beat ? t(`quien${beat.quien[0].toUpperCase()}${beat.quien.slice(1)}`) : '';
-  const textoCompleto = beat ? (idioma === 'en' ? beat.en : beat.es) : '';
-  // Texto mostrado: si se está escribiendo, usar el parcial; si no, el completo.
-  const texto = app.historiaEscribiendo ? app.historiaTextoMostrado : textoCompleto;
+  const texto = beat ? (idioma === 'en' ? beat.en : beat.es) : '';
   const completado = (guardado.campaign.best[indice] || 0) > 0;
-  const escribir = beat && !app.historiaEscribiendo && !completo;
   ponerOverlay(`<div class="panel historia">
     <div class="cabecera">
       <p class="kicker">${t('actLabel', { n: acto.id, name: nombreActoTxt })} · ${t('levelCell', { n: indice + 1 })}</p>
@@ -1229,7 +1223,7 @@ function renderHistoria() {
     <div class="acciones">
       ${completo
         ? `<button class="principal" type="button" data-accion="descend"><span>${completado ? t('descendAgain') : t('descend')}</span><kbd>↵</kbd></button>`
-        : `<button class="principal" type="button" data-accion="dialogNext"${escribir ? ' disabled' : ''}><span>${t('dialogoSiguiente')}</span><kbd>↵</kbd></button>`}
+        : `<button class="principal" type="button" data-accion="dialogNext"><span>${t('dialogoSiguiente')}</span><kbd>↵</kbd></button>`}
       <button type="button" data-accion="back"><span>${t('back')}</span><kbd>Esc</kbd></button>
     </div>
   </div>`);
@@ -1238,12 +1232,6 @@ function renderHistoria() {
   enfocarPrimero();
   const cv = document.getElementById('escena');
   if (cv) dibujarEscena(cv, nivel.escena || 'campo');
-  // Iniciar escritura de este diálogo si corresponde.
-  if (escribir) {
-    app.historiaEscribiendo = true;
-    app.historiaTextoMostrado = '';
-    app.historiaTiempoEscribir = 0;
-  }
 }
 
 function pasarLineaHistoria() {
@@ -1253,9 +1241,6 @@ function pasarLineaHistoria() {
   const total = (nivel.dialogo || []).length;
   if ((app.historiaLinea || 0) >= total) return;
   app.historiaLinea += 1;
-  app.historiaEscribiendo = false;
-  app.historiaTextoMostrado = '';
-  app.historiaTiempoEscribir = 0;
   audio.unlock();
   audio.play('ui');
   renderHistoria();
@@ -1483,8 +1468,10 @@ function empezarPartida(modo, nivel = null, datos = {}) {
     mostrarCampaña();
     return;
   }
-  // Modificadores aplicables a cualquier modo (excepto campaign y deadly).
-  const modsActivos = Object.keys(guardado.modificadores).some((k) => guardado.modificadores[k]);
+  // Modificadores aplicables a cualquier modo (excepto campaign y deadly),
+  // y solo después de completar intermedio (campaign.unlocked >= 2).
+  const modsDesbloqueados = guardado.campaign.unlocked >= 2;
+  const modsActivos = modsDesbloqueados && Object.keys(guardado.modificadores).some((k) => guardado.modificadores[k]);
   const esDeadly = modo === 'deadly';
   const puedeMods = modo !== 'campaign' && !esDeadly;
   const modsParaPartida = puedeMods && modsActivos ? { ...guardado.modificadores } : null;
@@ -1502,13 +1489,17 @@ function empezarPartida(modo, nivel = null, datos = {}) {
   app.juego = new Game(cfg, eventosJuego);
   app.modHard = puedeMods && guardado.modificadores.hard;
   app.modsActivos = puedeMods && modsActivos;
-  // Animación de entrada para TODOS los modos y zonas (skipable con ESPACIO).
-  // Se muestra la cuadrícula sorteándose como backrooms antes de jugar.
+
+  // Animación de entrada solo si hay modificadores activos (skipable con ESPACIO).
+  // Se muestra el tablero real que se va a jugar.
   if (!datos || !datos.saltarIntro) {
-    mostrarIntroPartida(modo, nivel);
-    return;
+    if (app.modsActivos) {
+      mostrarIntroPartida(app.juego);
+      return;
+    }
   }
-  // saltarIntro: ir directo al tablero
+
+  // Ir directo al tablero (sin mods o saltar intro).
   if (app.modHard) {
     audio.musica('hardMod', 0, 1);
   } else {
@@ -1860,60 +1851,62 @@ function limpiarFondoRojo() {
   }
 }
 
-// Animación de entrada: cuadrícula del campo sorteándose como backrooms.
-// Se revela progresivamente celda por celda con números y minas.
-// Se puede saltar manteniendo ESPACIO pulsado.
-function dibujarGeneracionCampo(ctx, w, h, t) {
+// Animación de entrada: revela el tablero real que se va a jugar.
+// Se muestra solo cuando hay modificadores activos.
+// No tiene texto, ni patrón fijo: usa las celdas reales del juego.
+function dibujarGeneracionCampo(ctx, w, h, t, juego) {
   // Fondo negro absoluto (mismo que el tablero)
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, w, h);
 
-  // Cuadrícula de campo de minas que se genera progresivamente
-  // Usa los mismos colores del tablero real: #111111 ocultas, #070707 reveladas, rojo minas.
-  const ciclo = Math.floor(t / 13 * 100);
-  const cols = Math.max(4, Math.floor(w / 34));
-  const rows = Math.max(3, Math.floor(h / 28));
-  const cellW = w / cols;
-  const cellH = h / rows;
-  const totalCeldas = cols * rows;
-  const reveladas = Math.min(totalCeldas, Math.floor((ciclo / 100) * totalCeldas * 1.3));
+  const j = juego;
+  if (!j || !j.tablero || !j.tablero.celdas) return;
 
+  const filas = j.filas;
+  const columnas = j.columnas;
+  const cellW = w / columnas;
+  const cellH = h / filas;
   const GAP = 2;
   const ACENTO = '#ff2b2b';
+
+  const ciclo = Math.floor(t / 13 * 100);
+  const totalCeldas = filas * columnas;
+  const reveladas = Math.min(totalCeldas, Math.floor((ciclo / 100) * totalCeldas * 1.3));
 
   ctx.fillStyle = '#111111';
   ctx.strokeStyle = '#000000';
   ctx.lineWidth = 1;
 
-  for (let y = 0; y < rows; y += 1) {
-    for (let x = 0; x < cols; x += 1) {
-      const idx = y * cols + x;
+  const celdas = j.tablero.celdas;
+
+  for (let y = 0; y < filas; y += 1) {
+    for (let x = 0; x < columnas; x += 1) {
+      const idx = y * columnas + x;
       const px = x * cellW;
       const py = y * cellH;
+      const c = celdas[idx];
 
       if (idx < reveladas) {
-        // Celda revelada (mismo estilo que el tablero: #070707 interior)
-        const esMina = (x * 7 + y * 13 + Math.floor(t * 50)) % 17 === 0;
-        if (esMina) {
+        // Celda revelada
+        if (c.mina) {
           ctx.fillStyle = ACENTO;
           ctx.fillRect(px + GAP, py + GAP, cellW - GAP * 2, cellH - GAP * 2);
           ctx.beginPath();
           ctx.arc(px + cellW / 2, py + cellH / 2, cellW * 0.22, 0, Math.PI * 2);
           ctx.fill();
         } else {
-          const adj = (x * 3 + y * 5 + Math.floor(t * 30)) % 9;
           ctx.fillStyle = '#070707';
           ctx.fillRect(px + GAP, py + GAP, cellW - GAP * 2, cellH - GAP * 2);
-          if (adj > 0) {
+          if (c.adj > 0) {
             ctx.fillStyle = '#ffffff';
             ctx.font = `${Math.max(10, cellW * 0.55)}px ui-monospace, monospace`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(String(adj), px + cellW / 2, py + cellH / 2 + cellW * 0.08);
+            ctx.fillText(String(c.adj), px + cellW / 2, py + cellH / 2 + cellW * 0.08);
           }
         }
       } else {
-        // Celda oculta (generándose) - misma base que el tablero (#111111)
+        // Celda oculta
         ctx.fillStyle = '#111111';
         ctx.fillRect(px + GAP, py + GAP, cellW - GAP * 2, cellH - GAP * 2);
         ctx.strokeRect(px + GAP, py + GAP, cellW - GAP * 2, cellH - GAP * 2);
@@ -1929,16 +1922,13 @@ function dibujarGeneracionCampo(ctx, w, h, t) {
   ctx.fillRect(barraX - 4, 0, 8, h * 0.15);
 }
 
-function mostrarIntroPartida(modo, nivel) {
+function mostrarIntroPartida(juego) {
   audio.unlock();
-  app.juego = null;
   app.introT = 0;
   app.introDuracion = 13000; // 0 → 13 s, cuajado con IntroMod.ogg
-  app.introModo = modo;
-  app.introNivel = nivel;
+  app.introJuego = juego;
   const html = '<div class="panel intro">' +
     '<canvas id="introCanvas" class="intro-canvas" aria-hidden="true"></canvas>' +
-    '<p class="intro-skip">' + t('introSkip') + '</p>' +
     '</div>';
   ponerOverlay(html);
   pantalla('intro');
@@ -1954,7 +1944,30 @@ function mostrarIntroPartida(modo, nivel) {
 
 function finalizarIntro() {
   if (app.introCtx) app.introCtx = null;
-  empezarPartida(app.introModo, app.introNivel, { saltarIntro: true });
+  const j = app.juego;
+  if (!j) {
+    mostrarPortada();
+    return;
+  }
+  if (app.modHard) {
+    audio.musica('hardMod', 0, 1);
+  } else {
+    app.modHard = false;
+  }
+  casillaArmada = null;
+  app.record = false;
+  app.contado = false;
+  app.flagMode = false;
+  el.flagToggle.setAttribute('aria-pressed', 'false');
+  el.flagToggle.classList.remove('activo');
+  ponerOverlay(null);
+  ocultarLupa();
+  pantalla('playing');
+  el.senal.textContent = t('startSignal');
+  el.senal.classList.add('visible');
+  ajustarLienzo();
+  actualizarMarcador();
+  audio.play('start');
 }
 
 
@@ -2531,7 +2544,7 @@ function bucle(t) {
     const cv = document.getElementById('introCanvas');
     if (cv) {
       app.introT += dt;
-      dibujarGeneracionCampo(app.introCtx, cv.width, cv.height, app.introT / 1000);
+      dibujarGeneracionCampo(app.introCtx, cv.width, cv.height, app.introT / 1000, app.introJuego);
       if (app.introT >= app.introDuracion) {
         app.introCtx = null;
         finalizarIntro();
@@ -2539,10 +2552,9 @@ function bucle(t) {
     }
   }
 
-  // Fondo rojo reaccionando a la música en el modo Hard.
+  // Fondo rojo del modo Hard (sin barras de audio, solo rojo sólido).
   const mostrarFondoRojo = app.pantalla === 'playing' && app.modHard;
   if (el.fondoRojo) {
-    // Re-agregar al DOM si fue removido y debe mostrarse.
     if (mostrarFondoRojo && !el.fondoRojo.isConnected) {
       try { document.body.appendChild(el.fondoRojo); } catch (err) { }
     }
@@ -2556,7 +2568,8 @@ function bucle(t) {
       fr.style.height = `${window.innerHeight}px`;
       const ctx = fr.getContext('2d');
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      audio.dibujarFondoRojo(ctx, window.innerWidth, window.innerHeight);
+      ctx.fillStyle = '#4a0000';
+      ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
     }
   }
 
@@ -2571,27 +2584,6 @@ function bucle(t) {
       }
       renderDemo();
     }
-  }
-
-  // Escritura progresiva del diálogo (efecto máquina de escribir).
-  if (app.pantalla === 'story' && app.historiaEscribiendo) {
-    app.historiaTiempoEscribir += dt;
-    const nivel = nivelCampana(app.historia);
-    const idioma = getLanguage();
-    const linea = Math.max(0, Math.floor(Number(app.historiaLinea) || 0));
-    const dialogo = nivel.dialogo || [];
-    const beat = dialogo[linea];
-    const textoCompleto = beat ? (idioma === 'en' ? beat.en : beat.es) : '';
-    const velocidad = 28; // ms por carácter
-    const chars = Math.floor(app.historiaTiempoEscribir / velocidad);
-    if (chars >= textoCompleto.length) {
-      app.historiaTextoMostrado = textoCompleto;
-      app.historiaEscribiendo = false;
-      app.historiaTiempoEscribir = 0;
-    } else {
-      app.historiaTextoMostrado = textoCompleto.slice(0, chars);
-    }
-    renderHistoria();
   }
 }
 

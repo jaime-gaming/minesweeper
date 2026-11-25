@@ -314,16 +314,10 @@ let ctx = null;
 let master = null;
 let musicGain = null;
 let pan = null;
-let analyser = null;
-let dataArray = null;
 let noiseBuf = null;
 let roto = false;
 let nivelMusica = 1;
 const GANANCIA_MUSICA = 1.3;
-
-// Música procedural (modo Modificadores). No depende de archivos MP3.
-let proc = null;
-const ESCALA_MOD = [73.42, 82.41, 87.31, 98.0, 110, 116.54, 130.81, 146.83];
 
 function build() {
   if (ctx) return ctx;
@@ -342,12 +336,6 @@ function build() {
     musicGain.gain.value = GANANCIA_MUSICA * nivelMusica;
     pan = ctx.createStereoPanner();
     pan.pan.value = 0;
-    analyser = ctx.createAnalyser();
-    analyser.fftSize = 2048;
-    dataArray = new Uint8Array(analyser.frequencyBinCount);
-
-    musicGain.connect(analyser);
-    analyser.connect(master);
     pan.connect(master);
     if (typeof ctx.createDynamicsCompressor === 'function') {
       const compresor = ctx.createDynamicsCompressor();
@@ -504,7 +492,7 @@ function cargarMusica(nombre) {
   return promesa;
 }
 
-function detenerMusicaActual(fade = 0.35) {
+function detenerMusicaActual(fade = 0.15) {
   generacion += 1;
   solicitada = null;
   const c = ctx;
@@ -528,64 +516,7 @@ function detenerMusicaActual(fade = 0.35) {
   }
 }
 
-function iniciarProcedural(nombre) {
-  if (nombre !== 'modifiers') return;
-  detenerProcedural();
-  const c = build();
-  if (!c) return;
-  const gan = c.createGain();
-  gan.gain.setValueAtTime(0.0001, c.currentTime);
-  gan.gain.exponentialRampToValueAtTime(0.03, c.currentTime + 1.5);
-  gan.connect(musicGain);
 
-  const drone = c.createOscillator();
-  drone.type = 'sine';
-  drone.frequency.setValueAtTime(73.42, c.currentTime);
-  drone.connect(gan);
-  drone.start();
-
-  proc = { c, gan, osciladores: [drone], activo: true, t: c.currentTime };
-  procTick();
-}
-
-function procTick() {
-  if (!proc || !proc.activo) return;
-  const c = proc.c;
-  const t0 = c.currentTime + 0.06;
-  const freq = ESCALA_MOD[Math.floor(Math.random() * ESCALA_MOD.length)];
-  const osc = c.createOscillator();
-  osc.type = 'triangle';
-  osc.frequency.setValueAtTime(freq, t0);
-  const ganN = c.createGain();
-  ganN.gain.setValueAtTime(0.0001, t0);
-  ganN.gain.exponentialRampToValueAtTime(0.045, t0 + 0.15);
-  ganN.gain.exponentialRampToValueAtTime(0.0001, t0 + 2.4);
-  osc.connect(ganN).connect(musicGain);
-  osc.start(t0);
-  osc.stop(t0 + 2.7);
-  proc.osciladores.push(osc);
-
-  const ahora = c.currentTime;
-  if (ahora - proc.t > 5) {
-    proc.t = ahora;
-    proc.gan.gain.setTargetAtTime(Math.random() * 0.04 + 0.015, ahora, 0.6);
-  }
-
-  proc.temporizador = setTimeout(procTick, 2000 + Math.random() * 1500);
-}
-
-function detenerProcedural() {
-  if (!proc) return;
-  proc.activo = false;
-  if (proc.temporizador) clearTimeout(proc.temporizador);
-  for (const osc of proc.osciladores) {
-    try { osc.stop(); } catch (err) {  }
-  }
-  if (proc.gan) {
-    try { proc.gan.gain.setTargetAtTime(0.0001, proc.c.currentTime, 0.4); } catch (err) {  }
-  }
-  proc = null;
-}
 
 let precargaHecha = false;
 function precargarTodo() {
@@ -697,72 +628,11 @@ const audio = {
     return v;
   },
 
-  obtenerFrecuencias() {
-    if (!analyser || !dataArray) return null;
-    analyser.getByteFrequencyData(dataArray);
-    return dataArray;
-  },
-
-  // Dibuja un fondo rojo que late con la música (modo Hard).
-  // ctx: contexto 2d de un canvas a pantalla completa.
-  dibujarFondoRojo(ctx, ancho, alto) {
-    if (!ctx) return;
-    const datos = this.obtenerFrecuencias();
-    if (!datos) {
-      ctx.fillStyle = '#000';
-      ctx.fillRect(0, 0, ancho, alto);
-      return;
-    }
-
-    // Bass (primeros bins) y energía general para el latido.
-    let bass = 0;
-    let energia = 0;
-    const cuenta = datos.length;
-    for (let i = 0; i < cuenta; i += 1) {
-      const v = datos[i];
-      energia += v;
-      if (i < cuenta * 0.25) bass += v;
-    }
-    const bajo = bass / Math.max(1, cuenta * 0.25) / 255;
-    const medio = energia / Math.max(1, cuenta) / 255;
-    const latido = Math.max(bajo, medio * 0.6);
-
-    // Fondo rojo oscuro con opacidad según la música.
-    const opacidad = 0.15 + latido * 0.55;
-    ctx.fillStyle = `rgba(120, 0, 0, ${Math.min(0.85, opacidad)})`;
-    ctx.fillRect(0, 0, ancho, alto);
-
-    // Barras de ecualizador rojo en la parte inferior.
-    const barras = 48;
-    const anchoBarra = ancho / barras;
-    const altoMax = alto * 0.45;
-    const yBase = alto - alto * 0.08;
-    ctx.fillStyle = '#ff2b2b';
-    for (let i = 0; i < barras; i += 1) {
-      const idx = Math.floor((i / barras) * cuenta);
-      const h = (datos[idx] / 255) * altoMax;
-      ctx.fillRect(i * anchoBarra + 2, yBase - h, anchoBarra - 4, h);
-    }
-
-    // Vignette roja que late en los bordes.
-    const gradiente = ctx.createRadialGradient(ancho / 2, alto / 2, alto * 0.2, ancho / 2, alto / 2, alto);
-    gradiente.addColorStop(0, `rgba(255, 43, 43, ${latido * 0.35})`);
-    gradiente.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    ctx.fillStyle = gradiente;
-    ctx.fillRect(0, 0, ancho, alto);
-  },
-
   precargar: precargarTodo,
 
   musica(nombre, retardoMs = 0, fundido = 1.2) {
     if (!this.enabled) return;
-    if (nombre === 'modifiers') {
-      detenerProcedural();
-      iniciarProcedural('modifiers');
-      return;
-    }
     if (!MUSICA[nombre]) return;
-    detenerProcedural();
     if (actual && actual.nombre === nombre) return;
     if (solicitada === nombre) return;
     const c = build();
@@ -800,12 +670,11 @@ const audio = {
     iniciarProcedural(nombre);
   },
 
-  pararMusica(fade = 0.9) {
+  pararMusica(fade = 0.3) {
     detenerMusicaActual(fade);
-    detenerProcedural();
   },
 
-  pararAmbiente(fade = 0.8) {
+  pararAmbiente(fade = 0.3) {
     const enMarcha = Boolean(actual && actual.nombre === 'ambience');
     const arrancando = solicitada === 'ambience';
     if (enMarcha || arrancando) detenerMusicaActual(fade);
@@ -2571,9 +2440,6 @@ const app = {
   nivel: null,
   historia: null,
   historiaLinea: 0,
-  historiaEscribiendo: false,
-  historiaTextoMostrado: '',
-  historiaTiempoEscribir: 0,
   record: false,
   flagMode: false,
   demo: null,
@@ -3667,11 +3533,8 @@ function renderHistoria() {
   const acto = actoDe(indice);
   const nombreActoTxt = idioma === 'en' ? acto.nombreEn : acto.nombreEs;
   const quienTxt = beat ? t(`quien${beat.quien[0].toUpperCase()}${beat.quien.slice(1)}`) : '';
-  const textoCompleto = beat ? (idioma === 'en' ? beat.en : beat.es) : '';
-  // Texto mostrado: si se está escribiendo, usar el parcial; si no, el completo.
-  const texto = app.historiaEscribiendo ? app.historiaTextoMostrado : textoCompleto;
+  const texto = beat ? (idioma === 'en' ? beat.en : beat.es) : '';
   const completado = (guardado.campaign.best[indice] || 0) > 0;
-  const escribir = beat && !app.historiaEscribiendo && !completo;
   ponerOverlay(`<div class="panel historia">
     <div class="cabecera">
       <p class="kicker">${t('actLabel', { n: acto.id, name: nombreActoTxt })} · ${t('levelCell', { n: indice + 1 })}</p>
@@ -3688,7 +3551,7 @@ function renderHistoria() {
     <div class="acciones">
       ${completo
         ? `<button class="principal" type="button" data-accion="descend"><span>${completado ? t('descendAgain') : t('descend')}</span><kbd>↵</kbd></button>`
-        : `<button class="principal" type="button" data-accion="dialogNext"${escribir ? ' disabled' : ''}><span>${t('dialogoSiguiente')}</span><kbd>↵</kbd></button>`}
+        : `<button class="principal" type="button" data-accion="dialogNext"><span>${t('dialogoSiguiente')}</span><kbd>↵</kbd></button>`}
       <button type="button" data-accion="back"><span>${t('back')}</span><kbd>Esc</kbd></button>
     </div>
   </div>`);
@@ -3697,12 +3560,6 @@ function renderHistoria() {
   enfocarPrimero();
   const cv = document.getElementById('escena');
   if (cv) dibujarEscena(cv, nivel.escena || 'campo');
-  // Iniciar escritura de este diálogo si corresponde.
-  if (escribir) {
-    app.historiaEscribiendo = true;
-    app.historiaTextoMostrado = '';
-    app.historiaTiempoEscribir = 0;
-  }
 }
 
 function pasarLineaHistoria() {
@@ -3712,9 +3569,6 @@ function pasarLineaHistoria() {
   const total = (nivel.dialogo || []).length;
   if ((app.historiaLinea || 0) >= total) return;
   app.historiaLinea += 1;
-  app.historiaEscribiendo = false;
-  app.historiaTextoMostrado = '';
-  app.historiaTiempoEscribir = 0;
   audio.unlock();
   audio.play('ui');
   renderHistoria();
@@ -3942,8 +3796,10 @@ function empezarPartida(modo, nivel = null, datos = {}) {
     mostrarCampaña();
     return;
   }
-  // Modificadores aplicables a cualquier modo (excepto campaign y deadly).
-  const modsActivos = Object.keys(guardado.modificadores).some((k) => guardado.modificadores[k]);
+  // Modificadores aplicables a cualquier modo (excepto campaign y deadly),
+  // y solo después de completar intermedio (campaign.unlocked >= 2).
+  const modsDesbloqueados = guardado.campaign.unlocked >= 2;
+  const modsActivos = modsDesbloqueados && Object.keys(guardado.modificadores).some((k) => guardado.modificadores[k]);
   const esDeadly = modo === 'deadly';
   const puedeMods = modo !== 'campaign' && !esDeadly;
   const modsParaPartida = puedeMods && modsActivos ? { ...guardado.modificadores } : null;
@@ -3961,13 +3817,17 @@ function empezarPartida(modo, nivel = null, datos = {}) {
   app.juego = new Game(cfg, eventosJuego);
   app.modHard = puedeMods && guardado.modificadores.hard;
   app.modsActivos = puedeMods && modsActivos;
-  // Animación de entrada para TODOS los modos y zonas (skipable con ESPACIO).
-  // Se muestra la cuadrícula sorteándose como backrooms antes de jugar.
+
+  // Animación de entrada solo si hay modificadores activos (skipable con ESPACIO).
+  // Se muestra el tablero real que se va a jugar.
   if (!datos || !datos.saltarIntro) {
-    mostrarIntroPartida(modo, nivel);
-    return;
+    if (app.modsActivos) {
+      mostrarIntroPartida(app.juego);
+      return;
+    }
   }
-  // saltarIntro: ir directo al tablero
+
+  // Ir directo al tablero (sin mods o saltar intro).
   if (app.modHard) {
     audio.musica('hardMod', 0, 1);
   } else {
@@ -4319,60 +4179,62 @@ function limpiarFondoRojo() {
   }
 }
 
-// Animación de entrada: cuadrícula del campo sorteándose como backrooms.
-// Se revela progresivamente celda por celda con números y minas.
-// Se puede saltar manteniendo ESPACIO pulsado.
-function dibujarGeneracionCampo(ctx, w, h, t) {
+// Animación de entrada: revela el tablero real que se va a jugar.
+// Se muestra solo cuando hay modificadores activos.
+// No tiene texto, ni patrón fijo: usa las celdas reales del juego.
+function dibujarGeneracionCampo(ctx, w, h, t, juego) {
   // Fondo negro absoluto (mismo que el tablero)
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, w, h);
 
-  // Cuadrícula de campo de minas que se genera progresivamente
-  // Usa los mismos colores del tablero real: #111111 ocultas, #070707 reveladas, rojo minas.
-  const ciclo = Math.floor(t / 13 * 100);
-  const cols = Math.max(4, Math.floor(w / 34));
-  const rows = Math.max(3, Math.floor(h / 28));
-  const cellW = w / cols;
-  const cellH = h / rows;
-  const totalCeldas = cols * rows;
-  const reveladas = Math.min(totalCeldas, Math.floor((ciclo / 100) * totalCeldas * 1.3));
+  const j = juego;
+  if (!j || !j.tablero || !j.tablero.celdas) return;
 
+  const filas = j.filas;
+  const columnas = j.columnas;
+  const cellW = w / columnas;
+  const cellH = h / filas;
   const GAP = 2;
   const ACENTO = '#ff2b2b';
+
+  const ciclo = Math.floor(t / 13 * 100);
+  const totalCeldas = filas * columnas;
+  const reveladas = Math.min(totalCeldas, Math.floor((ciclo / 100) * totalCeldas * 1.3));
 
   ctx.fillStyle = '#111111';
   ctx.strokeStyle = '#000000';
   ctx.lineWidth = 1;
 
-  for (let y = 0; y < rows; y += 1) {
-    for (let x = 0; x < cols; x += 1) {
-      const idx = y * cols + x;
+  const celdas = j.tablero.celdas;
+
+  for (let y = 0; y < filas; y += 1) {
+    for (let x = 0; x < columnas; x += 1) {
+      const idx = y * columnas + x;
       const px = x * cellW;
       const py = y * cellH;
+      const c = celdas[idx];
 
       if (idx < reveladas) {
-        // Celda revelada (mismo estilo que el tablero: #070707 interior)
-        const esMina = (x * 7 + y * 13 + Math.floor(t * 50)) % 17 === 0;
-        if (esMina) {
+        // Celda revelada
+        if (c.mina) {
           ctx.fillStyle = ACENTO;
           ctx.fillRect(px + GAP, py + GAP, cellW - GAP * 2, cellH - GAP * 2);
           ctx.beginPath();
           ctx.arc(px + cellW / 2, py + cellH / 2, cellW * 0.22, 0, Math.PI * 2);
           ctx.fill();
         } else {
-          const adj = (x * 3 + y * 5 + Math.floor(t * 30)) % 9;
           ctx.fillStyle = '#070707';
           ctx.fillRect(px + GAP, py + GAP, cellW - GAP * 2, cellH - GAP * 2);
-          if (adj > 0) {
+          if (c.adj > 0) {
             ctx.fillStyle = '#ffffff';
             ctx.font = `${Math.max(10, cellW * 0.55)}px ui-monospace, monospace`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(String(adj), px + cellW / 2, py + cellH / 2 + cellW * 0.08);
+            ctx.fillText(String(c.adj), px + cellW / 2, py + cellH / 2 + cellW * 0.08);
           }
         }
       } else {
-        // Celda oculta (generándose) - misma base que el tablero (#111111)
+        // Celda oculta
         ctx.fillStyle = '#111111';
         ctx.fillRect(px + GAP, py + GAP, cellW - GAP * 2, cellH - GAP * 2);
         ctx.strokeRect(px + GAP, py + GAP, cellW - GAP * 2, cellH - GAP * 2);
@@ -4388,16 +4250,13 @@ function dibujarGeneracionCampo(ctx, w, h, t) {
   ctx.fillRect(barraX - 4, 0, 8, h * 0.15);
 }
 
-function mostrarIntroPartida(modo, nivel) {
+function mostrarIntroPartida(juego) {
   audio.unlock();
-  app.juego = null;
   app.introT = 0;
   app.introDuracion = 13000; // 0 → 13 s, cuajado con IntroMod.ogg
-  app.introModo = modo;
-  app.introNivel = nivel;
+  app.introJuego = juego;
   const html = '<div class="panel intro">' +
     '<canvas id="introCanvas" class="intro-canvas" aria-hidden="true"></canvas>' +
-    '<p class="intro-skip">' + t('introSkip') + '</p>' +
     '</div>';
   ponerOverlay(html);
   pantalla('intro');
@@ -4413,7 +4272,30 @@ function mostrarIntroPartida(modo, nivel) {
 
 function finalizarIntro() {
   if (app.introCtx) app.introCtx = null;
-  empezarPartida(app.introModo, app.introNivel, { saltarIntro: true });
+  const j = app.juego;
+  if (!j) {
+    mostrarPortada();
+    return;
+  }
+  if (app.modHard) {
+    audio.musica('hardMod', 0, 1);
+  } else {
+    app.modHard = false;
+  }
+  casillaArmada = null;
+  app.record = false;
+  app.contado = false;
+  app.flagMode = false;
+  el.flagToggle.setAttribute('aria-pressed', 'false');
+  el.flagToggle.classList.remove('activo');
+  ponerOverlay(null);
+  ocultarLupa();
+  pantalla('playing');
+  el.senal.textContent = t('startSignal');
+  el.senal.classList.add('visible');
+  ajustarLienzo();
+  actualizarMarcador();
+  audio.play('start');
 }
 
 
@@ -4990,7 +4872,7 @@ function bucle(t) {
     const cv = document.getElementById('introCanvas');
     if (cv) {
       app.introT += dt;
-      dibujarGeneracionCampo(app.introCtx, cv.width, cv.height, app.introT / 1000);
+      dibujarGeneracionCampo(app.introCtx, cv.width, cv.height, app.introT / 1000, app.introJuego);
       if (app.introT >= app.introDuracion) {
         app.introCtx = null;
         finalizarIntro();
@@ -4998,10 +4880,9 @@ function bucle(t) {
     }
   }
 
-  // Fondo rojo reaccionando a la música en el modo Hard.
+  // Fondo rojo del modo Hard (sin barras de audio, solo rojo sólido).
   const mostrarFondoRojo = app.pantalla === 'playing' && app.modHard;
   if (el.fondoRojo) {
-    // Re-agregar al DOM si fue removido y debe mostrarse.
     if (mostrarFondoRojo && !el.fondoRojo.isConnected) {
       try { document.body.appendChild(el.fondoRojo); } catch (err) { }
     }
@@ -5015,7 +4896,8 @@ function bucle(t) {
       fr.style.height = `${window.innerHeight}px`;
       const ctx = fr.getContext('2d');
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      audio.dibujarFondoRojo(ctx, window.innerWidth, window.innerHeight);
+      ctx.fillStyle = '#4a0000';
+      ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
     }
   }
 
@@ -5030,27 +4912,6 @@ function bucle(t) {
       }
       renderDemo();
     }
-  }
-
-  // Escritura progresiva del diálogo (efecto máquina de escribir).
-  if (app.pantalla === 'story' && app.historiaEscribiendo) {
-    app.historiaTiempoEscribir += dt;
-    const nivel = nivelCampana(app.historia);
-    const idioma = getLanguage();
-    const linea = Math.max(0, Math.floor(Number(app.historiaLinea) || 0));
-    const dialogo = nivel.dialogo || [];
-    const beat = dialogo[linea];
-    const textoCompleto = beat ? (idioma === 'en' ? beat.en : beat.es) : '';
-    const velocidad = 28; // ms por carácter
-    const chars = Math.floor(app.historiaTiempoEscribir / velocidad);
-    if (chars >= textoCompleto.length) {
-      app.historiaTextoMostrado = textoCompleto;
-      app.historiaEscribiendo = false;
-      app.historiaTiempoEscribir = 0;
-    } else {
-      app.historiaTextoMostrado = textoCompleto.slice(0, chars);
-    }
-    renderHistoria();
   }
 }
 

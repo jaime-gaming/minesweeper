@@ -594,7 +594,7 @@ try {
   frames(5);
   if (jm.estado !== 'jugando' && jm.estado !== 'ganado') throw new Error('la partida de modificadores no avanzó');
 
-  // Sin mods → volver al menú, desactivar, empezar → abre intro, saltar para jugar
+  // Sin mods → volver al menú, desactivar, empezar → va directo a playing (sin intro)
   api.ejecutar('toMenu');
   frames(3);
   api.ejecutar('toggleMod:minasExtra');
@@ -604,10 +604,7 @@ try {
   if (api.app.pantalla !== 'preview') throw new Error('previsualización no se abrió');
   api.ejecutar('play:beginner');
   frames(3);
-  if (api.app.pantalla !== 'intro') throw new Error('sin mods también debería abrir la intro');
-  api.empezarPartida('beginner', null, { saltarIntro: true });
-  frames(3);
-  if (api.app.pantalla !== 'playing') throw new Error('sin mods debería ir a la partida');
+  if (api.app.pantalla !== 'playing') throw new Error('sin mods debería ir directo a playing');
   const jm2 = api.app.juego;
   if (!jm2 || jm2.mods && jm2.mods.minasExtra) throw new Error('mods no deberían estar activos');
   api.accion('confirm', false, { x: 0, y: 0, puntero: true });
