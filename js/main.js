@@ -1326,38 +1326,36 @@ function mostrarDificultades() {
   }));
 
   let bloqueMods = '';
-  if (true) {
-    const nActivas = Object.keys(guardado.modificadores).filter((k) => guardado.modificadores[k]).length;
-    const modsActivos = nActivas > 0;
-    const filasMod = [
-      { clave: 'minasExtra', nombre: t('modMinesExtra'), tag: t('modMinesExtraTag') },
-      { clave: 'reloj', nombre: t('modReloj'), tag: t('modRelojTag') },
-      { clave: 'sinBandera', nombre: t('modSinBandera'), tag: t('modSinBanderaTag') },
-      { clave: 'panico', nombre: t('modPanico'), tag: t('modPanicoTag') },
-      { clave: 'hard', nombre: t('modHard'), tag: t('modHardTag') },
-    ].map((m, i) => {
-      const act = guardado.modificadores[m.clave];
-      return `<button type="button" class="row mod-row ${act ? 'sel' : ''}" data-accion="toggleMod:${m.clave}">
-        <span class="row-idx">${dosDigitos(i + 1)}</span>
-        <span class="row-name">
-          ${m.nombre}<br>
-          <small>${m.tag}</small>
-        </span>
-        <span class="row-right">${act ? '●' : '○'}</span>
-      </button>`;
-    }).join('');
-    bloqueMods = `<details class="mods-section" open>
-      <summary class="mods-summary">
-        <span class="mods-arrow">▾</span>
-        <span class="mods-titulo">${t('modifiers')}</span>
-        <span class="mods-estado">${modsActivos ? '●' : '○'}</span>
-      </summary>
-      <nav class="filas mod-filas" aria-label="${t('modifiers')}">${filasMod}</nav>
-      <p class="nota mod-detalle">
-        ${modsActivos ? t('modActivas', { n: nActivas }) : t('modNinguno')}
-      </p>
-    </details>`;
-  }
+  const nActivas = Object.keys(guardado.modificadores).filter((k) => guardado.modificadores[k]).length;
+  const modsActivos = nActivas > 0;
+  const filasMod = [
+    { clave: 'minasExtra', nombre: t('modMinesExtra'), tag: t('modMinesExtraTag') },
+    { clave: 'reloj', nombre: t('modReloj'), tag: t('modRelojTag') },
+    { clave: 'sinBandera', nombre: t('modSinBandera'), tag: t('modSinBanderaTag') },
+    { clave: 'panico', nombre: t('modPanico'), tag: t('modPanicoTag') },
+    { clave: 'hard', nombre: t('modHard'), tag: t('modHardTag') },
+  ].map((m, i) => {
+    const act = guardado.modificadores[m.clave];
+    return `<button type="button" class="row mod-row ${act ? 'sel' : ''}" data-accion="toggleMod:${m.clave}">
+      <span class="row-idx">${dosDigitos(i + 1)}</span>
+      <span class="row-name">
+        ${m.nombre}<br>
+        <small>${m.tag}</small>
+      </span>
+      <span class="row-right">${act ? '●' : '○'}</span>
+    </button>`;
+  }).join('');
+  bloqueMods = `<details class="mods-section" open>
+    <summary class="mods-summary">
+      <span class="mods-arrow">▾</span>
+      <span class="mods-titulo">${t('modifiers')}</span>
+      <span class="mods-estado">${modsActivos ? '●' : '○'}</span>
+    </summary>
+    <nav class="filas mod-filas" aria-label="${t('modifiers')}">${filasMod}</nav>
+    <p class="nota mod-detalle">
+      ${modsActivos ? t('modActivas', { n: nActivas }) : t('modNinguno')}
+    </p>
+  </details>`;
   ponerOverlay(`<div class="panel">
     ${cabeceraPanel(t('difficulty'), botonVolver())}
     <nav class="filas" aria-label="${t('difficulty')}">${filas.join('')}</nav>
@@ -1513,10 +1511,8 @@ function empezarPartida(modo, nivel = null, datos = {}) {
   // saltarIntro: ir directo al tablero
   if (app.modHard) {
     audio.musica('hardMod', 0, 1);
-    app.fondoRojoActivo = true;
   } else {
     app.modHard = false;
-    app.fondoRojoActivo = false;
   }
   casillaArmada = null;
   app.record = false;
@@ -1858,138 +1854,9 @@ function mostrarModificadores() {
   enfocarPrimero();
 }
 
-function prepararFondoRojo() {
-  if (el.fondoRojo) return;
-  const fr = document.createElement('canvas');
-  fr.id = 'fondoRojo';
-  fr.style.position = 'fixed';
-  fr.style.inset = '0';
-  fr.style.zIndex = '5';
-  fr.style.pointerEvents = 'none';
-  fr.style.display = 'block';
-  document.body.appendChild(fr);
-  el.fondoRojo = fr;
-  ajustarFondoRojo();
-}
-
 function limpiarFondoRojo() {
   if (el.fondoRojo) {
-    el.fondoRojo.remove();
-    el.fondoRojo = null;
-  }
-}
-
-function ajustarFondoRojo() {
-  const fr = el.fondoRojo;
-  if (!fr) return;
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
-  fr.width = Math.round(window.innerWidth * dpr);
-  fr.height = Math.round(window.innerHeight * dpr);
-  fr.style.width = `${window.innerWidth}px`;
-  fr.style.height = `${window.innerHeight}px`;
-}
-
-function dibujarPuerta(ctx, w, h, segundos) {
-  const t = segundos;
-  const progreso = (t % 13) / 13;
-  const cx = w / 2;
-  const cy = h / 2;
-
-  ctx.fillStyle = '#000';
-  ctx.fillRect(0, 0, w, h);
-
-  let escala = 1;
-  let balanceo = 0;
-  let brillo = 0;
-  let glitch = 0;
-
-  if (progreso < 0.30) {
-    escala = 0.55 + progreso * 0.5;
-    balanceo = Math.sin(t * 2.2) * 0.06;
-    brillo = 0.25 + progreso * 0.35;
-  } else if (progreso < 0.69) {
-    escala = 2.0 + (progreso - 0.30) * 1.8;
-    balanceo = Math.sin(t * 3.5) * 0.12;
-    brillo = 0.6 + (progreso - 0.30) * 0.4;
-  } else if (progreso < 0.92) {
-    escala = 8.5 + (progreso - 0.69) * 3.5;
-    balanceo = Math.sin(t * 8) * 0.35;
-    brillo = 1.0;
-  } else {
-    escala = 13.5 + (progreso - 0.92) * 2;
-    balanceo = Math.sin(t * 14) * 0.6;
-    brillo = 1.0;
-    glitch = (progreso - 0.92) * 6;
-  }
-
-  const brilloGrad = ctx.createRadialGradient(
-    cx, cy - h * 0.35 + brillo * 120, 0,
-    cx, cy - h * 0.35 + brillo * 120, w * (0.6 + brillo * 0.9)
-  );
-  brilloGrad.addColorStop(0, `rgba(255, 255, 255, ${Math.min(1, brillo * 0.55)})`);
-  brilloGrad.addColorStop(0.45, `rgba(255, 43, 43, ${brillo * 0.25})`);
-  brilloGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-  ctx.fillStyle = brilloGrad;
-  ctx.fillRect(0, 0, w, h);
-
-  const puertaAn = w * 0.28 * escala;
-  const puertaAl = h * 0.72 * escala;
-  const puertaX = cx - puertaAn / 2 + Math.sin(balanceo) * w * 0.12;
-  const puertaY = cy - puertaAl / 2;
-
-  ctx.save();
-  ctx.translate(puertaX + puertaAn / 2, puertaY + puertaAl / 2);
-  ctx.rotate(balanceo);
-  ctx.translate(-puertaAn / 2, -puertaAl / 2);
-
-  ctx.fillStyle = '#1a1a1a';
-  ctx.fillRect(0, 0, puertaAn, puertaAl);
-  ctx.strokeStyle = '#333';
-  ctx.lineWidth = Math.max(2, Math.round(puertaAn * 0.03));
-  ctx.strokeRect(0, 0, puertaAn, puertaAl);
-
-  ctx.fillStyle = '#222';
-  ctx.fillRect(puertaAn * 0.08, puertaAl * 0.12, puertaAn * 0.42, puertaAl * 0.34);
-  ctx.fillRect(puertaAn * 0.50, puertaAl * 0.12, puertaAn * 0.42, puertaAl * 0.34);
-  ctx.fillRect(puertaAn * 0.08, puertaAl * 0.54, puertaAn * 0.42, puertaAl * 0.34);
-  ctx.fillRect(puertaAn * 0.50, puertaAl * 0.54, puertaAn * 0.42, puertaAl * 0.34);
-
-  ctx.fillStyle = '#8a2be2';
-  ctx.beginPath();
-  ctx.arc(puertaAn * 0.82, puertaAl * 0.5, puertaAn * 0.035, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#5b21b6';
-  ctx.beginPath();
-  ctx.arc(puertaAn * 0.82, puertaAl * 0.5, puertaAn * 0.018, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.restore();
-
-  ctx.strokeStyle = `rgba(255, 255, 255, ${0.15 + brillo * 0.25})`;
-  ctx.lineWidth = 1.5;
-  for (let i = 0; i < 6; i += 1) {
-    const angulo = (i / 6) * Math.PI * 2 + t * 0.1;
-    const largo = 500 + Math.sin(t + i) * 80;
-    ctx.beginPath();
-    ctx.moveTo(cx + Math.cos(angulo) * 40, cy + Math.sin(angulo) * 40);
-    ctx.lineTo(cx + Math.cos(angulo) * largo, cy + Math.sin(angulo) * largo);
-    ctx.stroke();
-  }
-
-  if (glitch > 0.05) {
-    const intensidad = Math.min(1, glitch);
-    ctx.save();
-    ctx.globalAlpha = 0.35 * intensidad;
-    for (let i = 0; i < 12; i += 1) {
-      const y = Math.random() * h;
-      const dh = Math.random() * h * 0.12 + 4;
-      const dx = (Math.random() - 0.5) * w * 0.15 * intensidad;
-      ctx.drawImage(ctx.canvas, dx, y, w, dh, dx, y, w, dh);
-    }
-    ctx.restore();
-
-    ctx.fillStyle = `rgba(120, 0, 0, ${0.35 * intensidad})`;
-    ctx.fillRect(0, 0, w, h);
+    try { el.fondoRojo.remove(); } catch (err) { }
   }
 }
 
@@ -1997,11 +1864,12 @@ function dibujarPuerta(ctx, w, h, segundos) {
 // Se revela progresivamente celda por celda con números y minas.
 // Se puede saltar manteniendo ESPACIO pulsado.
 function dibujarGeneracionCampo(ctx, w, h, t) {
-  // Fondo negro absoluto
+  // Fondo negro absoluto (mismo que el tablero)
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, w, h);
 
   // Cuadrícula de campo de minas que se genera progresivamente
+  // Usa los mismos colores del tablero real: #111111 ocultas, #070707 reveladas, rojo minas.
   const ciclo = Math.floor(t / 13 * 100);
   const cols = Math.max(4, Math.floor(w / 34));
   const rows = Math.max(3, Math.floor(h / 28));
@@ -2010,8 +1878,11 @@ function dibujarGeneracionCampo(ctx, w, h, t) {
   const totalCeldas = cols * rows;
   const reveladas = Math.min(totalCeldas, Math.floor((ciclo / 100) * totalCeldas * 1.3));
 
-  ctx.fillStyle = '#111';
-  ctx.strokeStyle = '#333';
+  const GAP = 2;
+  const ACENTO = '#ff2b2b';
+
+  ctx.fillStyle = '#111111';
+  ctx.strokeStyle = '#000000';
   ctx.lineWidth = 1;
 
   for (let y = 0; y < rows; y += 1) {
@@ -2021,21 +1892,20 @@ function dibujarGeneracionCampo(ctx, w, h, t) {
       const py = y * cellH;
 
       if (idx < reveladas) {
-        // Celda revelada
+        // Celda revelada (mismo estilo que el tablero: #070707 interior)
         const esMina = (x * 7 + y * 13 + Math.floor(t * 50)) % 17 === 0;
         if (esMina) {
-          ctx.fillStyle = '#3a0000';
-          ctx.fillRect(px + 1, py + 1, cellW - 2, cellH - 2);
-          ctx.fillStyle = '#ff2b2b';
+          ctx.fillStyle = ACENTO;
+          ctx.fillRect(px + GAP, py + GAP, cellW - GAP * 2, cellH - GAP * 2);
           ctx.beginPath();
           ctx.arc(px + cellW / 2, py + cellH / 2, cellW * 0.22, 0, Math.PI * 2);
           ctx.fill();
         } else {
           const adj = (x * 3 + y * 5 + Math.floor(t * 30)) % 9;
-          ctx.fillStyle = '#fff';
-          ctx.fillRect(px + 1, py + 1, cellW - 2, cellH - 2);
+          ctx.fillStyle = '#070707';
+          ctx.fillRect(px + GAP, py + GAP, cellW - GAP * 2, cellH - GAP * 2);
           if (adj > 0) {
-            ctx.fillStyle = '#000';
+            ctx.fillStyle = '#ffffff';
             ctx.font = `${Math.max(10, cellW * 0.55)}px ui-monospace, monospace`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
@@ -2043,18 +1913,17 @@ function dibujarGeneracionCampo(ctx, w, h, t) {
           }
         }
       } else {
-        // Celda oculta (generándose)
-        const brillo = Math.sin(t * 10 + x + y) * 0.4 + 0.6;
-        ctx.fillStyle = `rgba(30, 30, 30, ${0.5 + brillo * 0.3})`;
-        ctx.fillRect(px + 1, py + 1, cellW - 2, cellH - 2);
-        ctx.strokeRect(px + 1, py + 1, cellW - 2, cellH - 2);
+        // Celda oculta (generándose) - misma base que el tablero (#111111)
+        ctx.fillStyle = '#111111';
+        ctx.fillRect(px + GAP, py + GAP, cellW - GAP * 2, cellH - GAP * 2);
+        ctx.strokeRect(px + GAP, py + GAP, cellW - GAP * 2, cellH - GAP * 2);
       }
     }
   }
 
   // Barrido de generación (línea que avanza de izquierda a derecha)
   const barraX = (ciclo % 100) / 100 * w;
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
   ctx.fillRect(barraX, 0, 2, h);
   ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
   ctx.fillRect(barraX - 4, 0, 8, h * 0.15);
@@ -2671,16 +2540,24 @@ function bucle(t) {
   }
 
   // Fondo rojo reaccionando a la música en el modo Hard.
-  if (app.pantalla === 'playing' && app.modHard && el.fondoRojo) {
-    const fr = el.fondoRojo;
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    fr.width = Math.round(window.innerWidth * dpr);
-    fr.height = Math.round(window.innerHeight * dpr);
-    fr.style.width = `${window.innerWidth}px`;
-    fr.style.height = `${window.innerHeight}px`;
-    const ctx = fr.getContext('2d');
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    audio.dibujarFondoRojo(ctx, window.innerWidth, window.innerHeight);
+  const mostrarFondoRojo = app.pantalla === 'playing' && app.modHard;
+  if (el.fondoRojo) {
+    // Re-agregar al DOM si fue removido y debe mostrarse.
+    if (mostrarFondoRojo && !el.fondoRojo.isConnected) {
+      try { document.body.appendChild(el.fondoRojo); } catch (err) { }
+    }
+    el.fondoRojo.style.display = mostrarFondoRojo ? 'block' : 'none';
+    if (mostrarFondoRojo) {
+      const fr = el.fondoRojo;
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      fr.width = Math.round(window.innerWidth * dpr);
+      fr.height = Math.round(window.innerHeight * dpr);
+      fr.style.width = `${window.innerWidth}px`;
+      fr.style.height = `${window.innerHeight}px`;
+      const ctx = fr.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      audio.dibujarFondoRojo(ctx, window.innerWidth, window.innerHeight);
+    }
   }
 
   if (app.pantalla === 'home') {
@@ -2837,6 +2714,19 @@ function arrancar() {
     window.addEventListener('resize', alRedimensionar);
   }
   window.addEventListener('orientationchange', () => setTimeout(ajustarLienzo, 140));
+
+  // Canvas de fondo rojo del modo difícil (se crea oculto, se muestra solo en hard).
+  const fr = document.createElement('canvas');
+  fr.id = 'fondoRojo';
+  fr.style.position = 'fixed';
+  fr.style.inset = '0';
+  fr.style.zIndex = '5';
+  fr.style.pointerEvents = 'none';
+  fr.style.display = 'none';
+  el.fondoRojo = fr;
+  try {
+    if (document.body) document.body.appendChild(fr);
+  } catch (err) { }
 
   ajustarBarrido();
   restaurarRuta();
