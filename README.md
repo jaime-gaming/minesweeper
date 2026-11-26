@@ -1,5 +1,7 @@
 # minesweeper
 
+![Captura de minesweeper en partida](captura-juego.png)
+
 El buscaminas clásico, de bloques en blanco y negro y muy poco más: la rejilla, las minas, los números en su color de siempre y el rojo reservado para lo que estalla. Sin dependencias y sin llamadas a la red. La interfaz está en español y en inglés, y se puede jugar con ratón, teclado, táctil o mando. Comparte casa y estética con [snake](https://github.com/jaime-gaming/snake).
 
 ## Idea visual

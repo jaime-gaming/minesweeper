@@ -353,12 +353,7 @@ export const audio = {
     });
   },
 
-  musicaProc(nombre) {
-    if (!this.enabled) return;
-    iniciarProcedural(nombre);
-  },
-
-  pararMusica(fade = 0.3) {
+  pararMusica(fade = 0.15) {
     detenerMusicaActual(fade);
   },
 

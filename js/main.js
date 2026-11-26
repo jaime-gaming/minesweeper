@@ -222,6 +222,10 @@ function campañaSiguiente() {
   return NIVELES.length - 1;
 }
 
+function modsDesbloqueados() {
+  return guardado.campaign.unlocked >= 2;
+}
+
 function esTactil() {
   return window.matchMedia('(pointer: coarse)').matches;
 }
@@ -584,8 +588,6 @@ function gestionarMusicaPantalla(nombre) {
     if (app.juego && !app.juego.terminada) {
       if (app.modo === 'modifiers' && app.modHard) {
         audio.musica('hardMod', 0, 1);
-      } else if (app.modo === 'modifiers') {
-        audio.musicaProc('modifiers');
       } else {
         audio.musica('ambience', 200, 1.4);
       }
@@ -1247,10 +1249,12 @@ function pasarLineaHistoria() {
 }
 
 function filasModificadoresPreview(dificultadId) {
-  const modsActivos = Object.keys(guardado.modificadores).some((k) => guardado.modificadores[k]);
   const esDeadly = dificultadId === 'deadly';
 
   if (esDeadly) return '';
+  if (!modsDesbloqueados()) return '';
+
+  const modsActivos = Object.keys(guardado.modificadores).some((k) => guardado.modificadores[k]);
 
   const MODS = [
     { clave: 'minasExtra', nombre: t('modMinesExtra'), tag: t('modMinesExtraTag') },
@@ -1310,37 +1314,49 @@ function mostrarDificultades() {
     derecha: t('custom').toLowerCase(),
   }));
 
+  const desbloqueados = modsDesbloqueados();
   let bloqueMods = '';
-  const nActivas = Object.keys(guardado.modificadores).filter((k) => guardado.modificadores[k]).length;
-  const modsActivos = nActivas > 0;
-  const filasMod = [
-    { clave: 'minasExtra', nombre: t('modMinesExtra'), tag: t('modMinesExtraTag') },
-    { clave: 'reloj', nombre: t('modReloj'), tag: t('modRelojTag') },
-    { clave: 'sinBandera', nombre: t('modSinBandera'), tag: t('modSinBanderaTag') },
-    { clave: 'panico', nombre: t('modPanico'), tag: t('modPanicoTag') },
-    { clave: 'hard', nombre: t('modHard'), tag: t('modHardTag') },
-  ].map((m, i) => {
-    const act = guardado.modificadores[m.clave];
-    return `<button type="button" class="row mod-row ${act ? 'sel' : ''}" data-accion="toggleMod:${m.clave}">
-      <span class="row-idx">${dosDigitos(i + 1)}</span>
-      <span class="row-name">
-        ${m.nombre}<br>
-        <small>${m.tag}</small>
-      </span>
-      <span class="row-right">${act ? '●' : '○'}</span>
-    </button>`;
-  }).join('');
-  bloqueMods = `<details class="mods-section" open>
-    <summary class="mods-summary">
-      <span class="mods-arrow">▾</span>
-      <span class="mods-titulo">${t('modifiers')}</span>
-      <span class="mods-estado">${modsActivos ? '●' : '○'}</span>
-    </summary>
-    <nav class="filas mod-filas" aria-label="${t('modifiers')}">${filasMod}</nav>
-    <p class="nota mod-detalle">
-      ${modsActivos ? t('modActivas', { n: nActivas }) : t('modNinguno')}
-    </p>
-  </details>`;
+  if (desbloqueados) {
+    const nActivas = Object.keys(guardado.modificadores).filter((k) => guardado.modificadores[k]).length;
+    const modsActivos = nActivas > 0;
+    const filasMod = [
+      { clave: 'minasExtra', nombre: t('modMinesExtra'), tag: t('modMinesExtraTag') },
+      { clave: 'reloj', nombre: t('modReloj'), tag: t('modRelojTag') },
+      { clave: 'sinBandera', nombre: t('modSinBandera'), tag: t('modSinBanderaTag') },
+      { clave: 'panico', nombre: t('modPanico'), tag: t('modPanicoTag') },
+      { clave: 'hard', nombre: t('modHard'), tag: t('modHardTag') },
+    ].map((m, i) => {
+      const act = guardado.modificadores[m.clave];
+      return `<button type="button" class="row mod-row ${act ? 'sel' : ''}" data-accion="toggleMod:${m.clave}">
+        <span class="row-idx">${dosDigitos(i + 1)}</span>
+        <span class="row-name">
+          ${m.nombre}<br>
+          <small>${m.tag}</small>
+        </span>
+        <span class="row-right">${act ? '●' : '○'}</span>
+      </button>`;
+    }).join('');
+    bloqueMods = `<details class="mods-section" open>
+      <summary class="mods-summary">
+        <span class="mods-arrow">▾</span>
+        <span class="mods-titulo">${t('modifiers')}</span>
+        <span class="mods-estado">${modsActivos ? '●' : '○'}</span>
+      </summary>
+      <nav class="filas mod-filas" aria-label="${t('modifiers')}">${filasMod}</nav>
+      <p class="nota mod-detalle">
+        ${modsActivos ? t('modActivas', { n: nActivas }) : t('modNinguno')}
+      </p>
+    </details>`;
+  } else {
+    bloqueMods = `<details class="mods-section" open>
+      <summary class="mods-summary">
+        <span class="mods-arrow">▾</span>
+        <span class="mods-titulo">${t('modifiers')}</span>
+        <span class="mods-estado">○</span>
+      </summary>
+      <p class="nota mod-detalle">${t('modBloqueados')}</p>
+    </details>`;
+  }
   ponerOverlay(`<div class="panel">
     ${cabeceraPanel(t('difficulty'), botonVolver())}
     <nav class="filas" aria-label="${t('difficulty')}">${filas.join('')}</nav>
@@ -1522,8 +1538,8 @@ function empezarPartida(modo, nivel = null, datos = {}) {
 }
 
 function reiniciarPartida() {
-  if (app.modo === 'campaign' && app.nivel !== null) empezarPartida('campaign', app.nivel);
-  else empezarPartida(app.modo);
+  if (app.modo === 'campaign' && app.nivel !== null) empezarPartida('campaign', app.nivel, { saltarIntro: true });
+  else empezarPartida(app.modo, null, { saltarIntro: true });
 }
 
 function pausarJuego() {
@@ -1787,20 +1803,13 @@ function datoCifra(valor, etiqueta, cuenta, formato) {
   return `<div class="dato-cifra">${inner}<span>${etiqueta}</span></div>`;
 }
 
-function seleccionarMod(clave) {
-  for (const k of Object.keys(guardado.modificadores)) {
-    guardado.modificadores[k] = k === clave;
-  }
-  guardar();
-  audio.play('ui');
-  mostrarModificadores();
-}
-
 function mostrarModificadores() {
   app.juego = null;
   const mods = guardado.modificadores;
   const c = guardado.custom;
-  const activo = Object.keys(mods).find((k) => mods[k]);
+  const desbloqueados = modsDesbloqueados();
+  const nActivas = Object.keys(mods).filter((k) => mods[k]).length;
+  const modsActivos = nActivas > 0;
 
   const MODS = [
     { clave: 'minasExtra', nombre: t('modMinesExtra'), tag: t('modMinesExtraTag') },
@@ -1810,23 +1819,28 @@ function mostrarModificadores() {
     { clave: 'hard', nombre: t('modHard'), tag: t('modHardTag') },
   ];
 
-  let filas = MODS.map((m, i) => {
-    const sel = m.clave === activo;
-    return `<button type="button" class="row mod-row ${sel ? 'sel' : ''}" data-accion="selectMod:${m.clave}">
-      <span class="row-idx">${dosDigitos(i + 1)}</span>
-      <span class="row-name">
-        ${m.nombre}<br>
-        <small>${m.tag}</small>
-      </span>
-      <span class="row-right">${sel ? '●' : '○'}</span>
-    </button>`;
-  }).join('');
+  let filas = '';
+  if (desbloqueados) {
+    filas = MODS.map((m, i) => {
+      const act = mods[m.clave];
+      return `<button type="button" class="row mod-row ${act ? 'sel' : ''}" data-accion="toggleMod:${m.clave}">
+        <span class="row-idx">${dosDigitos(i + 1)}</span>
+        <span class="row-name">
+          ${m.nombre}<br>
+          <small>${m.tag}</small>
+        </span>
+        <span class="row-right">${act ? '●' : '○'}</span>
+      </button>`;
+    }).join('');
 
-  filas += `<button type="button" class="row mod-start" data-accion="modifiersStart">
-    <span class="row-idx">06</span>
-    <span class="row-name">${t('start')}</span>
-    <span class="row-right">${activo ? '▶' : '◯'}</span>
-  </button>`;
+    filas += `<button type="button" class="row mod-start principal" data-accion="modifiersStart">
+      <span class="row-idx">06</span>
+      <span class="row-name">${t('start')}</span>
+      <span class="row-right">${modsActivos ? '▶' : '◯'}</span>
+    </button>`;
+  } else {
+    filas = `<p class="nota mod-detalle">${t('modBloqueados')}</p>`;
+  }
 
   ponerOverlay(`<div class="panel">
     ${cabeceraPanel(t('modifiers'), botonVolver())}
@@ -1835,8 +1849,7 @@ function mostrarModificadores() {
       ${filas}
     </nav>
     <p class="nota mod-detalle">
-      ${activo ? t('modActiva') : t('modNinguno')}
-      ${activo ? ` · ${t(activo)}` : ''}
+      ${modsActivos ? t('modActivas', { n: nActivas }) : t('modNinguno')}
       · ${c.filas} × ${c.columnas} · ${c.minas} ${unitMinas(c.minas)}
     </p>
   </div>`);
@@ -2143,7 +2156,12 @@ function ejecutar(nombre) {
   }
   if (nombre.startsWith('selectMod:')) {
     const clave = nombre.slice('selectMod:'.length);
-    seleccionarMod(clave);
+    if (clave in guardado.modificadores) {
+      guardado.modificadores[clave] = !guardado.modificadores[clave];
+      guardar();
+      audio.play('ui');
+      mostrarModificadores();
+    }
     return;
   }
   if (nombre.startsWith('previewDifficulty:')) {
@@ -2299,6 +2317,13 @@ function accion(nombre, repetido = false, datos) {
   if (nombre === 'scrollTop') { el.overlay.scrollTop = 0; return; }
   if (nombre === 'scrollBottom') { el.overlay.scrollTop = el.overlay.scrollHeight; return; }
   if (nombre === 'padConectado') return;
+
+  if (app.pantalla === 'intro') {
+    if (nombre === 'confirm' || nombre === 'back') {
+      finalizarIntro();
+      return;
+    }
+  }
 
   const j = app.juego;
 
